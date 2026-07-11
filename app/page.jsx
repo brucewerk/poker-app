@@ -18,6 +18,7 @@ import HandHistory from "@/components/Poker/HandHistory.jsx";
 import { soundManager } from "@/lib/sound.js";
 import SoundToggle from "@/components/Poker/SoundToggle.jsx";
 import FullscreenButton from "@/components/Poker/FullscreenButton.jsx";
+import TurboButton from "@/components/Poker/TurboButton.jsx";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -68,6 +69,7 @@ export default function PokerGame() {
   const [newAchievements, setNewAchievements] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTurbo, setIsTurbo] = useState(false);
   const cpuTimerRef = useRef(null);
   const autoSaveRef = useRef(null);
   const pendingSaveRef = useRef(false);
@@ -75,6 +77,30 @@ export default function PokerGame() {
 
   const currentUser = session?.user?.username || null;
   const userChips = session?.user?.chips || 0;
+
+  // ====================== CONFIGURAÇÕES DE DELAY ======================
+  const getDelays = useCallback(() => {
+    if (isTurbo) {
+      return {
+        revealDelay: 400,
+        compareDelay: 600,
+        resultDelay: 600,
+        showdownStartDelay: 400,
+        victoryDelay: 200,
+        nextHandDelay: 2000,
+        cpuActionDelay: 400,
+      };
+    }
+    return {
+      revealDelay: 1000,
+      compareDelay: 1500,
+      resultDelay: 1500,
+      showdownStartDelay: 1000,
+      victoryDelay: 500,
+      nextHandDelay: 5000,
+      cpuActionDelay: 800,
+    };
+  }, [isTurbo]);
 
   // ====================== REDIRECIONAR SE NÃO AUTENTICADO ======================
   useEffect(() => {
@@ -89,6 +115,14 @@ export default function PokerGame() {
       soundManager.loadSounds();
     }
   }, [status]);
+
+  // ====================== CARREGAR MODO TURBO ======================
+  useEffect(() => {
+    const saved = localStorage.getItem("turbo-mode");
+    if (saved !== null) {
+      setIsTurbo(saved === "true");
+    }
+  }, []);
 
   // ====================== NOTIFICAÇÃO ======================
   const showNotification = useCallback((msg, isError = false) => {
@@ -354,6 +388,8 @@ export default function PokerGame() {
   function doShowdown(g, user) {
     if (!g.handActive || g.showdownStarted) return g;
 
+    const delays = getDelays();
+
     let state = {
       ...g,
       showdownStarted: true,
@@ -382,7 +418,7 @@ export default function PokerGame() {
       stage: "showdown",
     }));
 
-    // Fase 1: Revelar cartas da CPU com delay (1000ms)
+    // Fase 1: Revelar cartas da CPU com delay (ajustável)
     setTimeout(() => {
       setGame((prev) => ({
         ...prev,
@@ -391,7 +427,7 @@ export default function PokerGame() {
         cpuThought: `🤖 CPU: '${cName}!'`,
       }));
 
-      // Fase 2: Mostrar comparação (1500ms depois)
+      // Fase 2: Mostrar comparação
       setTimeout(() => {
         setGame((prev) => ({
           ...prev,
@@ -399,7 +435,7 @@ export default function PokerGame() {
           cpuThought: `🤖 CPU: '${cName} vs ${pName}'`,
         }));
 
-        // Fase 3: Resultado (1500ms depois)
+        // Fase 3: Resultado
         setTimeout(() => {
           let finalState = { ...state };
           finalState.cpuHandName = `🤖 ${cName}`;
@@ -413,7 +449,6 @@ export default function PokerGame() {
 
             updateStats("win", won, pName, state.playerAllin);
 
-            // Salvar histórico
             saveHandHistory({
               result: "win",
               playerHand: pName,
@@ -442,7 +477,7 @@ export default function PokerGame() {
                 handName: pName,
                 isSpecial: won >= 500 || pScore / 10 ** 10 >= 7,
               });
-            }, 500);
+            }, delays.victoryDelay);
           } else if (cScore > pScore) {
             finalState.cpuMoney += finalState.pot;
             const lost = finalState.pot;
@@ -452,7 +487,6 @@ export default function PokerGame() {
 
             updateStats("loss", lost, cName);
 
-            // Salvar histórico
             saveHandHistory({
               result: "loss",
               playerHand: pName,
@@ -484,7 +518,7 @@ export default function PokerGame() {
                 handName: cName,
                 isSpecial: false,
               });
-            }, 500);
+            }, delays.victoryDelay);
           } else {
             const split = Math.floor(finalState.pot / 2);
             finalState.playerMoney += split;
@@ -493,7 +527,6 @@ export default function PokerGame() {
             finalState.cpuThought = "🤖 CPU: 'Empate justo.'";
             finalState.gameStatus = "🤝 EMPATE!";
 
-            // Salvar histórico
             saveHandHistory({
               result: "tie",
               playerHand: pName,
@@ -520,8 +553,8 @@ export default function PokerGame() {
               setTimeout(() => {
                 setGame((prev) => ({ ...prev, showdownStarted: false }));
                 startNewHand(u, undefined);
-              }, 5000);
-            }, 500);
+              }, delays.nextHandDelay);
+            }, delays.victoryDelay);
           }
 
           // Atualizar estado final
@@ -532,9 +565,9 @@ export default function PokerGame() {
             handActive: false,
             stage: "showdown",
           }));
-        }, 1500);
-      }, 1500);
-    }, 1000);
+        }, delays.resultDelay);
+      }, delays.compareDelay);
+    }, delays.showdownStartDelay);
 
     return state;
   }
@@ -678,6 +711,8 @@ export default function PokerGame() {
   // ====================== TRIGGER CPU ACTION ======================
   function triggerCpuAction(g, user) {
     if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
+    const delays = getDelays();
+
     cpuTimerRef.current = setTimeout(() => {
       setGame((prev) => {
         if (!prev.handActive || prev.waitingPlayer) return prev;
@@ -769,7 +804,7 @@ export default function PokerGame() {
 
         return result;
       });
-    }, 800);
+    }, delays.cpuActionDelay);
   }
 
   // ====================== AÇÕES DO JOGADOR ======================
@@ -975,14 +1010,23 @@ export default function PokerGame() {
   }
 
   function closeVictoryModal() {
+    const delays = getDelays();
     setVictoryModal((v) => ({ ...v, open: false }));
     setGame((prev) => {
       const money = prev.playerMoney <= 0 ? 1000 : prev.playerMoney;
       if (prev.playerMoney <= 0) saveChips(currentUser, 1000);
       return { ...prev, playerMoney: money, showdownStarted: false };
     });
-    setTimeout(() => startNewHand(currentUser, undefined), 800);
+    setTimeout(
+      () => startNewHand(currentUser, undefined),
+      Math.min(delays.nextHandDelay, 800),
+    );
   }
+
+  // ====================== TOGGLE TURBO ======================
+  const handleTurboToggle = useCallback((turboState) => {
+    setIsTurbo(turboState);
+  }, []);
 
   // ====================== SUGESTÃO DO JOGADOR ======================
   function getPlayerSuggestion(g) {
@@ -1098,6 +1142,9 @@ export default function PokerGame() {
       {/* Fullscreen Button */}
       <FullscreenButton />
 
+      {/* Turbo Button */}
+      <TurboButton onToggle={handleTurboToggle} isTurbo={isTurbo} />
+
       {/* Victory Modal */}
       {victoryModal.open && (
         <VictoryModal
@@ -1161,6 +1208,7 @@ export default function PokerGame() {
               ["👤", g.playerMoney],
               ["🤖", g.cpuMoney],
               ["📊", `Aposta: ${g.currentBet}`],
+              ["🚀", isTurbo ? "Turbo" : "Normal"],
             ].map(([icon, val], i) => (
               <div
                 key={i}
@@ -1176,7 +1224,8 @@ export default function PokerGame() {
               >
                 <span
                   style={{
-                    color: "gold",
+                    color:
+                      icon === "🚀" ? (isTurbo ? "#ff9800" : "#888") : "gold",
                     fontSize: "1.1rem",
                     fontWeight: 800,
                     marginRight: 5,
@@ -1363,6 +1412,7 @@ export default function PokerGame() {
                 stageNames={stageNames}
                 gameStatus={g.gameStatus}
                 winnerMsg={g.winnerMsg}
+                isTurbo={isTurbo}
               />
 
               <StatsPanel

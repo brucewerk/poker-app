@@ -14,12 +14,14 @@ export default function StatusPanel({
   stageNames,
   gameStatus,
   winnerMsg,
+  isTurbo = false,
 }) {
   const [countdown, setCountdown] = useState(0);
 
   useEffect(() => {
     if (winnerMsg && stage === "showdown") {
-      setCountdown(5);
+      const duration = isTurbo ? 2 : 5;
+      setCountdown(duration);
       const interval = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -34,7 +36,7 @@ export default function StatusPanel({
     } else {
       setCountdown(0);
     }
-  }, [winnerMsg, stage]);
+  }, [winnerMsg, stage, isTurbo]);
 
   return (
     <div
@@ -44,19 +46,42 @@ export default function StatusPanel({
         borderRadius: 20,
         padding: 15,
         color: "white",
-        border: "1px solid rgba(255,215,0,0.2)",
+        border: `1px solid ${isTurbo ? "rgba(255,152,0,0.4)" : "rgba(255,215,0,0.2)"}`,
       }}
     >
-      <h3
+      <div
         style={{
-          color: "gold",
-          margin: "0 0 15px",
-          textAlign: "center",
-          fontSize: "1rem",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 10,
         }}
       >
-        📋 STATUS DA PARTIDA
-      </h3>
+        <h3
+          style={{
+            color: "gold",
+            margin: 0,
+            fontSize: "1rem",
+          }}
+        >
+          📋 STATUS DA PARTIDA
+        </h3>
+        {isTurbo && (
+          <span
+            style={{
+              background: "rgba(255,152,0,0.2)",
+              color: "#ff9800",
+              fontSize: "0.6rem",
+              padding: "2px 8px",
+              borderRadius: 10,
+              fontWeight: "bold",
+              border: "1px solid rgba(255,152,0,0.3)",
+            }}
+          >
+            🚀 TURBO
+          </span>
+        )}
+      </div>
 
       <div style={statusCardStyle()}>
         <p style={statusPStyle()}>
@@ -119,15 +144,22 @@ export default function StatusPanel({
       {countdown > 0 && (
         <div
           style={{
-            background: "rgba(255,215,0,0.15)",
+            background: isTurbo
+              ? "rgba(255,152,0,0.15)"
+              : "rgba(255,215,0,0.15)",
             borderRadius: 15,
             padding: "10px",
             marginTop: "10px",
             textAlign: "center",
-            border: "1px solid gold",
+            border: `1px solid ${isTurbo ? "#ff9800" : "gold"}`,
           }}
         >
-          <span style={{ fontSize: "0.9rem", color: "#ffd700" }}>
+          <span
+            style={{
+              fontSize: "0.9rem",
+              color: isTurbo ? "#ff9800" : "#ffd700",
+            }}
+          >
             ⏳ Próxima mão em {countdown}s...
           </span>
         </div>
