@@ -267,9 +267,21 @@ export default function PokerGame() {
   // ====================== FAST FORWARD ======================
   function fastForwardToShowdown(g, user) {
     let state = { ...g };
+
+    // Se já está no showdown, retornar
+    if (state.stage === "showdown" || state.showdownStarted) {
+      return doShowdown(state, user);
+    }
+
+    // Avançar fases até o river
     while (state.stage !== "river") {
       if (state.stage === "preflop") {
         state.stage = "flop";
+        // Verificar se ainda há cartas no deck
+        if (state.deck.length < 3) {
+          // Se não houver cartas suficientes, recriar o deck
+          state.deck = createDeck();
+        }
         state.community = [
           ...state.community,
           state.deck.pop(),
@@ -278,12 +290,19 @@ export default function PokerGame() {
         ];
       } else if (state.stage === "flop") {
         state.stage = "turn";
+        if (state.deck.length < 1) {
+          state.deck = createDeck();
+        }
         state.community = [...state.community, state.deck.pop()];
       } else if (state.stage === "turn") {
         state.stage = "river";
+        if (state.deck.length < 1) {
+          state.deck = createDeck();
+        }
         state.community = [...state.community, state.deck.pop()];
       } else break;
     }
+
     return doShowdown(state, user);
   }
 
@@ -532,6 +551,85 @@ export default function PokerGame() {
       setGame((prev) => {
         if (!prev.handActive || prev.waitingPlayer) return prev;
 
+        // Verificar se o jogador está all-in e a CPU precisa decidir
+        if (prev.playerAllin) {
+          // Se o jogador está all-in, a CPU decide se paga ou desiste
+          const toCall = prev.currentBet - prev.cpuBet;
+
+          // Se a CPU não tem fichas suficientes, vai all-in
+          if (toCall >= prev.cpuMoney) {
+            const cpuAllInAmount = prev.cpuMoney;
+            let state = { ...prev };
+            state.cpuMoney = 0;
+            state.cpuBet += cpuAllInAmount;
+            state.pot += cpuAllInAmount;
+            state.cpuAllin = true;
+
+            if (state.cpuBet > state.currentBet) {
+              state.currentBet = state.cpuBet;
+            }
+
+            showNotification(
+              `🤖 CPU paga ${cpuAllInAmount} e está ALL-IN!`,
+              true,
+            );
+            return fastForwardToShowdown(state, user);
+          }
+
+          // CPU decide se paga ou desiste
+          const strength = calculateHandStrength(prev.cpuCards, prev.community);
+          const potOdds = toCall / (prev.pot + toCall);
+          const adjustedStrength = strength * 0.7 + (1 - potOdds) * 0.3;
+          const willCall =
+            adjustedStrength > 0.35 ||
+            toCall <= 75 ||
+            (strength > 0.4 && toCall <= 150) ||
+            strength > 0.65;
+
+          if (willCall && prev.cpuMoney > 0) {
+            const callAmount = Math.min(toCall, prev.cpuMoney);
+            let state = { ...prev };
+            state.cpuMoney -= callAmount;
+            state.cpuBet += callAmount;
+            state.pot += callAmount;
+
+            if (state.cpuMoney === 0) {
+              state.cpuAllin = true;
+              showNotification(
+                `🤖 CPU paga ${callAmount} e está ALL-IN!`,
+                true,
+              );
+            } else {
+              showNotification(`🤖 CPU paga ${callAmount} fichas`, false);
+            }
+
+            // Avançar para showdown se necessário
+            if (state.playerAllin) {
+              return fastForwardToShowdown(state, user);
+            }
+            return { ...state, waitingPlayer: true };
+          } else {
+            // CPU desiste
+            let state = { ...prev };
+            state.handActive = false;
+            state.playerMoney += state.pot;
+            state.winnerMsg = "🤖 CPU DESISTIU! Você vence!";
+            state.gameStatus = "CPU Fold";
+            state.cpuThought = "🤖 CPU: 'Muito caro... Desisto.' 😞";
+            showNotification(
+              `🤖 CPU desistiu! Você ganhou ${state.pot} fichas!`,
+              false,
+            );
+            saveChips(user || currentUser, state.playerMoney);
+            setTimeout(
+              () => startNewHand(user || currentUser, undefined),
+              1500,
+            );
+            return state;
+          }
+        }
+
+        // Caso normal (sem all-in do jogador)
         const result = getCpuDecision(
           prev,
           advanceStage,
@@ -676,23 +774,51 @@ export default function PokerGame() {
       let state = { ...prev };
       const amount = state.playerMoney;
 
+      // Se o jogador não tem fichas, não pode all-in
       if (amount <= 0) {
         showNotification("❌ Você não tem fichas para all-in!", true);
         return prev;
       }
 
+      // Calcular quanto a CPU precisa pagar
+      let cpuCallAmount = state.currentBet - state.cpuBet;
+
+      // Se a CPU tem menos fichas que o valor do all-in
+      if (cpuCallAmount > state.cpuMoney) {
+        // A CPU vai all-in com o que tem
+        const cpuAllInAmount = state.cpuMoney;
+        state.cpuMoney = 0;
+        state.cpuBet += cpuAllInAmount;
+        state.pot += cpuAllInAmount;
+        state.cpuAllin = true;
+
+        // Atualizar a aposta atual se a CPU aumentou
+        if (state.cpuBet > state.currentBet) {
+          state.currentBet = state.cpuBet;
+        }
+
+        showNotification(
+          `⚡ CPU foi ALL-IN com ${cpuAllInAmount} fichas!`,
+          true,
+        );
+      }
+
+      // Jogador all-in
       state.playerMoney = 0;
       state.playerBet += amount;
       state.pot += amount;
-      if (state.playerBet > state.currentBet)
+      if (state.playerBet > state.currentBet) {
         state.currentBet = state.playerBet;
+      }
       state.playerAllin = true;
 
       showNotification(`⚡⚡⚡ ALL-IN! ${amount} fichas! ⚡⚡⚡`, true);
       state.gameStatus = "⚡ VOCÊ FOI ALL-IN! ⚡";
       saveChips(currentUser, 0);
 
+      // Verificar se ambos estão all-in ou se o jogo deve terminar
       if (state.cpuAllin || state.cpuBet === state.currentBet) {
+        // Avançar diretamente para showdown
         return fastForwardToShowdown(state, currentUser);
       }
 
@@ -1092,7 +1218,7 @@ export default function PokerGame() {
                 gap: 10,
               }}
             >
-              {/* Status Panel - VISÍVEL NOVAMENTE */}
+              {/* Status Panel */}
               <StatusPanel
                 stage={g.stage}
                 pot={g.pot}
