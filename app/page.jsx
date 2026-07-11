@@ -268,18 +268,14 @@ export default function PokerGame() {
   function fastForwardToShowdown(g, user) {
     let state = { ...g };
 
-    // Se já está no showdown, retornar
     if (state.stage === "showdown" || state.showdownStarted) {
       return doShowdown(state, user);
     }
 
-    // Avançar fases até o river
     while (state.stage !== "river") {
       if (state.stage === "preflop") {
         state.stage = "flop";
-        // Verificar se ainda há cartas no deck
         if (state.deck.length < 3) {
-          // Se não houver cartas suficientes, recriar o deck
           state.deck = createDeck();
         }
         state.community = [
@@ -306,7 +302,7 @@ export default function PokerGame() {
     return doShowdown(state, user);
   }
 
-  // ====================== SHOWDOWN ======================
+  // ====================== SHOWDOWN ANIMADO ======================
   function doShowdown(g, user) {
     if (!g.handActive || g.showdownStarted) return g;
 
@@ -323,91 +319,138 @@ export default function PokerGame() {
     const cName = getHandName(cScore);
 
     state.playerHandName = `🏆 ${pName}`;
-    state.cpuHandName = `🤖 ${cName}`;
-    state.gameStatus = "Showdown";
+    state.cpuHandName = "🔒 ???";
+    state.gameStatus = "Showdown - Revelando...";
+    state.cpuThought = "🤖 CPU: 'Vamos ver...'";
 
     const u = user || currentUser;
 
-    if (pScore > cScore) {
-      state.playerMoney += state.pot;
-      const won = state.pot;
-      state.winnerMsg = `🏆 Você venceu com ${pName}!`;
-      state.cpuThought = `🤖 CPU: '${cName}... Você foi melhor!'`;
+    // Atualizar estado inicial do showdown
+    setGame((prev) => ({
+      ...prev,
+      ...state,
+      showdownStarted: true,
+      handActive: false,
+      stage: "showdown",
+    }));
 
-      updateStats("win", won, pName, state.playerAllin);
+    // Fase 1: Revelar cartas da CPU com delay (1000ms - aumentado)
+    setTimeout(() => {
+      setGame((prev) => ({
+        ...prev,
+        cpuHandName: `🤖 ${cName}`,
+        gameStatus: `CPU tem ${cName}!`,
+        cpuThought: `🤖 CPU: '${cName}!'`,
+      }));
 
+      // Fase 2: Mostrar comparação (1500ms depois - aumentado)
       setTimeout(() => {
-        showNotification(`🎉 VOCÊ VENCEU! +${won} fichas!`, false);
-        saveChips(u, state.playerMoney);
-        fetch("/api/save-game-state", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: u,
-            gameState: null,
-          }),
-        }).catch(() => {});
-        setVictoryModal({
-          open: true,
-          winner: "player",
-          chipsWon: won,
-          handName: pName,
-          isSpecial: won >= 500 || pScore / 10 ** 10 >= 7,
-        });
-      }, 100);
-    } else if (cScore > pScore) {
-      state.cpuMoney += state.pot;
-      const lost = state.pot;
-      state.winnerMsg = `🤖 CPU venceu com ${cName}!`;
-      state.cpuThought = `🤖 CPU: '${cName}! Ganhei!'`;
+        setGame((prev) => ({
+          ...prev,
+          gameStatus: "Comparando mãos...",
+          cpuThought: `🤖 CPU: '${cName} vs ${pName}'`,
+        }));
 
-      updateStats("loss", lost, cName);
-
-      setTimeout(() => {
-        showNotification(
-          `😞 CPU venceu com ${cName}. Perdeu ${lost} fichas.`,
-          true,
-        );
-        saveChips(u, state.playerMoney);
-        fetch("/api/save-game-state", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: u,
-            gameState: null,
-          }),
-        }).catch(() => {});
-        setVictoryModal({
-          open: true,
-          winner: "cpu",
-          chipsWon: lost,
-          handName: cName,
-          isSpecial: false,
-        });
-      }, 100);
-    } else {
-      const split = Math.floor(state.pot / 2);
-      state.playerMoney += split;
-      state.cpuMoney += state.pot - split;
-      state.winnerMsg = `🤝 Empate! ${pName} — Pote dividido.`;
-      state.cpuThought = "🤖 CPU: 'Empate justo.'";
-      setTimeout(() => {
-        showNotification(`🤝 Empate! Você recebeu ${split} fichas.`, false);
-        saveChips(u, state.playerMoney);
-        fetch("/api/save-game-state", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: u,
-            gameState: null,
-          }),
-        }).catch(() => {});
+        // Fase 3: Resultado (1500ms depois - aumentado)
         setTimeout(() => {
-          setGame((prev) => ({ ...prev, showdownStarted: false }));
-          startNewHand(u, undefined);
-        }, 3500);
-      }, 100);
-    }
+          let finalState = { ...state };
+          finalState.cpuHandName = `🤖 ${cName}`;
+
+          if (pScore > cScore) {
+            finalState.playerMoney += finalState.pot;
+            const won = finalState.pot;
+            finalState.winnerMsg = `🏆 Você venceu com ${pName}!`;
+            finalState.cpuThought = `🤖 CPU: '${cName}... Você foi melhor!'`;
+            finalState.gameStatus = "🏆 VOCÊ VENCEU! 🎉";
+
+            updateStats("win", won, pName, state.playerAllin);
+
+            setTimeout(() => {
+              showNotification(`🎉 VOCÊ VENCEU! +${won} fichas!`, false);
+              saveChips(u, finalState.playerMoney);
+              fetch("/api/save-game-state", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: u, gameState: null }),
+              }).catch(() => {});
+
+              setVictoryModal({
+                open: true,
+                winner: "player",
+                chipsWon: won,
+                handName: pName,
+                isSpecial: won >= 500 || pScore / 10 ** 10 >= 7,
+              });
+            }, 500); // Aumentado para 500ms
+          } else if (cScore > pScore) {
+            finalState.cpuMoney += finalState.pot;
+            const lost = finalState.pot;
+            finalState.winnerMsg = `🤖 CPU venceu com ${cName}!`;
+            finalState.cpuThought = `🤖 CPU: '${cName}! Ganhei!'`;
+            finalState.gameStatus = "😞 CPU VENCEU!";
+
+            updateStats("loss", lost, cName);
+
+            setTimeout(() => {
+              showNotification(
+                `😞 CPU venceu com ${cName}. Perdeu ${lost} fichas.`,
+                true,
+              );
+              saveChips(u, finalState.playerMoney);
+              fetch("/api/save-game-state", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: u, gameState: null }),
+              }).catch(() => {});
+
+              setVictoryModal({
+                open: true,
+                winner: "cpu",
+                chipsWon: lost,
+                handName: cName,
+                isSpecial: false,
+              });
+            }, 500); // Aumentado para 500ms
+          } else {
+            const split = Math.floor(finalState.pot / 2);
+            finalState.playerMoney += split;
+            finalState.cpuMoney += finalState.pot - split;
+            finalState.winnerMsg = `🤝 Empate! ${pName} — Pote dividido.`;
+            finalState.cpuThought = "🤖 CPU: 'Empate justo.'";
+            finalState.gameStatus = "🤝 EMPATE!";
+
+            setTimeout(() => {
+              showNotification(
+                `🤝 Empate! Você recebeu ${split} fichas.`,
+                false,
+              );
+              saveChips(u, finalState.playerMoney);
+              fetch("/api/save-game-state", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: u, gameState: null }),
+              }).catch(() => {});
+
+              // Aumentado para 5000ms antes de iniciar nova mão
+              setTimeout(() => {
+                setGame((prev) => ({ ...prev, showdownStarted: false }));
+                startNewHand(u, undefined);
+              }, 5000);
+            }, 500);
+          }
+
+          // Atualizar estado final
+          setGame((prev) => ({
+            ...prev,
+            ...finalState,
+            showdownStarted: true,
+            handActive: false,
+            stage: "showdown",
+          }));
+        }, 1500); // Aumentado para 1500ms
+      }, 1500); // Aumentado para 1500ms
+    }, 1000); // Aumentado para 1000ms
+
     return state;
   }
 
@@ -551,12 +594,9 @@ export default function PokerGame() {
       setGame((prev) => {
         if (!prev.handActive || prev.waitingPlayer) return prev;
 
-        // Verificar se o jogador está all-in e a CPU precisa decidir
         if (prev.playerAllin) {
-          // Se o jogador está all-in, a CPU decide se paga ou desiste
           const toCall = prev.currentBet - prev.cpuBet;
 
-          // Se a CPU não tem fichas suficientes, vai all-in
           if (toCall >= prev.cpuMoney) {
             const cpuAllInAmount = prev.cpuMoney;
             let state = { ...prev };
@@ -576,7 +616,6 @@ export default function PokerGame() {
             return fastForwardToShowdown(state, user);
           }
 
-          // CPU decide se paga ou desiste
           const strength = calculateHandStrength(prev.cpuCards, prev.community);
           const potOdds = toCall / (prev.pot + toCall);
           const adjustedStrength = strength * 0.7 + (1 - potOdds) * 0.3;
@@ -603,13 +642,11 @@ export default function PokerGame() {
               showNotification(`🤖 CPU paga ${callAmount} fichas`, false);
             }
 
-            // Avançar para showdown se necessário
             if (state.playerAllin) {
               return fastForwardToShowdown(state, user);
             }
             return { ...state, waitingPlayer: true };
           } else {
-            // CPU desiste
             let state = { ...prev };
             state.handActive = false;
             state.playerMoney += state.pot;
@@ -629,7 +666,6 @@ export default function PokerGame() {
           }
         }
 
-        // Caso normal (sem all-in do jogador)
         const result = getCpuDecision(
           prev,
           advanceStage,
@@ -774,25 +810,20 @@ export default function PokerGame() {
       let state = { ...prev };
       const amount = state.playerMoney;
 
-      // Se o jogador não tem fichas, não pode all-in
       if (amount <= 0) {
         showNotification("❌ Você não tem fichas para all-in!", true);
         return prev;
       }
 
-      // Calcular quanto a CPU precisa pagar
       let cpuCallAmount = state.currentBet - state.cpuBet;
 
-      // Se a CPU tem menos fichas que o valor do all-in
       if (cpuCallAmount > state.cpuMoney) {
-        // A CPU vai all-in com o que tem
         const cpuAllInAmount = state.cpuMoney;
         state.cpuMoney = 0;
         state.cpuBet += cpuAllInAmount;
         state.pot += cpuAllInAmount;
         state.cpuAllin = true;
 
-        // Atualizar a aposta atual se a CPU aumentou
         if (state.cpuBet > state.currentBet) {
           state.currentBet = state.cpuBet;
         }
@@ -803,7 +834,6 @@ export default function PokerGame() {
         );
       }
 
-      // Jogador all-in
       state.playerMoney = 0;
       state.playerBet += amount;
       state.pot += amount;
@@ -816,9 +846,7 @@ export default function PokerGame() {
       state.gameStatus = "⚡ VOCÊ FOI ALL-IN! ⚡";
       saveChips(currentUser, 0);
 
-      // Verificar se ambos estão all-in ou se o jogo deve terminar
       if (state.cpuAllin || state.cpuBet === state.currentBet) {
-        // Avançar diretamente para showdown
         return fastForwardToShowdown(state, currentUser);
       }
 
@@ -865,7 +893,8 @@ export default function PokerGame() {
       if (prev.playerMoney <= 0) saveChips(currentUser, 1000);
       return { ...prev, playerMoney: money, showdownStarted: false };
     });
-    setTimeout(() => startNewHand(currentUser, undefined), 50);
+    // Aumentar delay antes de iniciar nova mão
+    setTimeout(() => startNewHand(currentUser, undefined), 800);
   }
 
   // ====================== SUGESTÃO DO JOGADOR ======================
@@ -1080,7 +1109,15 @@ export default function PokerGame() {
                   <div style={cardsRowStyle()}>
                     {g.cpuCards.length ? (
                       g.cpuCards.map((c, i) => (
-                        <Card key={i} card={c} faceDown={!showCpuCards} />
+                        <Card
+                          key={i}
+                          card={c}
+                          faceDown={!showCpuCards}
+                          delay={i * 300}
+                          isRevealing={
+                            g.stage === "showdown" && g.showdownStarted
+                          }
+                        />
                       ))
                     ) : (
                       <span style={{ color: "#ffdfaa" }}>Aguardando...</span>
@@ -1098,6 +1135,10 @@ export default function PokerGame() {
                         display: "inline-block",
                         color: "#ffcc88",
                         fontStyle: "italic",
+                        animation:
+                          g.stage === "showdown"
+                            ? "pulse 1s ease-in-out infinite"
+                            : "none",
                       }}
                     >
                       {g.cpuThought}
@@ -1218,7 +1259,6 @@ export default function PokerGame() {
                 gap: 10,
               }}
             >
-              {/* Status Panel */}
               <StatusPanel
                 stage={g.stage}
                 pot={g.pot}
@@ -1228,9 +1268,10 @@ export default function PokerGame() {
                 nextRaise={nextRaise}
                 notification={notification}
                 stageNames={stageNames}
+                gameStatus={g.gameStatus}
+                winnerMsg={g.winnerMsg}
               />
 
-              {/* Stats Panel */}
               <StatsPanel
                 username={currentUser}
                 onShowAchievements={() => setShowAchievementsModal(true)}

@@ -1,6 +1,8 @@
 // components/Poker/StatusPanel.jsx
 "use client";
 
+import { useState, useEffect } from "react";
+
 export default function StatusPanel({
   stage,
   pot,
@@ -10,7 +12,30 @@ export default function StatusPanel({
   nextRaise,
   notification,
   stageNames,
+  gameStatus,
+  winnerMsg,
 }) {
+  const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    if (winnerMsg && stage === "showdown") {
+      setCountdown(5);
+      const interval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setCountdown(0);
+    }
+  }, [winnerMsg, stage]);
+
   return (
     <div
       style={{
@@ -37,6 +62,19 @@ export default function StatusPanel({
         <p style={statusPStyle()}>
           <span style={{ color: "gold", fontWeight: "bold" }}>🎯 Fase:</span>{" "}
           {stageNames[stage] || stage}
+          {stage === "showdown" && winnerMsg && (
+            <span
+              style={{
+                display: "block",
+                color: "#ffd700",
+                fontSize: "0.8rem",
+                marginTop: "4px",
+                fontWeight: "bold",
+              }}
+            >
+              {winnerMsg}
+            </span>
+          )}
         </p>
         <p style={statusPStyle()}>
           <span style={{ color: "gold", fontWeight: "bold" }}>💰 Pote:</span>{" "}
@@ -77,6 +115,23 @@ export default function StatusPanel({
           Apostar tudo
         </p>
       </div>
+
+      {countdown > 0 && (
+        <div
+          style={{
+            background: "rgba(255,215,0,0.15)",
+            borderRadius: 15,
+            padding: "10px",
+            marginTop: "10px",
+            textAlign: "center",
+            border: "1px solid gold",
+          }}
+        >
+          <span style={{ fontSize: "0.9rem", color: "#ffd700" }}>
+            ⏳ Próxima mão em {countdown}s...
+          </span>
+        </div>
+      )}
 
       {notification.visible && (
         <div
