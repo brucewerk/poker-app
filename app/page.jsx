@@ -12,6 +12,8 @@ import Card from "@/components/Poker/Card.jsx";
 import ActionButtons from "@/components/Poker/ActionButtons.jsx";
 import StatusPanel from "@/components/Poker/StatusPanel.jsx";
 import VictoryModal from "@/components/Poker/VictoryModal.jsx";
+import StatsPanel from "@/components/Poker/StatsPanel.jsx";
+import AchievementsModal from "@/components/Poker/AchievementsModal.jsx";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -58,6 +60,8 @@ export default function PokerGame() {
     handName: "",
     isSpecial: false,
   });
+  const [showAchievementsModal, setShowAchievementsModal] = useState(false);
+  const [newAchievements, setNewAchievements] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const cpuTimerRef = useRef(null);
@@ -119,9 +123,8 @@ export default function PokerGame() {
       if (!currentUser || !state.handActive || state.gameOver) return;
 
       try {
-        // Criar uma cópia simplificada do estado para salvar
         const gameStateToSave = {
-          deck: state.deck.slice(0, 20), // Salvar apenas parte do deck
+          deck: state.deck.slice(0, 20),
           community: state.community,
           playerCards: state.playerCards,
           cpuCards: state.cpuCards,
@@ -173,18 +176,13 @@ export default function PokerGame() {
           const data = await res.json();
 
           if (data.success && data.gameState && data.gameState.handActive) {
-            // Restaurar estado salvo
             const savedState = data.gameState;
-
-            // Recriar o deck completo a partir do salvamento
             const fullDeck = createDeck();
-            // Simular o deck restante (aproximação)
             const remainingDeck = fullDeck.slice(0, savedState.deck.length);
 
             setGame({
               ...savedState,
               deck: remainingDeck,
-              // Garantir que o estado seja válido
               handActive: true,
               waitingPlayer: true,
             });
@@ -198,7 +196,6 @@ export default function PokerGame() {
           console.error("Erro ao recuperar estado:", error);
         }
 
-        // Se não houver estado salvo, iniciar nova mão
         startNewHand(currentUser, userChips);
         gameInitialized.current = true;
         setIsLoading(false);
@@ -216,7 +213,6 @@ export default function PokerGame() {
       currentUser &&
       gameInitialized.current
     ) {
-      // Salvar estado a cada 10 segundos
       const saveInterval = setInterval(() => {
         saveGameState(game);
       }, 10000);
@@ -224,6 +220,49 @@ export default function PokerGame() {
       return () => clearInterval(saveInterval);
     }
   }, [game, currentUser, saveGameState]);
+
+  // ====================== ATUALIZAR ESTATÍSTICAS ======================
+  const updateStats = useCallback(
+    async (result, chips, handName, wasAllIn = false) => {
+      if (!currentUser) return;
+
+      try {
+        const res = await fetch("/api/update-stats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: currentUser,
+            result,
+            chips,
+            handName,
+            wasAllIn,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data.success && data.newAchievements?.length > 0) {
+          const achievementNames = data.newAchievements
+            .map((a) => a.name)
+            .join(", ");
+          showNotification(
+            `🎉 Conquista desbloqueada: ${achievementNames}!`,
+            false,
+          );
+
+          setNewAchievements(data.newAchievements);
+          setTimeout(() => {
+            setShowAchievementsModal(true);
+          }, 1500);
+        }
+
+        return data;
+      } catch (error) {
+        console.error("Erro ao atualizar estatísticas:", error);
+      }
+    },
+    [currentUser, showNotification],
+  );
 
   // ====================== FAST FORWARD ======================
   function fastForwardToShowdown(g, user) {
@@ -275,10 +314,12 @@ export default function PokerGame() {
       const won = state.pot;
       state.winnerMsg = `🏆 Você venceu com ${pName}!`;
       state.cpuThought = `🤖 CPU: '${cName}... Você foi melhor!'`;
+
+      updateStats("win", won, pName, state.playerAllin);
+
       setTimeout(() => {
         showNotification(`🎉 VOCÊ VENCEU! +${won} fichas!`, false);
         saveChips(u, state.playerMoney);
-        // Limpar estado salvo após vitória
         fetch("/api/save-game-state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -300,13 +341,15 @@ export default function PokerGame() {
       const lost = state.pot;
       state.winnerMsg = `🤖 CPU venceu com ${cName}!`;
       state.cpuThought = `🤖 CPU: '${cName}! Ganhei!'`;
+
+      updateStats("loss", lost, cName);
+
       setTimeout(() => {
         showNotification(
           `😞 CPU venceu com ${cName}. Perdeu ${lost} fichas.`,
           true,
         );
         saveChips(u, state.playerMoney);
-        // Limpar estado salvo após derrota
         fetch("/api/save-game-state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -332,7 +375,6 @@ export default function PokerGame() {
       setTimeout(() => {
         showNotification(`🤝 Empate! Você recebeu ${split} fichas.`, false);
         saveChips(u, state.playerMoney);
-        // Limpar estado salvo após empate
         fetch("/api/save-game-state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -400,26 +442,9 @@ export default function PokerGame() {
       let cpuMoney = prev.cpuMoney <= 0 ? 1000 : prev.cpuMoney;
 
       if (playerMoney <= 0) {
-        showNotification(
-          `💀 Você FALIU! Clique em NOVA MÃO para recomeçar.`,
-          true,
-        );
-        // Limpar estado salvo
-        fetch("/api/save-game-state", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: user,
-            gameState: null,
-          }),
-        }).catch(() => {});
-        return {
-          ...prev,
-          gameOver: true,
-          handActive: false,
-          playerMoney: 0,
-          cpuMoney,
-        };
+        playerMoney = 1000;
+        showNotification(`🔄 Você foi recarregado com 1000 fichas!`, false);
+        setTimeout(() => saveChips(user, 1000), 100);
       }
 
       const deck = createDeck();
@@ -554,7 +579,6 @@ export default function PokerGame() {
       };
       showNotification(`❌ Você desistiu! Perdeu ${prev.pot} fichas.`, true);
       saveChips(currentUser, state.playerMoney);
-      // Limpar estado salvo
       fetch("/api/save-game-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -648,8 +672,15 @@ export default function PokerGame() {
         prev.playerAllin
       )
         return prev;
+
       let state = { ...prev };
       const amount = state.playerMoney;
+
+      if (amount <= 0) {
+        showNotification("❌ Você não tem fichas para all-in!", true);
+        return prev;
+      }
+
       state.playerMoney = 0;
       state.playerBet += amount;
       state.pot += amount;
@@ -660,13 +691,18 @@ export default function PokerGame() {
       showNotification(`⚡⚡⚡ ALL-IN! ${amount} fichas! ⚡⚡⚡`, true);
       state.gameStatus = "⚡ VOCÊ FOI ALL-IN! ⚡";
       saveChips(currentUser, 0);
+
+      if (state.cpuAllin || state.cpuBet === state.currentBet) {
+        return fastForwardToShowdown(state, currentUser);
+      }
+
       return afterPlayerMove(state, currentUser);
     });
   }
 
   function resetSession() {
     if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
-    // Limpar estado salvo
+
     fetch("/api/save-game-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -677,16 +713,23 @@ export default function PokerGame() {
     }).catch(() => {});
 
     setGame((prev) => {
-      const money = prev.playerMoney <= 0 ? 1000 : prev.playerMoney;
-      showNotification(
-        prev.playerMoney <= 0
-          ? "🔄 Recarregado com 1000 fichas!"
-          : `🔄 Nova mão! Você tem ${money} fichas.`,
-        false,
-      );
-      return { ...prev, playerMoney: money, cpuMoney: 1000, gameOver: false };
+      const money = 1000;
+      showNotification(`🔄 Nova mão! Você tem ${money} fichas.`, false);
+      return {
+        ...prev,
+        playerMoney: money,
+        cpuMoney: 1000,
+        gameOver: false,
+        handActive: false,
+        showdownStarted: false,
+        winnerMsg: "",
+        cpuThought: "",
+        playerHandName: "",
+        cpuHandName: "🔒 ???",
+      };
     });
-    setTimeout(() => startNewHand(currentUser, undefined), 50);
+
+    setTimeout(() => startNewHand(currentUser, 1000), 100);
   }
 
   function closeVictoryModal() {
@@ -816,6 +859,17 @@ export default function PokerGame() {
           isSpecial={victoryModal.isSpecial}
           playerName={currentUser}
           onClose={closeVictoryModal}
+        />
+      )}
+
+      {/* Achievements Modal */}
+      {showAchievementsModal && (
+        <AchievementsModal
+          onClose={() => {
+            setShowAchievementsModal(false);
+            setNewAchievements([]);
+          }}
+          newAchievements={newAchievements}
         />
       )}
 
@@ -1028,17 +1082,34 @@ export default function PokerGame() {
               </div>
             </div>
 
-            {/* Status Panel */}
-            <StatusPanel
-              stage={g.stage}
-              pot={g.pot}
-              currentBet={g.currentBet}
-              playerBet={g.playerBet}
-              cpuBet={g.cpuBet}
-              nextRaise={nextRaise}
-              notification={notification}
-              stageNames={stageNames}
-            />
+            {/* Status Panel e Stats Panel */}
+            <div
+              style={{
+                flex: 1,
+                minWidth: 220,
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              {/* Status Panel - VISÍVEL NOVAMENTE */}
+              <StatusPanel
+                stage={g.stage}
+                pot={g.pot}
+                currentBet={g.currentBet}
+                playerBet={g.playerBet}
+                cpuBet={g.cpuBet}
+                nextRaise={nextRaise}
+                notification={notification}
+                stageNames={stageNames}
+              />
+
+              {/* Stats Panel */}
+              <StatsPanel
+                username={currentUser}
+                onShowAchievements={() => setShowAchievementsModal(true)}
+              />
+            </div>
           </div>
         </div>
       </div>
