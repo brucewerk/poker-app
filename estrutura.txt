@@ -1,0 +1,22 @@
+poker-app/
+├── app/
+│   ├── page.jsx              ← tela principal (jogo)
+│   ├── login/page.jsx        ← tela de login
+│   ├── register/page.jsx     ← tela de cadastro
+│   └── api/
+│       ├── login/route.js    ← substitui login.php
+│       ├── register/route.js ← substitui register.php
+│       ├── get-chips/route.js← substitui get_user_chips.php
+│       └── save-chips/route.js← substitui save_chips.php
+├── lib/
+│   └── mongodb.js            ← conexão com o Atlas
+├── .env.local                ← credenciais (nunca sobe pro git)
+└── package.json
+
+
+
+# fez alguma mudança no código?
+git add .
+git commit -m "descricao"
+git push
+# a Vercel detecta e publica automaticamente
