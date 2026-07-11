@@ -14,13 +14,12 @@ export default function StatusPanel({
   return (
     <div
       style={{
-        flex: 1,
-        minWidth: 220,
         background: "#1a2a1ecc",
         backdropFilter: "blur(4px)",
-        borderRadius: 30,
+        borderRadius: 20,
         padding: 15,
         color: "white",
+        border: "1px solid rgba(255,215,0,0.2)",
       }}
     >
       <h3
@@ -103,16 +102,16 @@ export default function StatusPanel({
 
 function statusCardStyle() {
   return {
-    background: "#0a1a0eaa",
-    borderRadius: 20,
+    background: "rgba(0,0,0,0.3)",
+    borderRadius: 15,
     padding: 10,
-    marginBottom: 15,
+    marginBottom: 10,
   };
 }
 
 function statusPStyle() {
   return {
-    margin: "5px 0",
+    margin: "4px 0",
     fontSize: "0.85rem",
     color: "#ffefb9",
     wordBreak: "break-word",
