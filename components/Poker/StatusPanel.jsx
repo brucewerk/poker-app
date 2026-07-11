@@ -1,4 +1,5 @@
 // components/Poker/StatusPanel.jsx
+"use client";
 
 export default function StatusPanel({
   stage,

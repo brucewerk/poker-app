@@ -1,4 +1,5 @@
 // components/Poker/VictoryModal.jsx
+"use client";
 
 export default function VictoryModal({
   winner,

@@ -1,4 +1,5 @@
 // components/Poker/ActionButtons.jsx
+"use client";
 
 export default function ActionButtons({
   disabled,
