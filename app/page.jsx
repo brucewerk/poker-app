@@ -14,6 +14,7 @@ import StatusPanel from "@/components/Poker/StatusPanel.jsx";
 import VictoryModal from "@/components/Poker/VictoryModal.jsx";
 import StatsPanel from "@/components/Poker/StatsPanel.jsx";
 import AchievementsModal from "@/components/Poker/AchievementsModal.jsx";
+import HandHistory from "@/components/Poker/HandHistory.jsx";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -264,6 +265,27 @@ export default function PokerGame() {
     [currentUser, showNotification],
   );
 
+  // ====================== SALVAR HISTÓRICO ======================
+  const saveHandHistory = useCallback(
+    async (handData) => {
+      if (!currentUser) return;
+
+      try {
+        await fetch("/api/save-hand-history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: currentUser,
+            handData,
+          }),
+        });
+      } catch (error) {
+        console.error("Erro ao salvar histórico:", error);
+      }
+    },
+    [currentUser],
+  );
+
   // ====================== FAST FORWARD ======================
   function fastForwardToShowdown(g, user) {
     let state = { ...g };
@@ -334,7 +356,7 @@ export default function PokerGame() {
       stage: "showdown",
     }));
 
-    // Fase 1: Revelar cartas da CPU com delay (1000ms - aumentado)
+    // Fase 1: Revelar cartas da CPU com delay (1000ms)
     setTimeout(() => {
       setGame((prev) => ({
         ...prev,
@@ -343,7 +365,7 @@ export default function PokerGame() {
         cpuThought: `🤖 CPU: '${cName}!'`,
       }));
 
-      // Fase 2: Mostrar comparação (1500ms depois - aumentado)
+      // Fase 2: Mostrar comparação (1500ms depois)
       setTimeout(() => {
         setGame((prev) => ({
           ...prev,
@@ -351,7 +373,7 @@ export default function PokerGame() {
           cpuThought: `🤖 CPU: '${cName} vs ${pName}'`,
         }));
 
-        // Fase 3: Resultado (1500ms depois - aumentado)
+        // Fase 3: Resultado (1500ms depois)
         setTimeout(() => {
           let finalState = { ...state };
           finalState.cpuHandName = `🤖 ${cName}`;
@@ -364,6 +386,19 @@ export default function PokerGame() {
             finalState.gameStatus = "🏆 VOCÊ VENCEU! 🎉";
 
             updateStats("win", won, pName, state.playerAllin);
+
+            // Salvar histórico
+            saveHandHistory({
+              result: "win",
+              playerHand: pName,
+              cpuHand: cName,
+              pot: finalState.pot,
+              chipsWon: won,
+              playerCards: state.playerCards,
+              cpuCards: state.cpuCards,
+              communityCards: state.community,
+              wasAllIn: state.playerAllin,
+            });
 
             setTimeout(() => {
               showNotification(`🎉 VOCÊ VENCEU! +${won} fichas!`, false);
@@ -381,7 +416,7 @@ export default function PokerGame() {
                 handName: pName,
                 isSpecial: won >= 500 || pScore / 10 ** 10 >= 7,
               });
-            }, 500); // Aumentado para 500ms
+            }, 500);
           } else if (cScore > pScore) {
             finalState.cpuMoney += finalState.pot;
             const lost = finalState.pot;
@@ -390,6 +425,19 @@ export default function PokerGame() {
             finalState.gameStatus = "😞 CPU VENCEU!";
 
             updateStats("loss", lost, cName);
+
+            // Salvar histórico
+            saveHandHistory({
+              result: "loss",
+              playerHand: pName,
+              cpuHand: cName,
+              pot: finalState.pot,
+              chipsLost: lost,
+              playerCards: state.playerCards,
+              cpuCards: state.cpuCards,
+              communityCards: state.community,
+              wasAllIn: state.playerAllin,
+            });
 
             setTimeout(() => {
               showNotification(
@@ -410,7 +458,7 @@ export default function PokerGame() {
                 handName: cName,
                 isSpecial: false,
               });
-            }, 500); // Aumentado para 500ms
+            }, 500);
           } else {
             const split = Math.floor(finalState.pot / 2);
             finalState.playerMoney += split;
@@ -418,6 +466,18 @@ export default function PokerGame() {
             finalState.winnerMsg = `🤝 Empate! ${pName} — Pote dividido.`;
             finalState.cpuThought = "🤖 CPU: 'Empate justo.'";
             finalState.gameStatus = "🤝 EMPATE!";
+
+            // Salvar histórico
+            saveHandHistory({
+              result: "tie",
+              playerHand: pName,
+              cpuHand: cName,
+              pot: finalState.pot,
+              split: split,
+              playerCards: state.playerCards,
+              cpuCards: state.cpuCards,
+              communityCards: state.community,
+            });
 
             setTimeout(() => {
               showNotification(
@@ -431,7 +491,6 @@ export default function PokerGame() {
                 body: JSON.stringify({ username: u, gameState: null }),
               }).catch(() => {});
 
-              // Aumentado para 5000ms antes de iniciar nova mão
               setTimeout(() => {
                 setGame((prev) => ({ ...prev, showdownStarted: false }));
                 startNewHand(u, undefined);
@@ -447,9 +506,9 @@ export default function PokerGame() {
             handActive: false,
             stage: "showdown",
           }));
-        }, 1500); // Aumentado para 1500ms
-      }, 1500); // Aumentado para 1500ms
-    }, 1000); // Aumentado para 1000ms
+        }, 1500);
+      }, 1500);
+    }, 1000);
 
     return state;
   }
@@ -893,7 +952,6 @@ export default function PokerGame() {
       if (prev.playerMoney <= 0) saveChips(currentUser, 1000);
       return { ...prev, playerMoney: money, showdownStarted: false };
     });
-    // Aumentar delay antes de iniciar nova mão
     setTimeout(() => startNewHand(currentUser, undefined), 800);
   }
 
@@ -1276,6 +1334,8 @@ export default function PokerGame() {
                 username={currentUser}
                 onShowAchievements={() => setShowAchievementsModal(true)}
               />
+
+              <HandHistory username={currentUser} />
             </div>
           </div>
         </div>
