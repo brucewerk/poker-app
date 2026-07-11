@@ -59,6 +59,7 @@ export default function PokerGame() {
     isSpecial: false,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const cpuTimerRef = useRef(null);
   const autoSaveRef = useRef(null);
   const pendingSaveRef = useRef(false);
@@ -73,19 +74,6 @@ export default function PokerGame() {
       router.push("/login");
     }
   }, [status, router]);
-
-  // ====================== INICIAR JOGO QUANDO USUÁRIO LOGAR ======================
-  useEffect(() => {
-    if (
-      status === "authenticated" &&
-      currentUser &&
-      userChips > 0 &&
-      !gameInitialized.current
-    ) {
-      gameInitialized.current = true;
-      startNewHand(currentUser, userChips);
-    }
-  }, [status, currentUser, userChips]);
 
   // ====================== NOTIFICAÇÃO ======================
   const showNotification = useCallback((msg, isError = false) => {
@@ -124,6 +112,118 @@ export default function PokerGame() {
     },
     [isSaving],
   );
+
+  // ====================== SALVAR ESTADO DO JOGO ======================
+  const saveGameState = useCallback(
+    async (state) => {
+      if (!currentUser || !state.handActive || state.gameOver) return;
+
+      try {
+        // Criar uma cópia simplificada do estado para salvar
+        const gameStateToSave = {
+          deck: state.deck.slice(0, 20), // Salvar apenas parte do deck
+          community: state.community,
+          playerCards: state.playerCards,
+          cpuCards: state.cpuCards,
+          pot: state.pot,
+          playerMoney: state.playerMoney,
+          cpuMoney: state.cpuMoney,
+          currentBet: state.currentBet,
+          playerBet: state.playerBet,
+          cpuBet: state.cpuBet,
+          stage: state.stage,
+          handActive: state.handActive,
+          waitingPlayer: state.waitingPlayer,
+          gameOver: state.gameOver,
+          playerAllin: state.playerAllin,
+          cpuAllin: state.cpuAllin,
+          raiseCounter: state.raiseCounter,
+          showdownStarted: state.showdownStarted,
+          playerHandName: state.playerHandName,
+          cpuHandName: state.cpuHandName,
+          winnerMsg: state.winnerMsg,
+          cpuThought: state.cpuThought,
+          playerSuggestion: state.playerSuggestion,
+          gameStatus: state.gameStatus,
+          timestamp: Date.now(),
+        };
+
+        await fetch("/api/save-game-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: currentUser,
+            gameState: gameStateToSave,
+          }),
+        });
+      } catch (error) {
+        console.error("Erro ao salvar estado do jogo:", error);
+      }
+    },
+    [currentUser],
+  );
+
+  // ====================== RECUPERAR ESTADO SALVO ======================
+  useEffect(() => {
+    if (status === "authenticated" && currentUser && !gameInitialized.current) {
+      const loadGameState = async () => {
+        setIsLoading(true);
+        try {
+          const res = await fetch("/api/get-game-state");
+          const data = await res.json();
+
+          if (data.success && data.gameState && data.gameState.handActive) {
+            // Restaurar estado salvo
+            const savedState = data.gameState;
+
+            // Recriar o deck completo a partir do salvamento
+            const fullDeck = createDeck();
+            // Simular o deck restante (aproximação)
+            const remainingDeck = fullDeck.slice(0, savedState.deck.length);
+
+            setGame({
+              ...savedState,
+              deck: remainingDeck,
+              // Garantir que o estado seja válido
+              handActive: true,
+              waitingPlayer: true,
+            });
+
+            gameInitialized.current = true;
+            showNotification("🔄 Jogo restaurado!", false);
+            setIsLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error("Erro ao recuperar estado:", error);
+        }
+
+        // Se não houver estado salvo, iniciar nova mão
+        startNewHand(currentUser, userChips);
+        gameInitialized.current = true;
+        setIsLoading(false);
+      };
+
+      loadGameState();
+    }
+  }, [status, currentUser, userChips]);
+
+  // ====================== SALVAR ESTADO AUTOMATICAMENTE ======================
+  useEffect(() => {
+    if (
+      game.handActive &&
+      !game.gameOver &&
+      currentUser &&
+      gameInitialized.current
+    ) {
+      // Salvar estado a cada 10 segundos
+      const saveInterval = setInterval(() => {
+        saveGameState(game);
+      }, 10000);
+
+      return () => clearInterval(saveInterval);
+    }
+  }, [game, currentUser, saveGameState]);
 
   // ====================== FAST FORWARD ======================
   function fastForwardToShowdown(g, user) {
@@ -178,6 +278,15 @@ export default function PokerGame() {
       setTimeout(() => {
         showNotification(`🎉 VOCÊ VENCEU! +${won} fichas!`, false);
         saveChips(u, state.playerMoney);
+        // Limpar estado salvo após vitória
+        fetch("/api/save-game-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: u,
+            gameState: null,
+          }),
+        }).catch(() => {});
         setVictoryModal({
           open: true,
           winner: "player",
@@ -197,6 +306,15 @@ export default function PokerGame() {
           true,
         );
         saveChips(u, state.playerMoney);
+        // Limpar estado salvo após derrota
+        fetch("/api/save-game-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: u,
+            gameState: null,
+          }),
+        }).catch(() => {});
         setVictoryModal({
           open: true,
           winner: "cpu",
@@ -214,6 +332,15 @@ export default function PokerGame() {
       setTimeout(() => {
         showNotification(`🤝 Empate! Você recebeu ${split} fichas.`, false);
         saveChips(u, state.playerMoney);
+        // Limpar estado salvo após empate
+        fetch("/api/save-game-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: u,
+            gameState: null,
+          }),
+        }).catch(() => {});
         setTimeout(() => {
           setGame((prev) => ({ ...prev, showdownStarted: false }));
           startNewHand(u, undefined);
@@ -277,6 +404,15 @@ export default function PokerGame() {
           `💀 Você FALIU! Clique em NOVA MÃO para recomeçar.`,
           true,
         );
+        // Limpar estado salvo
+        fetch("/api/save-game-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: user,
+            gameState: null,
+          }),
+        }).catch(() => {});
         return {
           ...prev,
           gameOver: true,
@@ -418,6 +554,15 @@ export default function PokerGame() {
       };
       showNotification(`❌ Você desistiu! Perdeu ${prev.pot} fichas.`, true);
       saveChips(currentUser, state.playerMoney);
+      // Limpar estado salvo
+      fetch("/api/save-game-state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: currentUser,
+          gameState: null,
+        }),
+      }).catch(() => {});
       setTimeout(() => startNewHand(currentUser, undefined), 1500);
       return state;
     });
@@ -521,6 +666,16 @@ export default function PokerGame() {
 
   function resetSession() {
     if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
+    // Limpar estado salvo
+    fetch("/api/save-game-state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: currentUser,
+        gameState: null,
+      }),
+    }).catch(() => {});
+
     setGame((prev) => {
       const money = prev.playerMoney <= 0 ? 1000 : prev.playerMoney;
       showNotification(
@@ -586,8 +741,8 @@ export default function PokerGame() {
     showdown: "Showdown",
   };
 
-  // Se ainda não autenticado, mostra loading
-  if (status === "loading") {
+  // Loading
+  if (isLoading || status === "loading") {
     return (
       <div
         style={{
@@ -600,7 +755,10 @@ export default function PokerGame() {
           fontSize: "1.5rem",
         }}
       >
-        Carregando...
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "3rem", marginBottom: "20px" }}>🎴</div>
+          <p>Carregando seu jogo...</p>
+        </div>
       </div>
     );
   }
