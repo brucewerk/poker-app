@@ -15,6 +15,9 @@ import VictoryModal from "@/components/Poker/VictoryModal.jsx";
 import StatsPanel from "@/components/Poker/StatsPanel.jsx";
 import AchievementsModal from "@/components/Poker/AchievementsModal.jsx";
 import HandHistory from "@/components/Poker/HandHistory.jsx";
+import { soundManager } from "@/lib/sound.js";
+import SoundToggle from "@/components/Poker/SoundToggle.jsx";
+import FullscreenButton from "@/components/Poker/FullscreenButton.jsx";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -80,9 +83,32 @@ export default function PokerGame() {
     }
   }, [status, router]);
 
+  // ====================== CARREGAR SONS ======================
+  useEffect(() => {
+    if (status === "authenticated") {
+      soundManager.loadSounds();
+    }
+  }, [status]);
+
   // ====================== NOTIFICAÇÃO ======================
   const showNotification = useCallback((msg, isError = false) => {
     setNotification({ msg, isError, visible: true });
+
+    // Tocar sons baseado na mensagem
+    if (!isError && msg.includes("VENCEU")) {
+      soundManager.playSound("win");
+    } else if (isError && msg.includes("perdeu")) {
+      soundManager.playSound("lose");
+    } else if (msg.includes("ALL-IN")) {
+      soundManager.playSound("allin");
+    } else if (msg.includes("aumentou")) {
+      soundManager.playSound("raise");
+    } else if (msg.includes("desistiu")) {
+      soundManager.playSound("fold");
+    } else if (msg.includes("CHECK")) {
+      soundManager.playSound("check");
+    }
+
     setTimeout(() => setNotification((n) => ({ ...n, visible: false })), 2000);
   }, []);
 
@@ -569,6 +595,9 @@ export default function PokerGame() {
       }
 
       const deck = createDeck();
+      soundManager.playSound("shuffle");
+      setTimeout(() => soundManager.playSound("deal"), 300);
+
       const playerCards = [deck.pop(), deck.pop()];
       const cpuCards = [deck.pop(), deck.pop()];
 
@@ -1062,6 +1091,12 @@ export default function PokerGame() {
           </button>
         </div>
       )}
+
+      {/* Sound Toggle */}
+      <SoundToggle />
+
+      {/* Fullscreen Button */}
+      <FullscreenButton />
 
       {/* Victory Modal */}
       {victoryModal.open && (
