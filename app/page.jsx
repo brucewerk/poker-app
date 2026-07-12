@@ -77,6 +77,7 @@ export default function PokerGame() {
   const [multiplayerPlayers, setMultiplayerPlayers] = useState([]);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [showMultiplayerModal, setShowMultiplayerModal] = useState(false);
+  const [multiplayerModeActive, setMultiplayerModeActive] = useState(false);
   const cpuTimerRef = useRef(null);
   const autoSaveRef = useRef(null);
   const pendingSaveRef = useRef(false);
@@ -445,7 +446,11 @@ export default function PokerGame() {
           if (pScore > cScore) {
             finalState.playerMoney += finalState.pot;
             const won = finalState.pot;
-            finalState.winnerMsg = `🏆 ${isMultiplayer ? multiplayerPlayers[currentPlayerIndex]?.name || "Você" : "Você"} venceu com ${pName}!`;
+            const playerName =
+              isMultiplayer && multiplayerModeActive
+                ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador"
+                : currentUser || "Jogador";
+            finalState.winnerMsg = `🏆 ${playerName} venceu com ${pName}!`;
             finalState.cpuThought = `🤖 CPU: '${cName}... Você foi melhor!'`;
             finalState.gameStatus = "🏆 VITÓRIA! 🎉";
 
@@ -465,7 +470,7 @@ export default function PokerGame() {
 
             setTimeout(() => {
               showNotification(
-                `🎉 ${isMultiplayer ? multiplayerPlayers[currentPlayerIndex]?.name || "Você" : "Você"} VENCEU! +${won} fichas!`,
+                `🎉 ${playerName} VENCEU! +${won} fichas!`,
                 false,
               );
               saveChips(u, finalState.playerMoney);
@@ -557,6 +562,8 @@ export default function PokerGame() {
 
               setTimeout(() => {
                 setGame((prev) => ({ ...prev, showdownStarted: false }));
+                // ✅ Alternar jogador após empate
+                switchToNextPlayer();
                 startNewHand(u, undefined);
               }, delays.nextHandDelay);
             }, delays.victoryDelay);
@@ -575,6 +582,28 @@ export default function PokerGame() {
 
     return state;
   }
+
+  // ====================== ALTERNAR JOGADOR ======================
+  const switchToNextPlayer = useCallback(() => {
+    if (
+      isMultiplayer &&
+      multiplayerModeActive &&
+      multiplayerPlayers.length > 1
+    ) {
+      const nextIndex = (currentPlayerIndex + 1) % multiplayerPlayers.length;
+      setCurrentPlayerIndex(nextIndex);
+      const playerName = multiplayerPlayers[nextIndex]?.name || "Jogador";
+      showNotification(`🎯 Vez de ${playerName}!`, false);
+      return true;
+    }
+    return false;
+  }, [
+    isMultiplayer,
+    multiplayerModeActive,
+    multiplayerPlayers,
+    currentPlayerIndex,
+    showNotification,
+  ]);
 
   // ====================== AVANÇAR FASE ======================
   function advanceStage(g, user) {
@@ -627,8 +656,12 @@ export default function PokerGame() {
 
       if (playerMoney <= 0) {
         playerMoney = 1000;
+        const playerName =
+          isMultiplayer && multiplayerModeActive
+            ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador"
+            : currentUser || "Jogador";
         showNotification(
-          `🔄 ${isMultiplayer ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador" : "Você"} foi recarregado com 1000 fichas!`,
+          `🔄 ${playerName} foi recarregado com 1000 fichas!`,
           false,
         );
         setTimeout(() => saveChips(user, 1000), 100);
@@ -837,14 +870,15 @@ export default function PokerGame() {
         ...prev,
         handActive: false,
         cpuMoney: prev.cpuMoney + prev.pot,
-        winnerMsg: `❌ ${isMultiplayer ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador" : "Jogador"} desistiu! CPU vence.`,
+        winnerMsg: `❌ ${isMultiplayer && multiplayerModeActive ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador" : "Jogador"} desistiu! CPU vence.`,
         gameStatus: "Você desistiu",
         cpuThought: "🤖 CPU: 'Boa, ele desistiu!'",
       };
 
-      const playerName = isMultiplayer
-        ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador"
-        : "Jogador";
+      const playerName =
+        isMultiplayer && multiplayerModeActive
+          ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador"
+          : "Jogador";
       showNotification(
         `❌ ${playerName} desistiu! Perdeu ${prev.pot} fichas.`,
         true,
@@ -859,13 +893,13 @@ export default function PokerGame() {
         }),
       }).catch(() => {});
 
-      if (isMultiplayer) {
-        // Alternar para o próximo jogador
-        const nextPlayer = (currentPlayerIndex + 1) % multiplayerPlayers.length;
-        setCurrentPlayerIndex(nextPlayer);
-      }
-
-      setTimeout(() => startNewHand(currentUser, undefined), 1500);
+      // ✅ Alternar para o próximo jogador após fold
+      setTimeout(() => {
+        if (isMultiplayer && multiplayerModeActive) {
+          switchToNextPlayer();
+        }
+        startNewHand(currentUser, undefined);
+      }, 1500);
       return state;
     });
   }
@@ -1012,8 +1046,12 @@ export default function PokerGame() {
 
     setGame((prev) => {
       const money = 1000;
+      const playerName =
+        isMultiplayer && multiplayerModeActive
+          ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador"
+          : currentUser || "Jogador";
       showNotification(
-        `🔄 Nova mão! ${isMultiplayer ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador" : "Você"} tem ${money} fichas.`,
+        `🔄 Nova mão! ${playerName} tem ${money} fichas.`,
         false,
       );
       return {
@@ -1041,8 +1079,15 @@ export default function PokerGame() {
       if (prev.playerMoney <= 0) saveChips(currentUser, 1000);
       return { ...prev, playerMoney: money, showdownStarted: false };
     });
+
+    // ✅ Alternar jogador após fechar o modal
     setTimeout(
-      () => startNewHand(currentUser, undefined),
+      () => {
+        if (isMultiplayer && multiplayerModeActive) {
+          switchToNextPlayer();
+        }
+        startNewHand(currentUser, undefined);
+      },
       Math.min(delays.nextHandDelay, 800),
     );
   }
@@ -1057,23 +1102,27 @@ export default function PokerGame() {
     (config) => {
       setMultiplayerPlayers(config.players);
       setIsMultiplayer(true);
+      setMultiplayerModeActive(true);
       setCurrentPlayerIndex(0);
       setShowMultiplayerModal(false);
       showNotification(`👥 Modo 2 Jogadores ativado!`, false);
-      startNewHand(currentUser, config.players[0].chips);
+      // Iniciar com o primeiro jogador
+      setTimeout(() => {
+        startNewHand(currentUser, config.players[0].chips);
+      }, 100);
     },
     [currentUser],
   );
 
   const handleSwitchPlayer = useCallback(
     (index) => {
-      setCurrentPlayerIndex(index);
-      showNotification(
-        `🎯 Vez de ${multiplayerPlayers[index]?.name || "Jogador"}`,
-        false,
-      );
+      if (index !== currentPlayerIndex) {
+        setCurrentPlayerIndex(index);
+        const playerName = multiplayerPlayers[index]?.name || "Jogador";
+        showNotification(`🎯 Vez de ${playerName}!`, false);
+      }
     },
-    [multiplayerPlayers],
+    [currentPlayerIndex, multiplayerPlayers],
   );
 
   // ====================== SUGESTÃO DO JOGADOR ======================
@@ -1212,7 +1261,7 @@ export default function PokerGame() {
           handName={victoryModal.handName}
           isSpecial={victoryModal.isSpecial}
           playerName={
-            isMultiplayer
+            isMultiplayer && multiplayerModeActive
               ? multiplayerPlayers[currentPlayerIndex]?.name
               : currentUser
           }
@@ -1272,6 +1321,7 @@ export default function PokerGame() {
               ["🤖", g.cpuMoney],
               ["📊", `Aposta: ${g.currentBet}`],
               ["🚀", isTurbo ? "Turbo" : "Normal"],
+              ["👥", isMultiplayer && multiplayerModeActive ? "2P" : "1P"],
             ].map(([icon, val], i) => (
               <div
                 key={i}
@@ -1288,7 +1338,15 @@ export default function PokerGame() {
                 <span
                   style={{
                     color:
-                      icon === "🚀" ? (isTurbo ? "#ff9800" : "#888") : "gold",
+                      icon === "🚀"
+                        ? isTurbo
+                          ? "#ff9800"
+                          : "#888"
+                        : icon === "👥"
+                          ? isMultiplayer && multiplayerModeActive
+                            ? "#4caf50"
+                            : "#888"
+                          : "gold",
                     fontSize: "1.1rem",
                     fontWeight: 800,
                     marginRight: 5,
@@ -1302,13 +1360,15 @@ export default function PokerGame() {
           </div>
 
           {/* Player Selector (Multiplayer) */}
-          {isMultiplayer && multiplayerPlayers.length > 0 && (
-            <PlayerSelector
-              players={multiplayerPlayers}
-              currentPlayer={currentPlayerIndex}
-              onSelectPlayer={handleSwitchPlayer}
-            />
-          )}
+          {isMultiplayer &&
+            multiplayerModeActive &&
+            multiplayerPlayers.length > 0 && (
+              <PlayerSelector
+                players={multiplayerPlayers}
+                currentPlayer={currentPlayerIndex}
+                onSelectPlayer={handleSwitchPlayer}
+              />
+            )}
 
           {/* Layout Principal */}
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
@@ -1391,13 +1451,13 @@ export default function PokerGame() {
                 <div style={sectionStyle()}>
                   <div style={sectionTitleStyle()}>
                     🃏{" "}
-                    {isMultiplayer
+                    {isMultiplayer && multiplayerModeActive
                       ? multiplayerPlayers[currentPlayerIndex]?.name ||
                         "Jogador"
                       : currentUser
                         ? currentUser.toUpperCase()
                         : "JOGADOR"}
-                    {isMultiplayer && (
+                    {isMultiplayer && multiplayerModeActive && (
                       <span
                         style={{
                           fontSize: "0.6rem",
