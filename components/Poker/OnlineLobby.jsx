@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import RoomList from "./RoomList.jsx";
 
-export default function OnlineLobby({ onJoinGame }) {
+export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
   const [socket, setSocket] = useState(null);
   const [roomId, setRoomId] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -18,6 +18,37 @@ export default function OnlineLobby({ onJoinGame }) {
 
   const SOCKET_URL =
     process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
+
+  // ✅ Preencher com o usuário logado
+  useEffect(() => {
+    if (currentUser) {
+      setPlayerName(currentUser);
+      fetchUserChips(currentUser);
+    }
+  }, [currentUser]);
+
+  // ====================== BUSCAR FICHAS DO USUÁRIO ======================
+  const fetchUserChips = async (username) => {
+    if (!username) return;
+
+    try {
+      const res = await fetch("/api/public/get-chips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUserChips(data.chips || 1000);
+        console.log(`💰 ${username} tem ${data.chips} fichas no MongoDB`);
+        return data.chips;
+      }
+    } catch (error) {
+      console.error("Erro ao buscar fichas:", error);
+      setUserChips(1000);
+    }
+    return 1000;
+  };
 
   useEffect(() => {
     console.log("🔄 Conectando ao servidor Socket.IO...");
@@ -70,9 +101,6 @@ export default function OnlineLobby({ onJoinGame }) {
       }
     });
 
-    // ✅ Buscar fichas do usuário
-    fetchUserChips();
-
     return () => {
       console.log("🔌 Componente OnlineLobby desmontando...");
       newSocket.off("connect");
@@ -83,23 +111,7 @@ export default function OnlineLobby({ onJoinGame }) {
     };
   }, [SOCKET_URL]);
 
-  const fetchUserChips = async () => {
-    try {
-      const res = await fetch("/api/get-chips", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: playerName || "guest" }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUserChips(data.chips || 1000);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar fichas:", error);
-    }
-  };
-
-  const createRoom = () => {
+  const createRoom = async () => {
     if (!playerName.trim()) {
       setError("❌ Digite seu nome!");
       return;
@@ -109,14 +121,15 @@ export default function OnlineLobby({ onJoinGame }) {
       return;
     }
 
+    await fetchUserChips(playerName);
+
     setIsConnecting(true);
-    console.log(`📤 Criando sala para: ${playerName}`);
+    console.log(`📤 Criando sala para: ${playerName} (${userChips} fichas)`);
     const currentSocket = socketRef.current;
 
     currentSocket.off("room-created");
     currentSocket.off("error");
 
-    // ✅ Enviar fichas atuais do usuário
     currentSocket.emit("create-room", {
       playerName: playerName.trim(),
       initialChips: userChips,
@@ -134,6 +147,7 @@ export default function OnlineLobby({ onJoinGame }) {
         roomId: data.roomId,
         playerName: playerName.trim(),
         socket: currentSocket,
+        userChips: userChips,
       });
     });
 
@@ -145,7 +159,7 @@ export default function OnlineLobby({ onJoinGame }) {
     });
   };
 
-  const joinRoom = (roomIdToJoin) => {
+  const joinRoom = async (roomIdToJoin) => {
     const roomIdToUse = roomIdToJoin || roomId.trim().toUpperCase();
 
     if (!playerName.trim()) {
@@ -161,10 +175,12 @@ export default function OnlineLobby({ onJoinGame }) {
       return;
     }
 
+    await fetchUserChips(playerName);
+
     setIsConnecting(true);
     const roomIdUpper = roomIdToUse.toUpperCase();
     console.log(`📤 Tentando entrar na sala: ${roomIdUpper}`);
-    console.log(`📤 Jogador: ${playerName}`);
+    console.log(`📤 Jogador: ${playerName} (${userChips} fichas)`);
 
     const currentSocket = socketRef.current;
 
@@ -183,6 +199,7 @@ export default function OnlineLobby({ onJoinGame }) {
         roomId: roomIdUpper,
         playerName: playerName.trim(),
         socket: currentSocket,
+        userChips: userChips,
       });
     });
 
@@ -194,9 +211,21 @@ export default function OnlineLobby({ onJoinGame }) {
     });
   };
 
+  // ✅ Função para fechar com "Nova Mão" automático
+  const handleCancel = () => {
+    // Sinalizar que deve fazer "Nova Mão" ao voltar
+    if (onCancel) {
+      onCancel(true); // ✅ Passar true para indicar "Nova Mão" automática
+    }
+  };
+
   return (
     <div style={overlayStyle()}>
       <div style={modalStyle()}>
+        <button onClick={handleCancel} style={cancelButtonStyle()}>
+          ✕
+        </button>
+
         <h2 style={titleStyle()}>🌐 JOGAR ONLINE</h2>
 
         <div style={statusStyle()}>
@@ -228,12 +257,14 @@ export default function OnlineLobby({ onJoinGame }) {
             onChange={(e) => setPlayerName(e.target.value)}
             placeholder="Digite seu nome"
             style={inputStyle()}
-            disabled={isConnecting}
+            disabled={true}
           />
+          <span style={inputHintStyle()}>✅ Nome do usuário logado</span>
         </div>
 
         <div style={chipsDisplayStyle()}>
           💰 Suas fichas: <strong>{userChips}</strong>
+          <span style={chipsHintStyle()}> (saldo global do MongoDB)</span>
         </div>
 
         {createdRoomId && (
@@ -279,7 +310,6 @@ export default function OnlineLobby({ onJoinGame }) {
           {isConnecting ? "⏳ Entrando..." : "🔗 Entrar na Sala"}
         </button>
 
-        {/* ✅ LISTA DE SALAS DISPONÍVEIS */}
         <RoomList socket={socket} onJoinRoom={joinRoom} />
 
         {error && <div style={errorStyle()}>{error}</div>}
@@ -321,6 +351,23 @@ function modalStyle() {
     border: "2px solid gold",
     maxHeight: "90vh",
     overflowY: "auto",
+    position: "relative",
+  };
+}
+
+function cancelButtonStyle() {
+  return {
+    position: "absolute",
+    top: 15,
+    right: 20,
+    background: "none",
+    border: "none",
+    color: "#f44336",
+    fontSize: "1.5rem",
+    cursor: "pointer",
+    padding: "5px 10px",
+    borderRadius: 10,
+    transition: "all 0.3s ease",
   };
 }
 
@@ -367,6 +414,13 @@ function chipsDisplayStyle() {
   };
 }
 
+function chipsHintStyle() {
+  return {
+    fontSize: "0.7rem",
+    color: "#888",
+  };
+}
+
 function inputGroupStyle() {
   return {
     display: "flex",
@@ -392,7 +446,16 @@ function inputStyle() {
     background: "rgba(0,0,0,0.3)",
     color: "white",
     fontSize: "1rem",
-    transition: "all 0.3s ease",
+    cursor: "not-allowed",
+    opacity: 0.7,
+  };
+}
+
+function inputHintStyle() {
+  return {
+    fontSize: "0.7rem",
+    color: "#4caf50",
+    marginTop: "2px",
   };
 }
 

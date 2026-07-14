@@ -15,7 +15,14 @@ export async function POST(req) {
       );
     }
 
-    const { chips } = await req.json();
+    const { username, chips } = await req.json();
+
+    if (!username) {
+      return NextResponse.json(
+        { success: false, error: "Usuário não informado" },
+        { status: 400 },
+      );
+    }
 
     if (!Number.isInteger(chips) || chips < 0 || chips > 1_000_000) {
       return NextResponse.json(
@@ -26,13 +33,22 @@ export async function POST(req) {
 
     await connectDB();
 
-    // ✅ Usar updateOne com $set para evitar conflitos
-    await User.updateOne(
-      { username: session.user.username },
-      { $set: { chips: chips } },
-    );
+    const user = await User.findOne({ username });
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Usuário não encontrado" },
+        { status: 404 },
+      );
+    }
 
-    return NextResponse.json({ success: true });
+    user.chips = chips;
+    await user.save();
+
+    return NextResponse.json({
+      success: true,
+      chips: user.chips,
+      message: `Fichas de ${username} atualizadas para ${chips}`,
+    });
   } catch (error) {
     console.error("Erro ao salvar fichas:", error);
     return NextResponse.json(

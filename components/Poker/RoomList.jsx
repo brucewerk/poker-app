@@ -5,15 +5,12 @@ import { useState, useEffect } from "react";
 
 export default function RoomList({ socket, onJoinRoom }) {
   const [rooms, setRooms] = useState([]);
-  const [selectedRoom, setSelectedRoom] = useState(null);
 
   useEffect(() => {
     if (!socket) return;
 
-    // ✅ Pedir lista de salas ao conectar
     socket.emit("list-rooms");
 
-    // ✅ Ouvir atualizações da lista
     socket.on("room-list", (data) => {
       setRooms(data);
     });
@@ -22,10 +19,6 @@ export default function RoomList({ socket, onJoinRoom }) {
       socket.off("room-list");
     };
   }, [socket]);
-
-  const handleJoinRoom = (roomId) => {
-    onJoinRoom(roomId);
-  };
 
   if (rooms.length === 0) {
     return (
@@ -56,13 +49,14 @@ export default function RoomList({ socket, onJoinRoom }) {
             <div style={roomPlayersListStyle()}>
               {room.players.map((player, i) => (
                 <span key={i} style={playerChipStyle()}>
-                  {player.name} (💰{player.chips})
+                  {player.name}{" "}
+                  <span style={chipsStyle()}>💰{player.chips || 0}</span>
                 </span>
               ))}
             </div>
             {!room.isGameActive && room.playerCount < room.maxPlayers && (
               <button
-                onClick={() => handleJoinRoom(room.roomId)}
+                onClick={() => onJoinRoom(room.roomId)}
                 style={joinButtonStyle()}
               >
                 🔗 Entrar na Sala
@@ -170,8 +164,19 @@ function playerChipStyle() {
     fontSize: "0.75rem",
     color: "#ddd",
     background: "rgba(255,255,255,0.05)",
-    padding: "2px 8px",
+    padding: "2px 10px",
     borderRadius: 10,
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
+  };
+}
+
+function chipsStyle() {
+  return {
+    color: "#4caf50",
+    fontWeight: "bold",
+    fontSize: "0.7rem",
   };
 }
 

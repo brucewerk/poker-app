@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 
 function getRankDisplay(rank) {
   if (rank === 11) return "J";
@@ -25,6 +26,7 @@ function CardDisplay({ card, faceDown = false }) {
 }
 
 export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
+  const { update } = useSession();
   const [gameState, setGameState] = useState(null);
   const [players, setPlayers] = useState([]);
   const [isMyTurn, setIsMyTurn] = useState(false);
@@ -71,6 +73,11 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       console.log("📡 round-ended:", data);
       setResultData(data);
       setShowResult(true);
+
+      setTimeout(() => {
+        update();
+        console.log("🔄 Sessão atualizada após partida online");
+      }, 1000);
     };
 
     const onGameReset = () => {
@@ -104,7 +111,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       socket.off("round-ended", onRoundEnded);
       socket.off("game-reset", onGameReset);
     };
-  }, [socket]);
+  }, [socket, update]);
 
   const handleAction = (action, amount = 0) => {
     console.log(`📤 Enviando ação: ${action}`, { roomId, action, amount });
@@ -116,10 +123,15 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     socket.emit("player-ready", { roomId });
   };
 
-  const leaveRoom = () => {
+  const leaveRoom = async () => {
     console.log(`📤 Saindo da sala ${roomId}`);
     socket.emit("leave-room", { roomId });
-    onLeave();
+
+    await update();
+    console.log("🔄 Sessão atualizada ao sair da sala");
+
+    // ✅ Passar true para indicar que deve fazer "Nova Mão"
+    onLeave(true);
   };
 
   // ✅ Modal de resultado
@@ -318,7 +330,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   );
 }
 
-// ====================== ESTILOS DO RESULTADO ======================
+// ====================== ESTILOS ======================
 function resultOverlayStyle() {
   return {
     position: "fixed",
@@ -445,7 +457,6 @@ function resultButtonStyle() {
   };
 }
 
-// ====================== ESTILOS DO JOGO ======================
 function lobbyStyle() {
   return {
     background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
