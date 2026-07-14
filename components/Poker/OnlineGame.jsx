@@ -29,11 +29,12 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   const [players, setPlayers] = useState([]);
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const [resultData, setResultData] = useState(null);
 
   useEffect(() => {
     console.log("🔄 OnlineGame montado, socket:", socket?.id);
 
-    // ✅ Funções de callback com nomes para facilitar remoção
     const onRoomUpdate = (data) => {
       console.log("📡 room-update:", data);
       setPlayers(data.players || []);
@@ -44,6 +45,8 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     const onGameStarted = (data) => {
       console.log("📡 game-started:", data);
       setGameState(data);
+      setShowResult(false);
+      setResultData(null);
       if (data.currentPlayerIndex !== undefined) {
         const currentPlayer = data.players[data.currentPlayerIndex];
         setIsMyTurn(currentPlayer?.id === socket.id);
@@ -66,22 +69,24 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
 
     const onRoundEnded = (data) => {
       console.log("📡 round-ended:", data);
-      alert(`🏆 ${data.winner.name} venceu ${data.pot} fichas!`);
+      setResultData(data);
+      setShowResult(true);
     };
 
     const onGameReset = () => {
       console.log("📡 game-reset");
       setGameState(null);
+      setShowResult(false);
+      setResultData(null);
     };
 
-    // ✅ Remover listeners antigos antes de adicionar
     socket.off("room-update");
     socket.off("game-started");
     socket.off("game-update");
     socket.off("player-turn");
     socket.off("round-ended");
     socket.off("game-reset");
-    socket.off("error"); // ✅ Remover listeners de erro antigos
+    socket.off("error");
 
     socket.on("room-update", onRoomUpdate);
     socket.on("game-started", onGameStarted);
@@ -98,7 +103,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       socket.off("player-turn", onPlayerTurn);
       socket.off("round-ended", onRoundEnded);
       socket.off("game-reset", onGameReset);
-      // ✅ NÃO remover o listener de error global
     };
   }, [socket]);
 
@@ -117,6 +121,58 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     socket.emit("leave-room", { roomId });
     onLeave();
   };
+
+  // ✅ Modal de resultado
+  if (showResult && resultData) {
+    return (
+      <div style={resultOverlayStyle()}>
+        <div style={resultModalStyle()}>
+          <h2 style={resultTitleStyle()}>🏆 RESULTADO</h2>
+
+          <div style={resultPotStyle()}>💰 Pote: {resultData.pot} fichas</div>
+
+          <div style={resultCommunityStyle()}>
+            <span style={{ color: "#888", marginRight: "10px" }}>
+              Cartas da mesa:
+            </span>
+            {resultData.communityCards &&
+            resultData.communityCards.length > 0 ? (
+              resultData.communityCards.map((card, i) => (
+                <CardDisplay key={i} card={card} />
+              ))
+            ) : (
+              <span style={{ color: "#666" }}>(nenhuma)</span>
+            )}
+          </div>
+
+          <div style={resultPlayersStyle()}>
+            {resultData.results.map((r, i) => (
+              <div key={i} style={resultPlayerItemStyle(r.isWinner)}>
+                <span style={resultPlayerNameStyle(r.isWinner)}>
+                  {r.name} {r.isWinner && "👑"}
+                </span>
+                <span style={resultPlayerHandStyle(r.isWinner)}>{r.hand}</span>
+                {r.isWinner && (
+                  <span style={resultWinnerBadgeStyle()}>🏆 VENCEDOR</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={resultWinnerStyle()}>
+            🎉 {resultData.winner.name} venceu {resultData.pot} fichas!
+          </div>
+
+          <button
+            onClick={() => setShowResult(false)}
+            style={resultButtonStyle()}
+          >
+            CONTINUAR
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!gameState) {
     return (
@@ -263,6 +319,136 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
 }
 
 // ====================== ESTILOS ======================
+// ... (estilos anteriores) ...
+
+// ✅ Estilos do modal de resultado
+function resultOverlayStyle() {
+  return {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.9)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2000,
+    padding: 20,
+  };
+}
+
+function resultModalStyle() {
+  return {
+    background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
+    padding: "30px 40px",
+    borderRadius: 30,
+    maxWidth: 500,
+    width: "100%",
+    color: "white",
+    border: "3px solid gold",
+    maxHeight: "80vh",
+    overflowY: "auto",
+  };
+}
+
+function resultTitleStyle() {
+  return {
+    textAlign: "center",
+    color: "gold",
+    margin: "0 0 15px",
+    fontSize: "1.8rem",
+  };
+}
+
+function resultPotStyle() {
+  return {
+    textAlign: "center",
+    fontSize: "1.3rem",
+    color: "#ffd700",
+    marginBottom: "15px",
+  };
+}
+
+function resultCommunityStyle() {
+  return {
+    textAlign: "center",
+    padding: "10px",
+    background: "rgba(0,0,0,0.3)",
+    borderRadius: 15,
+    marginBottom: "15px",
+  };
+}
+
+function resultPlayersStyle() {
+  return {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    marginBottom: "20px",
+  };
+}
+
+function resultPlayerItemStyle(isWinner) {
+  return {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "10px 15px",
+    borderRadius: 10,
+    background: isWinner ? "rgba(255,215,0,0.15)" : "rgba(255,255,255,0.05)",
+    border: isWinner ? "1px solid gold" : "1px solid rgba(255,255,255,0.1)",
+  };
+}
+
+function resultPlayerNameStyle(isWinner) {
+  return {
+    fontWeight: "bold",
+    color: isWinner ? "gold" : "#fff",
+    fontSize: "1rem",
+  };
+}
+
+function resultPlayerHandStyle(isWinner) {
+  return {
+    color: isWinner ? "#4caf50" : "#aaa",
+    fontSize: "0.9rem",
+  };
+}
+
+function resultWinnerBadgeStyle() {
+  return {
+    background: "gold",
+    color: "#1a3a2a",
+    padding: "2px 10px",
+    borderRadius: 12,
+    fontSize: "0.7rem",
+    fontWeight: "bold",
+  };
+}
+
+function resultWinnerStyle() {
+  return {
+    textAlign: "center",
+    fontSize: "1.1rem",
+    color: "#ffd700",
+    marginBottom: "20px",
+  };
+}
+
+function resultButtonStyle() {
+  return {
+    background: "radial-gradient(#f7d97c,#d6a12e)",
+    border: "none",
+    fontWeight: "bold",
+    fontSize: "1rem",
+    padding: "12px 30px",
+    borderRadius: 60,
+    cursor: "pointer",
+    boxShadow: "0 4px 0 #7a4c1a",
+    color: "#2e241f",
+    width: "100%",
+  };
+}
+
+// ... (restante dos estilos)
 function lobbyStyle() {
   return {
     background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",

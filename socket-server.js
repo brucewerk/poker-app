@@ -207,7 +207,7 @@ io.on("connection", (socket) => {
         id: p.id,
         name: p.name,
         cards: [],
-        chips: 1000,
+        chips: 2000, // ✅ 2000 fichas iniciais
         bet: 0,
         isFolded: false,
         isAllIn: false,
@@ -239,7 +239,6 @@ io.on("connection", (socket) => {
 
     gameState.dealerIndex = dealerIdx;
 
-    // Small Blind
     const sbPlayer = gameState.players[sbIdx];
     if (sbPlayer.chips >= sb) {
       sbPlayer.chips -= sb;
@@ -251,7 +250,6 @@ io.on("connection", (socket) => {
     }
     gameState.pot += sbPlayer.bet;
 
-    // Big Blind
     const bbPlayer = gameState.players[bbIdx];
     if (bbPlayer.chips >= bb) {
       bbPlayer.chips -= bb;
@@ -296,11 +294,9 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // ✅ Marcar que o jogador agiu nesta rodada
     player.hasActed = true;
     gameState.actionCount++;
 
-    // Processar ação
     switch (action) {
       case "fold":
         player.isFolded = true;
@@ -357,7 +353,6 @@ io.on("connection", (socket) => {
         gameState.pot += raiseAmount;
         gameState.currentBet = player.bet;
         gameState.lastRaiser = playerIndex;
-        // ✅ Resetar hasActed de todos os outros jogadores após um raise
         gameState.players.forEach((p, idx) => {
           if (idx !== playerIndex && !p.isFolded) {
             p.hasActed = false;
@@ -381,7 +376,6 @@ io.on("connection", (socket) => {
         if (player.bet > gameState.currentBet) {
           gameState.currentBet = player.bet;
           gameState.lastRaiser = playerIndex;
-          // ✅ Resetar hasActed de todos os outros jogadores após all-in
           gameState.players.forEach((p, idx) => {
             if (idx !== playerIndex && !p.isFolded) {
               p.hasActed = false;
@@ -405,17 +399,10 @@ io.on("connection", (socket) => {
     const activePlayers = players.filter((p) => !p.isFolded && !p.isAllIn);
     const playersInHand = players.filter((p) => !p.isFolded);
 
-    // Verificar se apenas 1 jogador restante
     if (playersInHand.length <= 1) {
       endRound(roomId);
       return;
     }
-
-    // ✅ VERIFICAR SE A RODADA DE APOSTAS TERMINOU
-    // Condições para terminar a rodada de apostas:
-    // 1. Todos os jogadores ativos igualaram a aposta (currentBet)
-    // 2. O último raiser teve sua aposta igualada
-    // 3. Pelo menos um jogador agiu (não é o início da rodada)
 
     const allBetMatched = activePlayers.every(
       (p) => p.bet === gameState.currentBet,
@@ -425,7 +412,6 @@ io.on("connection", (socket) => {
       gameState.players[gameState.lastRaiser]?.bet === gameState.currentBet ||
       gameState.players[gameState.lastRaiser]?.isFolded;
 
-    // ✅ Verificar se todos os jogadores ativos já agiram
     const allActed = activePlayers.every((p) => p.hasActed === true);
     const hasActions = gameState.actionCount > 0;
 
@@ -435,13 +421,11 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Se não há jogadores ativos (todos all-in), avançar fase
     if (activePlayers.length === 0) {
       advancePhase(roomId);
       return;
     }
 
-    // ✅ Encontrar próximo jogador que ainda não agiu
     let nextIndex = (gameState.currentPlayerIndex + 1) % players.length;
     let attempts = 0;
     let foundPlayer = false;
@@ -450,9 +434,7 @@ io.on("connection", (socket) => {
       const idx =
         (gameState.currentPlayerIndex + 1 + attempts) % players.length;
       const p = players[idx];
-      // ✅ Verificar se o jogador está ativo e ainda não agiu (ou se é all-in)
       if (!p.isFolded && !p.isAllIn && p.chips > 0) {
-        // Se o jogador já agiu e a aposta não mudou, pular
         if (
           p.hasActed &&
           gameState.lastRaiser !== -1 &&
@@ -469,13 +451,11 @@ io.on("connection", (socket) => {
     }
 
     if (!foundPlayer) {
-      // Verificar novamente se todos agiram
       const allActedCheck = activePlayers.every((p) => p.hasActed === true);
       if (allActedCheck && hasActions) {
         advancePhase(roomId);
         return;
       }
-      // Se não encontrou jogador, avançar fase
       advancePhase(roomId);
       return;
     }
@@ -493,7 +473,6 @@ io.on("connection", (socket) => {
     const gameState = room.gameState;
     const players = gameState.players;
 
-    // ✅ Resetar apostas e flags para a nova fase
     players.forEach((p) => {
       if (!p.isFolded) {
         p.bet = 0;
@@ -505,7 +484,6 @@ io.on("connection", (socket) => {
     gameState.actionCount = 0;
     gameState.bettingRoundComplete = false;
 
-    // Avançar fase
     switch (gameState.phase) {
       case "preflop":
         gameState.phase = "flop";
@@ -530,7 +508,6 @@ io.on("connection", (socket) => {
         return;
     }
 
-    // ✅ Encontrar primeiro jogador ativo (Small Blind ou próximo)
     const startIndex = (gameState.dealerIndex + 1) % players.length;
     let firstActive = -1;
     for (let i = 0; i < players.length; i++) {
@@ -565,35 +542,59 @@ io.on("connection", (socket) => {
     const gameState = room.gameState;
     const playersInHand = gameState.players.filter((p) => !p.isFolded);
 
-    // Determinar vencedor
     let winner = null;
     let bestScore = -1;
+    let results = [];
 
     if (playersInHand.length === 1) {
       winner = playersInHand[0];
+      results.push({
+        name: winner.name,
+        hand: "Fold dos outros",
+        score: 0,
+        isWinner: true,
+      });
     } else {
-      // Showdown
+      // ✅ Showdown - avaliar todos os jogadores
       for (const player of playersInHand) {
         const score = evaluateBestHand(player.cards, gameState.communityCards);
+        const handName = getHandName(score);
+        results.push({
+          name: player.name,
+          hand: handName,
+          score: score,
+          isWinner: false,
+        });
         if (score > bestScore) {
           bestScore = score;
           winner = player;
         }
       }
+
+      // ✅ Marcar o vencedor
+      results = results.map((r) => ({
+        ...r,
+        isWinner: r.name === winner.name,
+      }));
     }
 
     if (winner) {
       winner.chips += gameState.pot;
-      const handName = getHandName(bestScore);
+
+      // ✅ Enviar resultado detalhado
       io.to(roomId).emit("round-ended", {
-        winner: winner,
+        winner: {
+          name: winner.name,
+          chips: winner.chips,
+        },
         pot: gameState.pot,
-        hand: handName,
+        results: results,
+        communityCards: gameState.communityCards,
       });
-      console.log(`🏆 ${winner.name} venceu ${gameState.pot} com ${handName}`);
+
+      console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
     }
 
-    // Resetar para nova mão
     setTimeout(() => {
       room.gameState = null;
       room.players.forEach((p) => {
@@ -608,7 +609,7 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("room-update", room);
       io.to(roomId).emit("game-reset");
       console.log(`🔄 Nova mao disponivel na sala ${roomId}`);
-    }, 5000);
+    }, 8000);
   }
 
   // ====================== SAIR ======================
