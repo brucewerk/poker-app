@@ -1,0 +1,21 @@
+📝 COMANDOS ÚTEIS PARA MANUTENÇÃO
+
+Atualizar local:
+bash
+git pull origin master
+npm install
+npm run dev
+
+Deploy manual na Vercel:
+bash
+vercel --prod
+
+Backup do banco de dados:
+bash
+mongodump --uri "sua_mongodb_uri" --out ./backup
+
+🎯 PARABÉNS!
+Você construiu um jogo de Poker completo, profissional e funcional! 🎉
+Local: http://localhost:3000
+Produção: https://poker-chi-neon.vercel.app
+O projeto está no GitHub e pode ser compartilhado com qualquer pessoa!

@@ -15,7 +15,7 @@ export async function POST(req) {
       );
     }
 
-    const { username, handData } = await req.json();
+    const { handData } = await req.json();
 
     await connectDB();
 
@@ -32,7 +32,7 @@ export async function POST(req) {
       user.handHistory = [];
     }
 
-    // Adicionar nova mão no início (mais recente primeiro)
+    // Adicionar nova mão no início
     user.handHistory.unshift({
       ...handData,
       timestamp: new Date(),
@@ -43,8 +43,11 @@ export async function POST(req) {
       user.handHistory = user.handHistory.slice(0, 20);
     }
 
-    user.markModified("handHistory");
-    await user.save();
+    // ✅ Usar updateOne com $set para evitar conflitos
+    await User.updateOne(
+      { username: session.user.username },
+      { $set: { handHistory: user.handHistory } },
+    );
 
     return NextResponse.json({
       success: true,

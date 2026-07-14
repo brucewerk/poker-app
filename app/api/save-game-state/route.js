@@ -19,9 +19,10 @@ export async function POST(req) {
 
     await connectDB();
 
-    await User.findOneAndUpdate(
+    // ✅ Usar updateOne com $set para evitar conflitos
+    await User.updateOne(
       { username: session.user.username },
-      { gameState },
+      { $set: { gameState: gameState } },
     );
 
     return NextResponse.json({ success: true });

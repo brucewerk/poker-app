@@ -18,6 +18,9 @@ import HandHistory from "@/components/Poker/HandHistory.jsx";
 import LevelDisplay from "@/components/Poker/LevelDisplay.jsx";
 import FindingsModal from "@/components/Poker/FindingsModal.jsx";
 import FriendsList from "@/components/Poker/FriendsList.jsx";
+import OnlineButton from "@/components/Poker/OnlineButton.jsx";
+import OnlineLobby from "@/components/Poker/OnlineLobby.jsx";
+import OnlineGame from "@/components/Poker/OnlineGame.jsx";
 import { soundManager } from "@/lib/sound.js";
 import SoundToggle from "@/components/Poker/SoundToggle.jsx";
 import FullscreenButton from "@/components/Poker/FullscreenButton.jsx";
@@ -83,6 +86,8 @@ export default function PokerGame() {
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [showMultiplayerModal, setShowMultiplayerModal] = useState(false);
   const [multiplayerModeActive, setMultiplayerModeActive] = useState(false);
+  const [showOnline, setShowOnline] = useState(false);
+  const [onlineGame, setOnlineGame] = useState(null);
   const cpuTimerRef = useRef(null);
   const autoSaveRef = useRef(null);
   const pendingSaveRef = useRef(false);
@@ -1149,9 +1154,23 @@ export default function PokerGame() {
     [currentPlayerIndex, multiplayerPlayers],
   );
 
-  // ====================== SUGESTÃO DO JOGADOR (CORRIGIDA) ======================
+  // ====================== ONLINE ======================
+  const handleJoinOnlineGame = useCallback(
+    (data) => {
+      setOnlineGame(data);
+      setShowOnline(false);
+      showNotification(`🌐 Entrou na sala ${data.roomId}!`, false);
+    },
+    [showNotification],
+  );
+
+  const handleLeaveOnlineGame = useCallback(() => {
+    setOnlineGame(null);
+    showNotification("👋 Saiu do jogo online", false);
+  }, [showNotification]);
+
+  // ====================== SUGESTÃO DO JOGADOR ======================
   function getPlayerSuggestion(g) {
-    // ✅ Verificação de segurança
     if (!g || !g.playerCards || !g.playerCards.length) return "";
 
     if (g.stage === "preflop") {
@@ -1278,11 +1297,28 @@ export default function PokerGame() {
       {/* Multiplayer Button */}
       <MultiplayerButton onClick={() => setShowMultiplayerModal(true)} />
 
+      {/* Online Button */}
+      <OnlineButton onClick={() => setShowOnline(true)} />
+
       {/* Multiplayer Modal */}
       {showMultiplayerModal && (
         <MultiplayerModal
           onStart={handleMultiplayerStart}
           onClose={() => setShowMultiplayerModal(false)}
+        />
+      )}
+
+      {/* Online Lobby/Game */}
+      {showOnline && !onlineGame && (
+        <OnlineLobby onJoinGame={handleJoinOnlineGame} />
+      )}
+
+      {onlineGame && (
+        <OnlineGame
+          roomId={onlineGame.roomId}
+          playerName={onlineGame.playerName}
+          socket={onlineGame.socket}
+          onLeave={handleLeaveOnlineGame}
         />
       )}
 

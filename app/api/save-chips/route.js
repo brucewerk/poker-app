@@ -7,7 +7,6 @@ import User from "@/lib/models/User";
 
 export async function POST(req) {
   try {
-    // Verificar autenticação
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
@@ -18,7 +17,6 @@ export async function POST(req) {
 
     const { chips } = await req.json();
 
-    // Validar
     if (!Number.isInteger(chips) || chips < 0 || chips > 1_000_000) {
       return NextResponse.json(
         { success: false, error: "Fichas inválidas" },
@@ -28,8 +26,11 @@ export async function POST(req) {
 
     await connectDB();
 
-    // Atualizar usando o username da sessão
-    await User.findOneAndUpdate({ username: session.user.username }, { chips });
+    // ✅ Usar updateOne com $set para evitar conflitos
+    await User.updateOne(
+      { username: session.user.username },
+      { $set: { chips: chips } },
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

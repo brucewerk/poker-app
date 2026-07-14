@@ -22,6 +22,7 @@ export async function POST(req) {
 
     await connectDB();
 
+    // ✅ Usar findOneAndUpdate para evitar conflitos de versão
     const user = await User.findOne({ username: session.user.username });
     if (!user) {
       return NextResponse.json(
@@ -48,14 +49,13 @@ export async function POST(req) {
 
     const stats = user.stats;
     stats.handsPlayed = (stats.handsPlayed || 0) + 1;
-    let xpGained = 5; // XP base por jogar
+    let xpGained = 5;
 
     if (result === "win") {
       stats.handsWon = (stats.handsWon || 0) + 1;
       stats.totalChipsWon = (stats.totalChipsWon || 0) + chips;
       stats.currentStreak = (stats.currentStreak || 0) + 1;
 
-      // XP por vitória
       xpGained += 10 + Math.floor(chips / 50);
 
       if ((stats.currentStreak || 0) > (stats.bestStreak || 0)) {
@@ -64,13 +64,12 @@ export async function POST(req) {
 
       if (chips > (stats.biggestWin || 0)) {
         stats.biggestWin = chips;
-        // XP extra por recorde de vitória
         xpGained += 20;
       }
 
       if (wasAllIn) {
         stats.allInWins = (stats.allInWins || 0) + 1;
-        xpGained += 15; // XP extra por all-in vitorioso
+        xpGained += 15;
       }
 
       if (
@@ -79,15 +78,14 @@ export async function POST(req) {
           getHandScore(handName) > getHandScore(stats.bestHand))
       ) {
         stats.bestHand = handName;
-        xpGained += 25; // XP extra por melhor mão
+        xpGained += 25;
       }
     } else if (result === "loss") {
       stats.handsLost = (stats.handsLost || 0) + 1;
       stats.currentStreak = 0;
-      xpGained += 3; // XP por participar
+      xpGained += 3;
     }
 
-    // Atualizar fichas totais
     stats.totalChips = user.chips;
 
     // Verificar conquistas
@@ -95,7 +93,6 @@ export async function POST(req) {
     if (newAchievements.length > 0) {
       const achievementIds = newAchievements.map((a) => a.id);
       user.achievements = [...(user.achievements || []), ...achievementIds];
-      // XP extra por conquistas
       xpGained += newAchievements.length * 30;
     }
 
@@ -105,7 +102,6 @@ export async function POST(req) {
     if (newFindings.length > 0) {
       const findingIds = newFindings.map((f) => f.id);
       user.findings = [...currentFindings, ...findingIds];
-      // XP extra dos findings
       const findingsXp = newFindings.reduce((sum, f) => sum + (f.xp || 0), 0);
       xpGained += findingsXp;
     }
@@ -123,15 +119,20 @@ export async function POST(req) {
       leveledUp = true;
     }
 
-    user.xp = newXp;
-    user.level = newLevel;
-    user.xpToNextLevel = xpToNext;
-
-    // Salvar
-    user.markModified("stats");
-    user.markModified("achievements");
-    user.markModified("findings");
-    await user.save();
+    // ✅ Usar updateOne com $set para evitar conflitos
+    await User.updateOne(
+      { username: session.user.username },
+      {
+        $set: {
+          stats: stats,
+          achievements: user.achievements,
+          findings: user.findings,
+          xp: newXp,
+          level: newLevel,
+          xpToNextLevel: xpToNext,
+        },
+      },
+    );
 
     return NextResponse.json({
       success: true,
