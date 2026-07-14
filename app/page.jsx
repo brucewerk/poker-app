@@ -18,6 +18,7 @@ import HandHistory from "@/components/Poker/HandHistory.jsx";
 import LevelDisplay from "@/components/Poker/LevelDisplay.jsx";
 import FindingsModal from "@/components/Poker/FindingsModal.jsx";
 import FriendsList from "@/components/Poker/FriendsList.jsx";
+import MissionsPanel from "@/components/Poker/MissionsPanel.jsx";
 import OnlineButton from "@/components/Poker/OnlineButton.jsx";
 import OnlineLobby from "@/components/Poker/OnlineLobby.jsx";
 import OnlineGame from "@/components/Poker/OnlineGame.jsx";
@@ -1245,7 +1246,6 @@ export default function PokerGame() {
 
       await refreshUserChips();
 
-      // ✅ Se deve resetar, fazer "Nova Mão" automático
       if (shouldReset) {
         console.log("🔄 Resetando jogo contra CPU com saldo atualizado");
         setGame((prev) => {
@@ -1768,6 +1768,8 @@ export default function PokerGame() {
               <LevelDisplay username={currentUser} />
 
               <FriendsList username={currentUser} />
+
+              <MissionsPanel username={currentUser} />
 
               <HandHistory username={currentUser} />
             </div>
