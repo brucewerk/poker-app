@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
+import RoomList from "./RoomList.jsx";
 
 export default function OnlineLobby({ onJoinGame }) {
   const [socket, setSocket] = useState(null);
@@ -12,10 +13,9 @@ export default function OnlineLobby({ onJoinGame }) {
   const [error, setError] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [createdRoomId, setCreatedRoomId] = useState("");
+  const [userChips, setUserChips] = useState(0);
   const socketRef = useRef(null);
-  const listenersAttached = useRef(false);
 
-  // ✅ URL do servidor Socket.IO (Render ou local)
   const SOCKET_URL =
     process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
@@ -70,7 +70,8 @@ export default function OnlineLobby({ onJoinGame }) {
       }
     });
 
-    listenersAttached.current = true;
+    // ✅ Buscar fichas do usuário
+    fetchUserChips();
 
     return () => {
       console.log("🔌 Componente OnlineLobby desmontando...");
@@ -81,6 +82,22 @@ export default function OnlineLobby({ onJoinGame }) {
       newSocket.offAny();
     };
   }, [SOCKET_URL]);
+
+  const fetchUserChips = async () => {
+    try {
+      const res = await fetch("/api/get-chips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: playerName || "guest" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUserChips(data.chips || 1000);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar fichas:", error);
+    }
+  };
 
   const createRoom = () => {
     if (!playerName.trim()) {
@@ -99,7 +116,11 @@ export default function OnlineLobby({ onJoinGame }) {
     currentSocket.off("room-created");
     currentSocket.off("error");
 
-    currentSocket.emit("create-room", { playerName: playerName.trim() });
+    // ✅ Enviar fichas atuais do usuário
+    currentSocket.emit("create-room", {
+      playerName: playerName.trim(),
+      initialChips: userChips,
+    });
 
     currentSocket.once("room-created", (data) => {
       setIsConnecting(false);
@@ -124,12 +145,14 @@ export default function OnlineLobby({ onJoinGame }) {
     });
   };
 
-  const joinRoom = () => {
+  const joinRoom = (roomIdToJoin) => {
+    const roomIdToUse = roomIdToJoin || roomId.trim().toUpperCase();
+
     if (!playerName.trim()) {
       setError("❌ Digite seu nome!");
       return;
     }
-    if (!roomId.trim()) {
+    if (!roomIdToUse) {
       setError("❌ Digite o código da sala!");
       return;
     }
@@ -139,7 +162,7 @@ export default function OnlineLobby({ onJoinGame }) {
     }
 
     setIsConnecting(true);
-    const roomIdUpper = roomId.trim().toUpperCase();
+    const roomIdUpper = roomIdToUse.toUpperCase();
     console.log(`📤 Tentando entrar na sala: ${roomIdUpper}`);
     console.log(`📤 Jogador: ${playerName}`);
 
@@ -209,6 +232,10 @@ export default function OnlineLobby({ onJoinGame }) {
           />
         </div>
 
+        <div style={chipsDisplayStyle()}>
+          💰 Suas fichas: <strong>{userChips}</strong>
+        </div>
+
         {createdRoomId && (
           <div style={successStyle()}>
             ✅ Sala criada: <strong>{createdRoomId}</strong>
@@ -245,12 +272,15 @@ export default function OnlineLobby({ onJoinGame }) {
         </div>
 
         <button
-          onClick={joinRoom}
+          onClick={() => joinRoom()}
           style={buttonStyle(connected && !isConnecting && roomId.trim())}
           disabled={!connected || isConnecting || !roomId.trim()}
         >
           {isConnecting ? "⏳ Entrando..." : "🔗 Entrar na Sala"}
         </button>
+
+        {/* ✅ LISTA DE SALAS DISPONÍVEIS */}
+        <RoomList socket={socket} onJoinRoom={joinRoom} />
 
         {error && <div style={errorStyle()}>{error}</div>}
 
@@ -285,7 +315,7 @@ function modalStyle() {
     background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
     padding: "30px 40px",
     borderRadius: 30,
-    maxWidth: 450,
+    maxWidth: 480,
     width: "100%",
     color: "white",
     border: "2px solid gold",
@@ -325,26 +355,15 @@ function warningStyle() {
   };
 }
 
-function codeStyle() {
+function chipsDisplayStyle() {
   return {
-    background: "rgba(0,0,0,0.4)",
-    padding: "4px 10px",
-    borderRadius: 8,
-    fontFamily: "monospace",
-    fontSize: "0.8rem",
-  };
-}
-
-function successStyle() {
-  return {
-    background: "rgba(76,175,80,0.15)",
-    border: "1px solid #4caf50",
-    borderRadius: 15,
-    padding: "10px",
-    marginBottom: "15px",
-    fontSize: "0.9rem",
-    color: "#4caf50",
     textAlign: "center",
+    padding: "8px",
+    background: "rgba(255,215,0,0.1)",
+    borderRadius: 10,
+    marginBottom: "15px",
+    color: "#ffd700",
+    fontSize: "0.95rem",
   };
 }
 
@@ -408,6 +427,19 @@ function dividerStyle() {
     color: "#888",
     margin: "15px 0",
     fontSize: "0.9rem",
+  };
+}
+
+function successStyle() {
+  return {
+    background: "rgba(76,175,80,0.15)",
+    border: "1px solid #4caf50",
+    borderRadius: 15,
+    padding: "10px",
+    marginBottom: "15px",
+    fontSize: "0.9rem",
+    color: "#4caf50",
+    textAlign: "center",
   };
 }
 

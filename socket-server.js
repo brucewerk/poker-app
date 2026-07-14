@@ -3,6 +3,7 @@ const { Server } = require("socket.io");
 
 // ====================== ESTADO ======================
 const rooms = new Map();
+const userChips = new Map(); // ✅ Armazena fichas dos usuários
 
 function generateRoomId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -116,7 +117,7 @@ function evaluateBestHand(playerCards, communityCards) {
 // ====================== SERVIDOR ======================
 const io = new Server({
   cors: {
-    origin: "*", // ✅ Permitir qualquer origem (Vercel)
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
@@ -125,13 +126,41 @@ const io = new Server({
 io.on("connection", (socket) => {
   console.log(`🟢 Conectado: ${socket.id}`);
 
+  // ====================== LISTAR SALAS ======================
+  socket.on("list-rooms", () => {
+    const roomList = [];
+    rooms.forEach((room, roomId) => {
+      roomList.push({
+        roomId: roomId,
+        players: room.players.map((p) => ({
+          name: p.name,
+          chips: p.chips || 0,
+        })),
+        playerCount: room.players.length,
+        maxPlayers: 4,
+        isGameActive: !!room.gameState,
+      });
+    });
+    socket.emit("room-list", roomList);
+  });
+
   // ====================== CRIAR SALA ======================
   socket.on("create-room", (data) => {
-    const { playerName } = data;
+    const { playerName, initialChips } = data;
     const roomId = generateRoomId();
 
+    // ✅ Usar fichas do usuário ou 1000 se não tiver
+    const userChipBalance = userChips.get(playerName) || initialChips || 1000;
+
     rooms.set(roomId, {
-      players: [{ id: socket.id, name: playerName, isReady: false }],
+      players: [
+        {
+          id: socket.id,
+          name: playerName,
+          chips: userChipBalance,
+          isReady: false,
+        },
+      ],
       gameState: null,
     });
 
@@ -139,8 +168,12 @@ io.on("connection", (socket) => {
     socket.emit("room-created", { roomId });
     socket.emit("room-update", rooms.get(roomId));
 
-    console.log(`✅ Sala criada: ${roomId} por ${playerName}`);
-    console.log(`📋 Salas ativas: ${rooms.size}`);
+    // ✅ Atualizar lista de salas para todos
+    broadcastRoomList();
+
+    console.log(
+      `✅ Sala criada: ${roomId} por ${playerName} (${userChipBalance} fichas)`,
+    );
   });
 
   // ====================== ENTRAR NA SALA ======================
@@ -166,11 +199,25 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.players.push({ id: socket.id, name: playerName, isReady: false });
+    // ✅ Buscar fichas do usuário
+    const userChipBalance = userChips.get(playerName) || 1000;
+
+    room.players.push({
+      id: socket.id,
+      name: playerName,
+      chips: userChipBalance,
+      isReady: false,
+    });
     socket.join(normalizedRoomId);
 
     io.to(normalizedRoomId).emit("room-update", room);
-    console.log(`✅ ${playerName} entrou na sala ${normalizedRoomId}`);
+
+    // ✅ Atualizar lista de salas para todos
+    broadcastRoomList();
+
+    console.log(
+      `✅ ${playerName} entrou na sala ${normalizedRoomId} (${userChipBalance} fichas)`,
+    );
   });
 
   // ====================== PRONTO ======================
@@ -208,7 +255,7 @@ io.on("connection", (socket) => {
         id: p.id,
         name: p.name,
         cards: [],
-        chips: 2000,
+        chips: p.chips, // ✅ Usar fichas atuais do jogador
         bet: 0,
         isFolded: false,
         isAllIn: false,
@@ -572,6 +619,12 @@ io.on("connection", (socket) => {
 
     if (winner) {
       winner.chips += gameState.pot;
+
+      // ✅ Atualizar fichas dos jogadores no estado global
+      gameState.players.forEach((p) => {
+        userChips.set(p.name, p.chips);
+      });
+
       io.to(roomId).emit("round-ended", {
         winner: {
           name: winner.name,
@@ -580,7 +633,12 @@ io.on("connection", (socket) => {
         pot: gameState.pot,
         results: results,
         communityCards: gameState.communityCards,
+        players: gameState.players.map((p) => ({
+          name: p.name,
+          chips: p.chips,
+        })),
       });
+
       console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
     }
 
@@ -588,6 +646,11 @@ io.on("connection", (socket) => {
       room.gameState = null;
       room.players.forEach((p) => {
         p.isReady = false;
+        // ✅ Atualizar fichas dos jogadores na sala
+        const updatedPlayer = gameState.players.find((gp) => gp.id === p.id);
+        if (updatedPlayer) {
+          p.chips = updatedPlayer.chips;
+        }
         p.cards = [];
         p.bet = 0;
         p.isFolded = false;
@@ -597,8 +660,30 @@ io.on("connection", (socket) => {
       });
       io.to(roomId).emit("room-update", room);
       io.to(roomId).emit("game-reset");
+
+      // ✅ Atualizar lista de salas
+      broadcastRoomList();
+
       console.log(`🔄 Nova mão disponível na sala ${roomId}`);
     }, 8000);
+  }
+
+  // ====================== BROADCAST LISTA DE SALAS ======================
+  function broadcastRoomList() {
+    const roomList = [];
+    rooms.forEach((room, roomId) => {
+      roomList.push({
+        roomId: roomId,
+        players: room.players.map((p) => ({
+          name: p.name,
+          chips: p.chips || 0,
+        })),
+        playerCount: room.players.length,
+        maxPlayers: 4,
+        isGameActive: !!room.gameState,
+      });
+    });
+    io.emit("room-list", roomList);
   }
 
   // ====================== SAIR ======================
@@ -617,6 +702,7 @@ io.on("connection", (socket) => {
     } else {
       io.to(normalizedRoomId).emit("room-update", room);
     }
+    broadcastRoomList();
   });
 
   socket.on("disconnect", () => {
@@ -633,15 +719,17 @@ io.on("connection", (socket) => {
         }
       }
     });
+    broadcastRoomList();
   });
 });
 
-// ====================== INICIAR SERVIDOR ======================
 const PORT = process.env.PORT || 3001;
 io.listen(PORT);
 console.log(`\n🚀 Servidor Socket.IO rodando na porta ${PORT}`);
 console.log(`📋 Texas Hold'em Online pronto!\n`);
+console.log(`💡 Fluxo correto:`);
+console.log(`  1. Preflop -> 2. Flop -> 3. Turn -> 4. River -> 5. Showdown\n`);
 console.log(`💡 Para testar:`);
-console.log(`  - Abra duas janelas`);
+console.log(`  - Abra duas janelas (Edge e Chrome)`);
 console.log(`  - Entre na mesma sala`);
 console.log(`  - Ambos cliquem em "Pronto para jogar"\n`);
