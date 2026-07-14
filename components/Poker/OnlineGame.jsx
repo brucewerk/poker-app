@@ -318,15 +318,12 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   );
 }
 
-// ====================== ESTILOS ======================
-// ... (estilos anteriores) ...
-
-// ✅ Estilos do modal de resultado
+// ====================== ESTILOS DO RESULTADO ======================
 function resultOverlayStyle() {
   return {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.9)",
+    background: "rgba(0,0,0,0.95)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -448,7 +445,7 @@ function resultButtonStyle() {
   };
 }
 
-// ... (restante dos estilos)
+// ====================== ESTILOS DO JOGO ======================
 function lobbyStyle() {
   return {
     background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",

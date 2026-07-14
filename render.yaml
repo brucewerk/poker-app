@@ -1,0 +1,12 @@
+# render.yaml
+services:
+  - type: web
+    name: poker-socket-server
+    env: node
+    buildCommand: npm install
+    startCommand: node socket-server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 18.0.0
+      - key: PORT
+        value: 3001

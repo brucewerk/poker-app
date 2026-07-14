@@ -13,14 +13,17 @@ export default function OnlineLobby({ onJoinGame }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [createdRoomId, setCreatedRoomId] = useState("");
   const socketRef = useRef(null);
-
-  // ✅ Usar refs para controlar listeners únicos
   const listenersAttached = useRef(false);
+
+  // ✅ URL do servidor Socket.IO (Render ou local)
+  const SOCKET_URL =
+    process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
   useEffect(() => {
     console.log("🔄 Conectando ao servidor Socket.IO...");
+    console.log(`📍 URL: ${SOCKET_URL}`);
 
-    const newSocket = io("http://localhost:3001", {
+    const newSocket = io(SOCKET_URL, {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       timeout: 10000,
@@ -31,7 +34,6 @@ export default function OnlineLobby({ onJoinGame }) {
     socketRef.current = newSocket;
     setSocket(newSocket);
 
-    // ✅ Remover listeners antigos antes de adicionar novos
     newSocket.off("connect");
     newSocket.off("connect_error");
     newSocket.off("disconnect");
@@ -54,7 +56,6 @@ export default function OnlineLobby({ onJoinGame }) {
       console.log("🔴 Desconectado do servidor");
     });
 
-    // ✅ Listener de erro APENAS para o lobby
     const errorHandler = (data) => {
       console.log("📡 Erro do lobby:", data);
       setError(`❌ ${data.message}`);
@@ -63,9 +64,7 @@ export default function OnlineLobby({ onJoinGame }) {
 
     newSocket.on("error", errorHandler);
 
-    // ✅ Evento para debug
     newSocket.onAny((event, ...args) => {
-      // Não logar eventos de erro para não poluir
       if (event !== "error") {
         console.log(`📡 Evento: ${event}`, args);
       }
@@ -75,15 +74,13 @@ export default function OnlineLobby({ onJoinGame }) {
 
     return () => {
       console.log("🔌 Componente OnlineLobby desmontando...");
-      // ✅ Remover todos os listeners ao desmontar
       newSocket.off("connect");
       newSocket.off("connect_error");
       newSocket.off("disconnect");
       newSocket.off("error");
       newSocket.offAny();
-      // ✅ NÃO desconectar o socket - ele será reutilizado
     };
-  }, []);
+  }, [SOCKET_URL]);
 
   const createRoom = () => {
     if (!playerName.trim()) {
@@ -99,7 +96,6 @@ export default function OnlineLobby({ onJoinGame }) {
     console.log(`📤 Criando sala para: ${playerName}`);
     const currentSocket = socketRef.current;
 
-    // ✅ Remover listeners antigos
     currentSocket.off("room-created");
     currentSocket.off("error");
 
@@ -113,7 +109,6 @@ export default function OnlineLobby({ onJoinGame }) {
       setError(`✅ Sala criada! Código: ${data.roomId}`);
       setTimeout(() => setError(""), 5000);
 
-      // ✅ Passar o socket existente
       onJoinGame({
         roomId: data.roomId,
         playerName: playerName.trim(),
@@ -121,7 +116,6 @@ export default function OnlineLobby({ onJoinGame }) {
       });
     });
 
-    // ✅ Listener de erro específico para criação
     currentSocket.once("error", (data) => {
       setIsConnecting(false);
       setError(`❌ ${data.message}`);
@@ -151,7 +145,6 @@ export default function OnlineLobby({ onJoinGame }) {
 
     const currentSocket = socketRef.current;
 
-    // ✅ Remover listeners antigos
     currentSocket.off("room-update");
     currentSocket.off("error");
 
@@ -170,7 +163,6 @@ export default function OnlineLobby({ onJoinGame }) {
       });
     });
 
-    // ✅ Listener de erro específico para entrada
     currentSocket.once("error", (data) => {
       setIsConnecting(false);
       setError(`❌ ${data.message}`);
@@ -199,7 +191,9 @@ export default function OnlineLobby({ onJoinGame }) {
           <div style={warningStyle()}>
             ⚠️ Servidor Socket.IO não está rodando!
             <br />
-            <code style={codeStyle()}>npm run socket</code>
+            <span style={{ fontSize: "0.8rem", color: "#888" }}>
+              URL: {SOCKET_URL}
+            </span>
           </div>
         )}
 
@@ -264,7 +258,7 @@ export default function OnlineLobby({ onJoinGame }) {
           💡 Dica: Abra outra janela do navegador para testar!
           <br />
           <span style={{ fontSize: "0.7rem", color: "#666" }}>
-            Certifique-se de que o servidor Socket.IO está rodando
+            Servidor: {SOCKET_URL}
           </span>
         </div>
       </div>

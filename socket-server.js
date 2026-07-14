@@ -116,7 +116,7 @@ function evaluateBestHand(playerCards, communityCards) {
 // ====================== SERVIDOR ======================
 const io = new Server({
   cors: {
-    origin: "*",
+    origin: "*", // ✅ Permitir qualquer origem (Vercel)
     methods: ["GET", "POST"],
   },
 });
@@ -140,6 +140,7 @@ io.on("connection", (socket) => {
     socket.emit("room-update", rooms.get(roomId));
 
     console.log(`✅ Sala criada: ${roomId} por ${playerName}`);
+    console.log(`📋 Salas ativas: ${rooms.size}`);
   });
 
   // ====================== ENTRAR NA SALA ======================
@@ -150,13 +151,13 @@ io.on("connection", (socket) => {
     const room = rooms.get(normalizedRoomId);
     if (!room) {
       socket.emit("error", {
-        message: `Sala nao encontrada: ${normalizedRoomId}`,
+        message: `Sala não encontrada: ${normalizedRoomId}`,
       });
       return;
     }
 
     if (room.players.find((p) => p.id === socket.id)) {
-      socket.emit("error", { message: "Voce ja esta nesta sala!" });
+      socket.emit("error", { message: "Você já está nesta sala!" });
       return;
     }
 
@@ -207,7 +208,7 @@ io.on("connection", (socket) => {
         id: p.id,
         name: p.name,
         cards: [],
-        chips: 2000, // ✅ 2000 fichas iniciais
+        chips: 2000,
         bet: 0,
         isFolded: false,
         isAllIn: false,
@@ -224,20 +225,16 @@ io.on("connection", (socket) => {
       bettingRoundComplete: false,
     };
 
-    // Distribuir cartas
     gameState.players.forEach((p) => {
       p.cards = [deck.pop(), deck.pop()];
     });
 
-    // Postar blinds
     const sb = 25;
     const bb = 50;
-
-    const dealerIdx = 0;
     const sbIdx = 1 % numPlayers;
     const bbIdx = 2 % numPlayers;
 
-    gameState.dealerIndex = dealerIdx;
+    gameState.dealerIndex = 0;
 
     const sbPlayer = gameState.players[sbIdx];
     if (sbPlayer.chips >= sb) {
@@ -285,12 +282,12 @@ io.on("connection", (socket) => {
     const player = gameState.players[playerIndex];
 
     if (gameState.currentPlayerIndex !== playerIndex) {
-      socket.emit("error", { message: "Nao e sua vez!" });
+      socket.emit("error", { message: "Não é sua vez!" });
       return;
     }
 
     if (player.isFolded) {
-      socket.emit("error", { message: "Voce ja desistiu!" });
+      socket.emit("error", { message: "Você já desistiu!" });
       return;
     }
 
@@ -307,7 +304,7 @@ io.on("connection", (socket) => {
       case "check":
         if (player.bet < gameState.currentBet) {
           socket.emit("error", {
-            message: "❌ Voce precisa pagar a aposta antes de dar CHECK!",
+            message: "❌ Você precisa pagar a aposta antes de dar CHECK!",
           });
           player.hasActed = false;
           gameState.actionCount--;
@@ -336,7 +333,7 @@ io.on("connection", (socket) => {
       case "raise":
         const minRaise = gameState.currentBet + 50;
         if (amount < minRaise) {
-          socket.emit("error", { message: `Aumento minimo: ${minRaise}` });
+          socket.emit("error", { message: `Aumento mínimo: ${minRaise}` });
           player.hasActed = false;
           gameState.actionCount--;
           return;
@@ -364,7 +361,7 @@ io.on("connection", (socket) => {
       case "all-in":
         const allInAmount = player.chips;
         if (allInAmount === 0) {
-          socket.emit("error", { message: "Voce ja esta all-in!" });
+          socket.emit("error", { message: "Você já está all-in!" });
           player.hasActed = false;
           gameState.actionCount--;
           return;
@@ -389,7 +386,7 @@ io.on("connection", (socket) => {
     advanceGame(normalizedRoomId);
   });
 
-  // ====================== AVANÇAR JOGO ======================
+  // ====================== FUNÇÕES DE JOGO ======================
   function advanceGame(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -401,6 +398,11 @@ io.on("connection", (socket) => {
 
     if (playersInHand.length <= 1) {
       endRound(roomId);
+      return;
+    }
+
+    if (activePlayers.length === 0) {
+      advancePhase(roomId);
       return;
     }
 
@@ -417,11 +419,6 @@ io.on("connection", (socket) => {
 
     if (allBetMatched && lastRaiserSatisfied && allActed && hasActions) {
       console.log(`📢 Rodada de apostas concluída! Avançando fase...`);
-      advancePhase(roomId);
-      return;
-    }
-
-    if (activePlayers.length === 0) {
       advancePhase(roomId);
       return;
     }
@@ -465,7 +462,6 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("player-turn", { playerId: players[nextIndex].id });
   }
 
-  // ====================== AVANÇAR FASE ======================
   function advancePhase(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -534,7 +530,6 @@ io.on("connection", (socket) => {
     );
   }
 
-  // ====================== FINALIZAR RODADA ======================
   function endRound(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -555,7 +550,6 @@ io.on("connection", (socket) => {
         isWinner: true,
       });
     } else {
-      // ✅ Showdown - avaliar todos os jogadores
       for (const player of playersInHand) {
         const score = evaluateBestHand(player.cards, gameState.communityCards);
         const handName = getHandName(score);
@@ -570,8 +564,6 @@ io.on("connection", (socket) => {
           winner = player;
         }
       }
-
-      // ✅ Marcar o vencedor
       results = results.map((r) => ({
         ...r,
         isWinner: r.name === winner.name,
@@ -580,8 +572,6 @@ io.on("connection", (socket) => {
 
     if (winner) {
       winner.chips += gameState.pot;
-
-      // ✅ Enviar resultado detalhado
       io.to(roomId).emit("round-ended", {
         winner: {
           name: winner.name,
@@ -591,7 +581,6 @@ io.on("connection", (socket) => {
         results: results,
         communityCards: gameState.communityCards,
       });
-
       console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
     }
 
@@ -608,7 +597,7 @@ io.on("connection", (socket) => {
       });
       io.to(roomId).emit("room-update", room);
       io.to(roomId).emit("game-reset");
-      console.log(`🔄 Nova mao disponivel na sala ${roomId}`);
+      console.log(`🔄 Nova mão disponível na sala ${roomId}`);
     }, 8000);
   }
 
@@ -647,13 +636,12 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = process.env.SOCKET_PORT || 3001;
+// ====================== INICIAR SERVIDOR ======================
+const PORT = process.env.PORT || 3001;
 io.listen(PORT);
 console.log(`\n🚀 Servidor Socket.IO rodando na porta ${PORT}`);
 console.log(`📋 Texas Hold'em Online pronto!\n`);
-console.log(`💡 Fluxo correto:`);
-console.log(`  1. Preflop -> 2. Flop -> 3. Turn -> 4. River -> 5. Showdown\n`);
 console.log(`💡 Para testar:`);
-console.log(`  - Abra duas janelas (Edge e Chrome)`);
+console.log(`  - Abra duas janelas`);
 console.log(`  - Entre na mesma sala`);
 console.log(`  - Ambos cliquem em "Pronto para jogar"\n`);
