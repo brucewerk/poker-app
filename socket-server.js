@@ -121,45 +121,8 @@ const io = new Server({
   },
 });
 
-// ====================== FUNÇÃO PARA SALVAR FICHAS (COM RETRY) ======================
+// ====================== FUNÇÕES PARA API PÚBLICA ======================
 const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-async function saveChipsToDatabase(playerName, chips, retries = 3) {
-  try {
-    console.log(`💾 Tentando salvar ${playerName}: ${chips} fichas...`);
-
-    const response = await fetch(`${API_BASE_URL}/api/public/save-chips`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: playerName, chips: chips }),
-    });
-
-    const data = await response.json();
-
-    if (data.success) {
-      console.log(`✅ ${playerName}: ${chips} fichas salvas no MongoDB`);
-      return true;
-    } else {
-      console.log(`⚠️ Falha ao salvar ${playerName}: ${data.error}`);
-      if (retries > 0) {
-        console.log(
-          `🔄 Tentando novamente (${retries} tentativas restantes)...`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        return saveChipsToDatabase(playerName, chips, retries - 1);
-      }
-      return false;
-    }
-  } catch (error) {
-    console.error(`❌ Erro ao salvar ${playerName}:`, error.message);
-    if (retries > 0) {
-      console.log(`🔄 Tentando novamente (${retries} tentativas restantes)...`);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      return saveChipsToDatabase(playerName, chips, retries - 1);
-    }
-    return false;
-  }
-}
 
 async function getChipsFromDatabase(playerName) {
   try {
@@ -179,21 +142,52 @@ async function getChipsFromDatabase(playerName) {
   }
 }
 
+async function saveChipsToDatabase(playerName, chips) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/public/save-chips`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: playerName, chips: chips }),
+    });
+    const data = await response.json();
+    if (data.success) {
+      console.log(`✅ ${playerName}: ${chips} fichas salvas no MongoDB`);
+      return true;
+    }
+    console.log(`⚠️ Falha ao salvar fichas de ${playerName}: ${data.error}`);
+    return false;
+  } catch (error) {
+    console.error(`❌ Erro ao salvar fichas de ${playerName}:`, error.message);
+    return false;
+  }
+}
+
 // ====================== BROADCAST LISTA DE SALAS ======================
-function broadcastRoomList() {
+async function broadcastRoomList() {
   const roomList = [];
-  rooms.forEach((room, roomId) => {
+
+  for (const [roomId, room] of rooms) {
+    // ✅ Buscar fichas atualizadas para cada jogador na sala
+    const updatedPlayers = [];
+    for (const player of room.players) {
+      const currentChips = await getChipsFromDatabase(player.name);
+      updatedPlayers.push({
+        name: player.name,
+        chips: currentChips,
+      });
+      // Atualizar as fichas do jogador na sala
+      player.chips = currentChips;
+    }
+
     roomList.push({
       roomId: roomId,
-      players: room.players.map((p) => ({
-        name: p.name,
-        chips: p.chips || 0,
-      })),
+      players: updatedPlayers,
       playerCount: room.players.length,
       maxPlayers: 4,
       isGameActive: !!room.gameState,
     });
-  });
+  }
+
   io.emit("room-list", roomList);
 }
 
@@ -202,21 +196,8 @@ io.on("connection", (socket) => {
   console.log(`🟢 Conectado: ${socket.id}`);
 
   // ====================== LISTAR SALAS ======================
-  socket.on("list-rooms", () => {
-    const roomList = [];
-    rooms.forEach((room, roomId) => {
-      roomList.push({
-        roomId: roomId,
-        players: room.players.map((p) => ({
-          name: p.name,
-          chips: p.chips || 0,
-        })),
-        playerCount: room.players.length,
-        maxPlayers: 4,
-        isGameActive: !!room.gameState,
-      });
-    });
-    socket.emit("room-list", roomList);
+  socket.on("list-rooms", async () => {
+    await broadcastRoomList();
   });
 
   // ====================== CRIAR SALA ======================
@@ -242,7 +223,7 @@ io.on("connection", (socket) => {
     socket.emit("room-created", { roomId });
     socket.emit("room-update", rooms.get(roomId));
 
-    broadcastRoomList();
+    await broadcastRoomList();
 
     console.log(
       `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas)`,
@@ -284,7 +265,7 @@ io.on("connection", (socket) => {
     socket.join(normalizedRoomId);
 
     io.to(normalizedRoomId).emit("room-update", room);
-    broadcastRoomList();
+    await broadcastRoomList();
 
     console.log(
       `✅ ${playerName} entrou na sala ${normalizedRoomId} (${userChips} fichas)`,
@@ -648,7 +629,6 @@ io.on("connection", (socket) => {
     );
   }
 
-  // ====================== END ROUND ======================
   async function endRound(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -692,33 +672,14 @@ io.on("connection", (socket) => {
     if (winner) {
       winner.chips += gameState.pot;
 
-      // ✅ Atualizar as fichas dos jogadores no estado da sala
-      gameState.players.forEach((p) => {
-        const playerInRoom = room.players.find((rp) => rp.id === p.id);
-        if (playerInRoom) {
-          playerInRoom.chips = p.chips;
-        }
-      });
-
-      console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
-
-      // ✅ SALVAR FICHAS NO MONGODB (COM RETRY E LOGS DETALHADOS)
+      // ✅ SALVAR FICHAS DE TODOS OS JOGADORES NO MONGODB
       console.log(
         `💾 Salvando fichas de ${gameState.players.length} jogadores...`,
       );
 
-      const savePromises = gameState.players.map(async (p) => {
-        const saved = await saveChipsToDatabase(p.name, p.chips);
-        if (saved) {
-          console.log(`✅ ${p.name}: ${p.chips} fichas salvas com sucesso`);
-        } else {
-          console.log(`❌ Falha ao salvar fichas de ${p.name}`);
-        }
-        return saved;
-      });
-
-      await Promise.all(savePromises);
-      console.log(`📊 Todas as tentativas de salvamento concluídas`);
+      for (const p of gameState.players) {
+        await saveChipsToDatabase(p.name, p.chips);
+      }
 
       io.to(roomId).emit("round-ended", {
         winner: {
@@ -733,10 +694,18 @@ io.on("connection", (socket) => {
           chips: p.chips,
         })),
       });
+
+      console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
     }
 
-    // ✅ Resetar para nova mão
     setTimeout(() => {
+      gameState.players.forEach((p) => {
+        const playerInRoom = room.players.find((rp) => rp.id === p.id);
+        if (playerInRoom) {
+          playerInRoom.chips = p.chips;
+        }
+      });
+
       room.gameState = null;
       room.players.forEach((p) => {
         p.isReady = false;
@@ -763,7 +732,6 @@ io.on("connection", (socket) => {
     const room = rooms.get(normalizedRoomId);
     if (!room) return;
 
-    // ✅ SALVAR FICHAS AO SAIR DA SALA (garantia)
     for (const player of room.players) {
       if (player.id === socket.id) {
         await saveChipsToDatabase(player.name, player.chips);
@@ -807,6 +775,8 @@ const PORT = process.env.PORT || 3001;
 io.listen(PORT);
 console.log(`\n🚀 Servidor Socket.IO rodando na porta ${PORT}`);
 console.log(`📋 Texas Hold'em Online pronto!\n`);
+console.log(`💡 Fluxo correto:`);
+console.log(`  1. Preflop -> 2. Flop -> 3. Turn -> 4. River -> 5. Showdown\n`);
 console.log(`💡 Para testar:`);
 console.log(`  - Abra duas janelas (Edge e Chrome)`);
 console.log(`  - Entre na mesma sala`);
