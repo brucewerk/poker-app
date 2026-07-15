@@ -134,10 +134,8 @@ async function getChipsFromDatabase(playerName) {
     });
     const data = await response.json();
     if (data.success) {
-      console.log(`💰 ${playerName} tem ${data.chips} fichas no MongoDB`);
       return data.chips || 1000;
     }
-    console.log(`⚠️ Erro ao buscar fichas de ${playerName}: ${data.error}`);
     return 1000;
   } catch (error) {
     console.error(`❌ Erro ao buscar fichas de ${playerName}:`, error.message);
@@ -172,7 +170,6 @@ async function broadcastRoomList() {
   for (const [roomId, room] of rooms) {
     const updatedPlayers = [];
     for (const player of room.players) {
-      // ✅ SEMPRE BUSCAR DO MONGODB
       const currentChips = await getChipsFromDatabase(player.name);
       updatedPlayers.push({
         name: player.name,
@@ -698,6 +695,7 @@ io.on("connection", (socket) => {
       console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
     }
 
+    // ✅ TEMPO AUMENTADO PARA 8 SEGUNDOS (8000ms)
     setTimeout(async () => {
       gameState.players.forEach((p) => {
         const playerInRoom = room.players.find((rp) => rp.id === p.id);
@@ -722,7 +720,7 @@ io.on("connection", (socket) => {
       await broadcastRoomList();
 
       console.log(`🔄 Nova mão disponível na sala ${roomId}`);
-    }, 8000);
+    }, 8000); // ✅ 8 segundos
   }
 
   // ====================== SAIR ======================
