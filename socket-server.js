@@ -167,7 +167,6 @@ async function broadcastRoomList() {
   const roomList = [];
 
   for (const [roomId, room] of rooms) {
-    // ✅ Buscar fichas atualizadas para cada jogador na sala
     const updatedPlayers = [];
     for (const player of room.players) {
       const currentChips = await getChipsFromDatabase(player.name);
@@ -175,7 +174,6 @@ async function broadcastRoomList() {
         name: player.name,
         chips: currentChips,
       });
-      // Atualizar as fichas do jogador na sala
       player.chips = currentChips;
     }
 
@@ -672,7 +670,6 @@ io.on("connection", (socket) => {
     if (winner) {
       winner.chips += gameState.pot;
 
-      // ✅ SALVAR FICHAS DE TODOS OS JOGADORES NO MONGODB
       console.log(
         `💾 Salvando fichas de ${gameState.players.length} jogadores...`,
       );
@@ -698,7 +695,7 @@ io.on("connection", (socket) => {
       console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
     }
 
-    setTimeout(() => {
+    setTimeout(async () => {
       gameState.players.forEach((p) => {
         const playerInRoom = room.players.find((rp) => rp.id === p.id);
         if (playerInRoom) {
@@ -719,7 +716,8 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("room-update", room);
       io.to(roomId).emit("game-reset");
 
-      broadcastRoomList();
+      // ✅ AGORA await está dentro de uma função async (setTimeout com async)
+      await broadcastRoomList();
 
       console.log(`🔄 Nova mão disponível na sala ${roomId}`);
     }, 8000);
@@ -750,7 +748,8 @@ io.on("connection", (socket) => {
     } else {
       io.to(normalizedRoomId).emit("room-update", room);
     }
-    broadcastRoomList();
+
+    await broadcastRoomList();
   });
 
   socket.on("disconnect", () => {

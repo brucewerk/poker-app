@@ -91,11 +91,13 @@ export default function PokerGame() {
   const [onlineGame, setOnlineGame] = useState(null);
   const [currentChips, setCurrentChips] = useState(0);
   const [isRefreshingChips, setIsRefreshingChips] = useState(false);
+  const [isCpuGamePaused, setIsCpuGamePaused] = useState(false);
   const cpuTimerRef = useRef(null);
   const autoSaveRef = useRef(null);
   const pendingSaveRef = useRef(false);
   const gameInitialized = useRef(false);
   const chipsSyncedRef = useRef(false);
+  const hasLeftOnlineRef = useRef(false);
 
   const currentUser = session?.user?.username || null;
   const userChips = session?.user?.chips || 0;
@@ -130,26 +132,116 @@ export default function PokerGame() {
 
     try {
       const chips = await fetchChipsFromDB();
-      if (chips !== null && chips !== currentChips) {
+      if (chips !== null) {
         setCurrentChips(chips);
-        setGame((prev) => {
-          if (prev.playerMoney !== chips && !prev.handActive) {
-            console.log(
-              `🔄 Atualizando saldo do jogo: ${prev.playerMoney} -> ${chips}`,
-            );
-            return { ...prev, playerMoney: chips };
-          }
-          return prev;
-        });
+
+        if (!isCpuGamePaused) {
+          setGame((prev) => {
+            if (!prev.handActive || prev.playerMoney !== chips) {
+              console.log(
+                `🔄 Atualizando saldo do jogo: ${prev.playerMoney} -> ${chips}`,
+              );
+              return { ...prev, playerMoney: chips };
+            }
+            return prev;
+          });
+        }
+
         await update();
-        console.log(`🔄 Fichas atualizadas: ${chips}`);
+        console.log(
+          `🔄 Sessão atualizada: ${currentUser} agora tem ${chips} fichas`,
+        );
       }
     } catch (error) {
       console.error("Erro ao atualizar fichas:", error);
     } finally {
       setIsRefreshingChips(false);
     }
-  }, [fetchChipsFromDB, currentChips, update, isRefreshingChips]);
+  }, [fetchChipsFromDB, currentUser, update, isCpuGamePaused]);
+
+  // ====================== SALVAR ESTADO DO JOGO ======================
+  const saveGameState = useCallback(
+    async (state) => {
+      if (!currentUser || !state.handActive || state.gameOver) return;
+
+      try {
+        const gameStateToSave = {
+          deck: state.deck.slice(0, 20),
+          community: state.community,
+          playerCards: state.playerCards,
+          cpuCards: state.cpuCards,
+          pot: state.pot,
+          playerMoney: state.playerMoney,
+          cpuMoney: state.cpuMoney,
+          currentBet: state.currentBet,
+          playerBet: state.playerBet,
+          cpuBet: state.cpuBet,
+          stage: state.stage,
+          handActive: state.handActive,
+          waitingPlayer: state.waitingPlayer,
+          gameOver: state.gameOver,
+          playerAllin: state.playerAllin,
+          cpuAllin: state.cpuAllin,
+          raiseCounter: state.raiseCounter,
+          showdownStarted: state.showdownStarted,
+          playerHandName: state.playerHandName,
+          cpuHandName: state.cpuHandName,
+          winnerMsg: state.winnerMsg,
+          cpuThought: state.cpuThought,
+          playerSuggestion: state.playerSuggestion,
+          gameStatus: state.gameStatus,
+          timestamp: Date.now(),
+        };
+
+        await fetch("/api/save-game-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: currentUser,
+            gameState: gameStateToSave,
+          }),
+        });
+      } catch (error) {
+        console.error("Erro ao salvar estado do jogo:", error);
+      }
+    },
+    [currentUser],
+  );
+
+  // ====================== PAUSAR JOGO CPU ======================
+  const pauseCpuGame = useCallback(() => {
+    if (!isCpuGamePaused) {
+      console.log("⏸️ Pausando jogo contra CPU...");
+      setIsCpuGamePaused(true);
+      saveGameState(game);
+    }
+  }, [isCpuGamePaused, game, saveGameState]);
+
+  // ====================== FORÇAR RESTAURAÇÃO DO JOGO CPU ======================
+  const restoreCpuGame = useCallback(async () => {
+    console.log("🔄 Restaurando jogo contra CPU...");
+    const chips = await fetchChipsFromDB();
+    const finalChips = chips || currentChips || session?.user?.chips || 1000;
+
+    setCurrentChips(finalChips);
+    setIsCpuGamePaused(false);
+
+    setGame((prev) => ({
+      ...prev,
+      ...INITIAL_GAME,
+      playerMoney: finalChips,
+      cpuMoney: 1000,
+      handActive: false,
+      gameOver: false,
+    }));
+
+    setTimeout(() => {
+      startNewHand(currentUser, finalChips);
+    }, 300);
+
+    await update();
+    console.log(`🔄 Jogo CPU restaurado com ${finalChips} fichas`);
+  }, [fetchChipsFromDB, currentChips, session, currentUser, update]);
 
   // ====================== ATUALIZAR AO INICIAR ======================
   useEffect(() => {
@@ -158,6 +250,15 @@ export default function PokerGame() {
       refreshUserChips();
     }
   }, [status, currentUser, refreshUserChips]);
+
+  // ====================== FORÇAR ATUALIZAÇÃO AO VOLTAR DO MULTIPLAYER ======================
+  useEffect(() => {
+    if (!onlineGame && !showOnline && currentUser && hasLeftOnlineRef.current) {
+      console.log("🔄 Saindo do multiplayer, restaurando jogo CPU...");
+      hasLeftOnlineRef.current = false;
+      restoreCpuGame();
+    }
+  }, [onlineGame, showOnline, currentUser, restoreCpuGame]);
 
   // ====================== CONFIGURAÇÕES DE DELAY ======================
   const getDelays = useCallback(() => {
@@ -245,7 +346,9 @@ export default function PokerGame() {
         const data = await res.json();
         if (data.success) {
           setCurrentChips(chips);
-          setGame((prev) => ({ ...prev, playerMoney: chips }));
+          if (!isCpuGamePaused) {
+            setGame((prev) => ({ ...prev, playerMoney: chips }));
+          }
           await update();
           console.log(
             `🔄 Sessão atualizada: ${user} agora tem ${chips} fichas`,
@@ -263,57 +366,25 @@ export default function PokerGame() {
         }
       }
     },
-    [isSaving, update],
+    [isSaving, update, isCpuGamePaused],
   );
 
-  // ====================== SALVAR ESTADO DO JOGO ======================
-  const saveGameState = useCallback(
-    async (state) => {
-      if (!currentUser || !state.handActive || state.gameOver) return;
+  // ====================== SALVAR ESTADO AUTOMATICAMENTE ======================
+  useEffect(() => {
+    if (
+      game.handActive &&
+      !game.gameOver &&
+      currentUser &&
+      gameInitialized.current &&
+      !isCpuGamePaused
+    ) {
+      const saveInterval = setInterval(() => {
+        saveGameState(game);
+      }, 10000);
 
-      try {
-        const gameStateToSave = {
-          deck: state.deck.slice(0, 20),
-          community: state.community,
-          playerCards: state.playerCards,
-          cpuCards: state.cpuCards,
-          pot: state.pot,
-          playerMoney: state.playerMoney,
-          cpuMoney: state.cpuMoney,
-          currentBet: state.currentBet,
-          playerBet: state.playerBet,
-          cpuBet: state.cpuBet,
-          stage: state.stage,
-          handActive: state.handActive,
-          waitingPlayer: state.waitingPlayer,
-          gameOver: state.gameOver,
-          playerAllin: state.playerAllin,
-          cpuAllin: state.cpuAllin,
-          raiseCounter: state.raiseCounter,
-          showdownStarted: state.showdownStarted,
-          playerHandName: state.playerHandName,
-          cpuHandName: state.cpuHandName,
-          winnerMsg: state.winnerMsg,
-          cpuThought: state.cpuThought,
-          playerSuggestion: state.playerSuggestion,
-          gameStatus: state.gameStatus,
-          timestamp: Date.now(),
-        };
-
-        await fetch("/api/save-game-state", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: currentUser,
-            gameState: gameStateToSave,
-          }),
-        });
-      } catch (error) {
-        console.error("Erro ao salvar estado do jogo:", error);
-      }
-    },
-    [currentUser],
-  );
+      return () => clearInterval(saveInterval);
+    }
+  }, [game, currentUser, saveGameState, isCpuGamePaused]);
 
   // ====================== RECUPERAR ESTADO SALVO ======================
   useEffect(() => {
@@ -354,22 +425,6 @@ export default function PokerGame() {
       loadGameState();
     }
   }, [status, currentUser, userChips, currentChips]);
-
-  // ====================== SALVAR ESTADO AUTOMATICAMENTE ======================
-  useEffect(() => {
-    if (
-      game.handActive &&
-      !game.gameOver &&
-      currentUser &&
-      gameInitialized.current
-    ) {
-      const saveInterval = setInterval(() => {
-        saveGameState(game);
-      }, 10000);
-
-      return () => clearInterval(saveInterval);
-    }
-  }, [game, currentUser, saveGameState]);
 
   // ====================== ATUALIZAR ESTATÍSTICAS ======================
   const updateStats = useCallback(
@@ -1234,9 +1289,11 @@ export default function PokerGame() {
     (data) => {
       setOnlineGame(data);
       setShowOnline(false);
+      pauseCpuGame();
+      hasLeftOnlineRef.current = false;
       showNotification(`🌐 Entrou na sala ${data.roomId}!`, false);
     },
-    [showNotification],
+    [showNotification, pauseCpuGame],
   );
 
   const handleLeaveOnlineGame = useCallback(
@@ -1244,38 +1301,13 @@ export default function PokerGame() {
       setOnlineGame(null);
       showNotification("👋 Saiu do jogo online", false);
 
-      await refreshUserChips();
+      hasLeftOnlineRef.current = true;
 
-      if (shouldReset) {
-        console.log("🔄 Resetando jogo contra CPU com saldo atualizado");
-        setGame((prev) => {
-          const money = currentChips || session?.user?.chips || 1000;
-          return {
-            ...prev,
-            playerMoney: money,
-            cpuMoney: 1000,
-            gameOver: false,
-            handActive: false,
-            showdownStarted: false,
-            winnerMsg: "",
-            cpuThought: "",
-            playerHandName: "",
-            cpuHandName: "🔒 ???",
-          };
-        });
-        setTimeout(
-          () =>
-            startNewHand(
-              currentUser,
-              currentChips || session?.user?.chips || 1000,
-            ),
-          200,
-        );
-      }
+      await refreshUserChips();
 
       console.log("🔄 Fichas atualizadas ao sair do multiplayer");
     },
-    [showNotification, refreshUserChips, currentChips, session, currentUser],
+    [showNotification, refreshUserChips],
   );
 
   // ====================== SUGESTÃO DO JOGADOR ======================

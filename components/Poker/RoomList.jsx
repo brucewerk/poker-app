@@ -9,9 +9,12 @@ export default function RoomList({ socket, onJoinRoom }) {
   useEffect(() => {
     if (!socket) return;
 
+    // ✅ Solicitar lista de salas ao montar
     socket.emit("list-rooms");
 
+    // ✅ Ouvir atualizações da lista
     socket.on("room-list", (data) => {
+      console.log("📡 Lista de salas atualizada:", data);
       setRooms(data);
     });
 
@@ -22,7 +25,7 @@ export default function RoomList({ socket, onJoinRoom }) {
 
   if (rooms.length === 0) {
     return (
-      <div style={emptyStyle()}>
+      <div style={containerStyle()}>
         <p style={emptyTextStyle()}>📭 Nenhuma sala disponível no momento.</p>
         <p style={emptySubStyle()}>Crie uma sala para começar a jogar!</p>
       </div>
@@ -203,18 +206,9 @@ function gameActiveStyle() {
   };
 }
 
-function emptyStyle() {
-  return {
-    marginTop: "15px",
-    padding: "20px",
-    background: "rgba(0,0,0,0.3)",
-    borderRadius: 15,
-    textAlign: "center",
-  };
-}
-
 function emptyTextStyle() {
   return {
+    textAlign: "center",
     color: "#888",
     fontSize: "0.9rem",
     margin: "0 0 5px",
@@ -223,6 +217,7 @@ function emptyTextStyle() {
 
 function emptySubStyle() {
   return {
+    textAlign: "center",
     color: "#666",
     fontSize: "0.8rem",
     margin: 0,
