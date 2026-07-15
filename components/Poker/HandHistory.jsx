@@ -17,14 +17,22 @@ export default function HandHistory({ username }) {
 
     try {
       setRefreshing(true);
-      const res = await fetch("/api/get-hand-history");
+      const res = await fetch(
+        `/api/get-hand-history?username=${encodeURIComponent(username)}`,
+      );
       const data = await res.json();
 
       if (data.success) {
         setHistory(data.handHistory || []);
+      } else {
+        // ✅ Se a API não existir, usa dados vazios
+        console.log("ℹ️ API de histórico não disponível, usando dados vazios");
+        setHistory([]);
       }
     } catch (error) {
-      console.error("Erro ao carregar histórico:", error);
+      // ✅ Em caso de erro, usa dados vazios
+      console.log("ℹ️ Erro ao carregar histórico, usando dados vazios");
+      setHistory([]);
     } finally {
       setLoading(false);
       setRefreshing(false);

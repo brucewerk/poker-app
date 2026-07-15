@@ -9,22 +9,48 @@ export default function FriendsList({ username }) {
   const [showFriends, setShowFriends] = useState(false);
   const [newFriend, setNewFriend] = useState("");
   const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (username) {
       fetchFriends();
+    } else {
+      setLoading(false);
     }
   }, [username]);
 
   const fetchFriends = async () => {
+    if (!username) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch("/api/friends");
+      setLoading(true);
+      const res = await fetch(
+        `/api/friends?username=${encodeURIComponent(username)}`,
+      );
       const data = await res.json();
       if (data.success) {
-        setFriends(data.friends || []);
+        // 🔥 Garantir que cada amigo tenha os campos corretos
+        const validFriends = (data.friends || []).map((friend) => ({
+          username: friend.username || "Desconhecido",
+          level: friend.level || 1,
+          chips: friend.chips || 0,
+          isOnline: friend.isOnline || false,
+        }));
+        setFriends(validFriends);
+        console.log(
+          `✅ ${validFriends.length} amigos carregados:`,
+          validFriends,
+        );
+      } else {
+        console.log("ℹ️ API de amigos retornou erro:", data.error);
+        setFriends([]);
       }
     } catch (error) {
-      console.error("Erro ao carregar amigos:", error);
+      console.log("ℹ️ Erro ao carregar amigos:", error);
+      setFriends([]);
     } finally {
       setLoading(false);
     }
@@ -33,6 +59,7 @@ export default function FriendsList({ username }) {
   const addFriend = async () => {
     if (!newFriend.trim()) return;
     setError("");
+    setRefreshing(true);
 
     try {
       const res = await fetch("/api/friends", {
@@ -47,16 +74,21 @@ export default function FriendsList({ username }) {
       const data = await res.json();
       if (data.success) {
         setNewFriend("");
-        fetchFriends();
+        await fetchFriends();
+        alert(`✅ ${newFriend.trim()} adicionado como amigo!`);
       } else {
         setError(data.error || "Erro ao adicionar amigo");
       }
     } catch (error) {
       setError("Erro de conexão");
+    } finally {
+      setRefreshing(false);
     }
   };
 
   const removeFriend = async (friendUsername) => {
+    if (!confirm(`Remover ${friendUsername} da lista de amigos?`)) return;
+
     try {
       const res = await fetch("/api/friends", {
         method: "POST",
@@ -69,10 +101,11 @@ export default function FriendsList({ username }) {
 
       const data = await res.json();
       if (data.success) {
-        fetchFriends();
+        await fetchFriends();
       }
     } catch (error) {
       console.error("Erro ao remover amigo:", error);
+      alert("Erro ao remover amigo");
     }
   };
 
@@ -107,24 +140,42 @@ export default function FriendsList({ username }) {
               placeholder="Nome do amigo"
               style={inputStyle()}
               onKeyPress={(e) => e.key === "Enter" && addFriend()}
+              disabled={refreshing}
             />
-            <button onClick={addFriend} style={addButtonStyle()}>
-              Adicionar
+            <button
+              onClick={addFriend}
+              style={addButtonStyle()}
+              disabled={refreshing || !newFriend.trim()}
+            >
+              {refreshing ? "⏳" : "Adicionar"}
             </button>
           </div>
 
           {error && <div style={errorStyle()}>{error}</div>}
 
           {friends.length === 0 ? (
-            <p style={emptyStyle()}>Nenhum amigo adicionado ainda.</p>
+            <p style={emptyStyle()}>
+              {username
+                ? "Nenhum amigo adicionado ainda."
+                : "Faça login para ver seus amigos."}
+            </p>
           ) : (
             <div style={friendsListStyle()}>
               {friends.map((friend, index) => (
                 <div key={index} style={friendItemStyle()}>
                   <div style={friendInfoStyle()}>
-                    <span style={friendNameStyle()}>{friend.username}</span>
-                    <span style={friendLevelStyle()}>Nv. {friend.level}</span>
-                    <span style={friendChipsStyle()}>💰 {friend.chips}</span>
+                    <span style={friendNameStyle()}>
+                      {friend.username || "Desconhecido"}
+                    </span>
+                    <span style={friendLevelStyle()}>
+                      Nv. {friend.level || 1}
+                    </span>
+                    <span style={friendChipsStyle()}>
+                      💰 {friend.chips || 0}
+                    </span>
+                    {friend.isOnline && (
+                      <span style={onlineBadgeStyle()}>🟢 Online</span>
+                    )}
                   </div>
                   <button
                     onClick={() => removeFriend(friend.username)}
@@ -287,6 +338,16 @@ function friendChipsStyle() {
   return {
     color: "#4caf50",
     fontSize: "0.7rem",
+  };
+}
+
+function onlineBadgeStyle() {
+  return {
+    fontSize: "0.6rem",
+    color: "#4caf50",
+    background: "rgba(76,175,80,0.2)",
+    padding: "2px 8px",
+    borderRadius: 10,
   };
 }
 

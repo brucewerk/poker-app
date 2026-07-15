@@ -1,57 +1,70 @@
 // app/api/get-stats/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { connectDB } from "@/lib/mongodb";
+import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
-import { getAchievementById } from "@/lib/achievements";
 
-export async function GET(req) {
+export async function GET(request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
     if (!session) {
       return NextResponse.json(
-        { success: false, error: "Não autenticado" },
+        { success: false, error: "Não autorizado" },
         { status: 401 },
       );
     }
 
-    await connectDB();
+    const { searchParams } = new URL(request.url);
+    // 🔥 Usar o username da sessão se não for fornecido
+    const username = searchParams.get("username") || session.user.username;
 
-    const user = await User.findOne({ username: session.user.username });
-    if (!user) {
+    if (!username) {
       return NextResponse.json(
-        { success: false, error: "Usuário não encontrado" },
-        { status: 404 },
+        { success: false, error: "Username não fornecido" },
+        { status: 400 },
       );
     }
 
-    // Formatar estatísticas para exibição
-    const stats = user.stats || {};
-    const achievements = (user.achievements || [])
-      .map((id) => getAchievementById(id))
-      .filter(Boolean);
-    const totalAchievements = Object.keys(
-      require("@/lib/achievements").ACHIEVEMENTS,
-    ).length;
+    await dbConnect();
+
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return NextResponse.json({
+        success: true,
+        stats: {
+          handsPlayed: 0,
+          handsWon: 0,
+          totalChipsWon: 0,
+          biggestWin: 0,
+          bestStreak: 0,
+          bestHand: "",
+          allInWins: 0,
+        },
+        achievements: [],
+        message: "Usuário não encontrado",
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      stats: {
-        ...stats,
-        winRate:
-          stats.handsPlayed > 0
-            ? Math.round((stats.handsWon / stats.handsPlayed) * 100)
-            : 0,
-        achievementProgress: `${achievements.length}/${totalAchievements}`,
+      stats: user.stats || {
+        handsPlayed: 0,
+        handsWon: 0,
+        totalChipsWon: 0,
+        biggestWin: 0,
+        bestStreak: 0,
+        bestHand: "",
+        allInWins: 0,
       },
-      achievements,
-      totalAchievements,
+      achievements: user.achievements || [],
+      level: user.level || 1,
+      xp: user.xp || 0,
     });
   } catch (error) {
     console.error("Erro ao buscar estatísticas:", error);
     return NextResponse.json(
-      { success: false, error: "Erro interno do servidor" },
+      { success: false, error: error.message },
       { status: 500 },
     );
   }

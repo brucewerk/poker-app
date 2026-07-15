@@ -1,54 +1,47 @@
-// app/api/public/save-chips/route.js
+// app/api/save-chips/route.js
 import { NextResponse } from "next/server";
-import { connectDB } from "@/lib/mongodb";
+import { getServerSession } from "next-auth";
+import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
 
-export async function POST(req) {
+export async function POST(request) {
   try {
-    const { username, chips } = await req.json();
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: "Não autorizado" },
+        { status: 401 },
+      );
+    }
 
-    console.log(
-      `📥 Recebendo requisição para salvar ${username}: ${chips} fichas`,
-    );
+    const { username, chips } = await request.json();
 
     if (!username) {
       return NextResponse.json(
-        { success: false, error: "Usuário não informado" },
+        { success: false, error: "Username não fornecido" },
         { status: 400 },
       );
     }
 
-    if (!Number.isInteger(chips) || chips < 0 || chips > 1_000_000) {
+    if (typeof chips !== "number" || chips < 0) {
       return NextResponse.json(
-        { success: false, error: "Fichas inválidas" },
+        { success: false, error: "Valor de fichas inválido" },
         { status: 400 },
       );
     }
 
-    await connectDB();
+    await dbConnect();
 
-    const user = await User.findOne({ username });
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Usuário não encontrado" },
-        { status: 404 },
-      );
-    }
-
-    user.chips = chips;
-    await user.save();
-
-    console.log(`✅ ${username}: ${chips} fichas salvas no MongoDB`);
+    await User.updateOne({ username }, { $set: { chips } }, { upsert: true });
 
     return NextResponse.json({
       success: true,
-      chips: user.chips,
-      message: `Fichas de ${username} atualizadas para ${chips}`,
+      chips,
     });
   } catch (error) {
-    console.error("❌ Erro ao salvar fichas:", error);
+    console.error("Erro ao salvar fichas:", error);
     return NextResponse.json(
-      { success: false, error: "Erro interno do servidor" },
+      { success: false, error: error.message },
       { status: 500 },
     );
   }

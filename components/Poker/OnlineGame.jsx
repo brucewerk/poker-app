@@ -1,7 +1,7 @@
 // components/Poker/OnlineGame.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 
 function getRankDisplay(rank) {
@@ -33,6 +33,14 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   const [isReady, setIsReady] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [resultData, setResultData] = useState(null);
+  const [isSummaryClosing, setIsSummaryClosing] = useState(false);
+  const [closedCount, setClosedCount] = useState(0);
+  const [totalPlayers, setTotalPlayers] = useState(0);
+
+  // 🔥 REFS
+  const resultLockedRef = useRef(false);
+  const resultClosedRef = useRef(false);
+  const isClosingRef = useRef(false);
 
   useEffect(() => {
     console.log("🔄 OnlineGame montado, socket:", socket?.id);
@@ -47,8 +55,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     const onGameStarted = (data) => {
       console.log("📡 game-started:", data);
       setGameState(data);
-      setShowResult(false);
-      setResultData(null);
+      setIsSummaryClosing(false);
       if (data.currentPlayerIndex !== undefined) {
         const currentPlayer = data.players[data.currentPlayerIndex];
         setIsMyTurn(currentPlayer?.id === socket.id);
@@ -69,38 +76,83 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       setIsMyTurn(data.playerId === socket.id);
     };
 
+    // 🔥 QUANDO O RESULTADO CHEGA
     const onRoundEnded = (data) => {
-      console.log("📡 round-ended:", data);
+      console.log("📡 ROUND-ENDED recebido!");
+
+      // 🔒 TRAVAR O MODAL
+      resultLockedRef.current = true;
+      resultClosedRef.current = false;
+      isClosingRef.current = false;
+
       setResultData(data);
       setShowResult(true);
+      setIsSummaryClosing(false);
 
-      setTimeout(() => {
-        update();
-        console.log("🔄 Sessão atualizada após partida online");
-      }, 1000);
+      // 🔥 Atualizar contadores
+      const playersWithStatus = data.players || [];
+      setTotalPlayers(playersWithStatus.length);
+      const closed = playersWithStatus.filter((p) => p.hasClosedSummary).length;
+      setClosedCount(closed);
+
+      console.log(
+        `📊 Modal aberto! ${closed}/${playersWithStatus.length} jogadores fecharam`,
+      );
     };
 
-    const onGameReset = () => {
-      console.log("📡 game-reset");
-      setGameState(null);
-      setShowResult(false);
-      setResultData(null);
+    // 🔥 PROGRESSO - atualiza quem já fechou
+    const onSummaryProgress = (data) => {
+      console.log("📡 summary-progress:", data);
+      if (data.roomId === roomId) {
+        setClosedCount(data.closedCount || 0);
+        setTotalPlayers(data.totalPlayers || 0);
+
+        // Atualizar resultado data com os novos status
+        setResultData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            players: data.players || prev.players,
+          };
+        });
+      }
     };
 
+    // 🔥 QUANDO TODOS FECHARAM OU TIMER
+    const onSummaryClosed = (data) => {
+      console.log("📡 summary-closed:", data);
+      if (data.roomId === roomId) {
+        resultLockedRef.current = false;
+        resultClosedRef.current = true;
+        isClosingRef.current = true;
+        setShowResult(false);
+        setResultData(null);
+        setIsSummaryClosing(false);
+        setGameState(null);
+        setClosedCount(0);
+        setTotalPlayers(0);
+      }
+    };
+
+    // Limpar listeners antigos
     socket.off("room-update");
     socket.off("game-started");
     socket.off("game-update");
     socket.off("player-turn");
     socket.off("round-ended");
     socket.off("game-reset");
+    socket.off("summary-closed");
+    socket.off("summary-progress");
     socket.off("error");
 
+    // Registrar novos listeners
     socket.on("room-update", onRoomUpdate);
     socket.on("game-started", onGameStarted);
     socket.on("game-update", onGameUpdate);
     socket.on("player-turn", onPlayerTurn);
     socket.on("round-ended", onRoundEnded);
-    socket.on("game-reset", onGameReset);
+    socket.on("summary-closed", onSummaryClosed);
+    socket.on("summary-progress", onSummaryProgress);
 
     return () => {
       console.log("🔌 OnlineGame desmontando, removendo listeners...");
@@ -109,9 +161,24 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       socket.off("game-update", onGameUpdate);
       socket.off("player-turn", onPlayerTurn);
       socket.off("round-ended", onRoundEnded);
-      socket.off("game-reset", onGameReset);
+      socket.off("summary-closed", onSummaryClosed);
+      socket.off("summary-progress", onSummaryProgress);
     };
-  }, [socket, update]);
+  }, [socket, update, roomId]);
+
+  // 🔥 FECHAR RESUMO - APENAS PARA QUEM CLICOU
+  const handleCloseSummary = () => {
+    if (isClosingRef.current) return;
+    if (resultClosedRef.current) return;
+    if (!resultLockedRef.current) return;
+
+    console.log("🖱️ USUÁRIO CLICOU EM FECHAR!");
+    isClosingRef.current = true;
+    setIsSummaryClosing(true);
+
+    console.log(`📤 Emitindo close-summary para sala ${roomId}`);
+    socket.emit("close-summary", { roomId });
+  };
 
   const handleAction = (action, amount = 0) => {
     console.log(`📤 Enviando ação: ${action}`, { roomId, action, amount });
@@ -130,16 +197,22 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     await update();
     console.log("🔄 Sessão atualizada ao sair da sala");
 
-    // ✅ Passar true para indicar que deve fazer "Nova Mão"
     onLeave(true);
   };
 
-  // ✅ Modal de resultado
-  if (showResult && resultData) {
+  // ✅ MODAL DE RESULTADO
+  if (showResult && resultData && resultLockedRef.current) {
+    const total = totalPlayers || resultData.players?.length || 0;
+    const closed =
+      closedCount ||
+      resultData.players?.filter((p) => p.hasClosedSummary).length ||
+      0;
+    const isAllClosed = closed >= total && total > 0;
+
     return (
       <div style={resultOverlayStyle()}>
         <div style={resultModalStyle()}>
-          <h2 style={resultTitleStyle()}>🏆 RESULTADO</h2>
+          <h2 style={resultTitleStyle()}>🏆 RESULTADO DA PARTIDA</h2>
 
           <div style={resultPotStyle()}>💰 Pote: {resultData.pot} fichas</div>
 
@@ -175,17 +248,70 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             🎉 {resultData.winner.name} venceu {resultData.pot} fichas!
           </div>
 
-          <button
-            onClick={() => setShowResult(false)}
-            style={resultButtonStyle()}
+          {/* 🔥 INDICADOR DE PROGRESSO */}
+          <div style={resultStatusStyle()}>
+            <span style={{ color: "#888", fontSize: "0.85rem" }}>
+              👥 {closed}/{total} jogadores já fecharam
+            </span>
+            <span style={{ color: "#666", fontSize: "0.75rem" }}>
+              ⏳ Fechamento automático em 25s
+            </span>
+          </div>
+
+          {/* 🔥 BARRA DE PROGRESSO */}
+          <div style={progressBarContainerStyle()}>
+            <div
+              style={{
+                ...progressBarFillStyle(),
+                width: `${total > 0 ? (closed / total) * 100 : 0}%`,
+              }}
+            />
+          </div>
+
+          {/* 🔥 BOTÃO DE FECHAR */}
+          <div style={resultButtonsStyle()}>
+            <button
+              onClick={handleCloseSummary}
+              disabled={isSummaryClosing || isAllClosed}
+              style={{
+                ...resultButtonStyle(),
+                opacity: isSummaryClosing || isAllClosed ? 0.6 : 1,
+              }}
+            >
+              {isAllClosed
+                ? "✅ Todos fecharam!"
+                : isSummaryClosing
+                  ? "⏳ Fechando..."
+                  : "✕ FECHAR RESUMO"}
+            </button>
+          </div>
+
+          <p style={resultHintStyle()}>
+            {isAllClosed
+              ? "✅ Todos os jogadores já fecharam! Aguarde..."
+              : isSummaryClosing
+                ? "⏳ Fechando o resumo..."
+                : `💡 Clique no botão para fechar. Aguarde os outros (${closed}/${total})`}
+          </p>
+
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: "0.7rem",
+              color: "#4caf50",
+              marginTop: "10px",
+              paddingTop: "10px",
+              borderTop: "1px solid rgba(76,175,80,0.3)",
+            }}
           >
-            CONTINUAR
-          </button>
+            🔒 Resumo travado - Aguardando sua ação
+          </div>
         </div>
       </div>
     );
   }
 
+  // ====================== LOBBY ======================
   if (!gameState) {
     return (
       <div style={lobbyStyle()}>
@@ -220,6 +346,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     );
   }
 
+  // ====================== JOGO ======================
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const isCurrentPlayerMe = currentPlayer?.id === socket?.id;
 
@@ -442,6 +569,50 @@ function resultWinnerStyle() {
   };
 }
 
+// 🔥 NOVOS ESTILOS PARA PROGRESSO
+function resultStatusStyle() {
+  return {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "8px 12px",
+    background: "rgba(0,0,0,0.3)",
+    borderRadius: 10,
+    marginBottom: "10px",
+    flexWrap: "wrap",
+    gap: "5px",
+  };
+}
+
+function progressBarContainerStyle() {
+  return {
+    width: "100%",
+    height: "6px",
+    background: "rgba(255,255,255,0.1)",
+    borderRadius: 5,
+    overflow: "hidden",
+    marginBottom: "15px",
+  };
+}
+
+function progressBarFillStyle() {
+  return {
+    height: "100%",
+    background: "linear-gradient(90deg, #4caf50, gold)",
+    borderRadius: 5,
+    transition: "width 0.5s ease",
+  };
+}
+
+function resultButtonsStyle() {
+  return {
+    display: "flex",
+    justifyContent: "center",
+    gap: "10px",
+    marginTop: "10px",
+  };
+}
+
 function resultButtonStyle() {
   return {
     background: "radial-gradient(#f7d97c,#d6a12e)",
@@ -454,9 +625,20 @@ function resultButtonStyle() {
     boxShadow: "0 4px 0 #7a4c1a",
     color: "#2e241f",
     width: "100%",
+    transition: "all 0.3s ease",
   };
 }
 
+function resultHintStyle() {
+  return {
+    textAlign: "center",
+    fontSize: "0.75rem",
+    color: "#888",
+    marginTop: "10px",
+  };
+}
+
+// ====================== ESTILOS EXISTENTES ======================
 function lobbyStyle() {
   return {
     background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",

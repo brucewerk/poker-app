@@ -163,6 +163,39 @@ async function saveChipsToDatabase(playerName, chips) {
   }
 }
 
+// ====================== FUNÇÃO PARA CLONAR GAMESTATE ======================
+function sanitizeGameState(gameState) {
+  if (!gameState) return null;
+  return {
+    phase: gameState.phase,
+    communityCards: gameState.communityCards
+      ? [...gameState.communityCards]
+      : [],
+    players: gameState.players
+      ? gameState.players.map((p) => ({
+          id: p.id,
+          name: p.name,
+          cards: p.cards ? [...p.cards] : [],
+          chips: p.chips,
+          bet: p.bet,
+          isFolded: p.isFolded,
+          isAllIn: p.isAllIn,
+          isActive: p.isActive,
+          hasActed: p.hasActed,
+          hasClosedSummary: p.hasClosedSummary || false,
+        }))
+      : [],
+    pot: gameState.pot,
+    currentBet: gameState.currentBet,
+    currentPlayerIndex: gameState.currentPlayerIndex,
+    dealerIndex: gameState.dealerIndex,
+    actionCount: gameState.actionCount,
+    lastRaiser: gameState.lastRaiser,
+    roundStartIndex: gameState.roundStartIndex,
+    bettingRoundComplete: gameState.bettingRoundComplete,
+  };
+}
+
 // ====================== BROADCAST LISTA DE SALAS ======================
 async function broadcastRoomList() {
   const roomList = [];
@@ -194,12 +227,10 @@ async function broadcastRoomList() {
 io.on("connection", (socket) => {
   console.log(`🟢 Conectado: ${socket.id}`);
 
-  // ====================== LISTAR SALAS ======================
   socket.on("list-rooms", async () => {
     await broadcastRoomList();
   });
 
-  // ====================== CRIAR SALA ======================
   socket.on("create-room", async (data) => {
     const { playerName } = data;
     const roomId = generateRoomId();
@@ -213,9 +244,12 @@ io.on("connection", (socket) => {
           name: playerName,
           chips: userChips,
           isReady: false,
+          hasClosedSummary: false,
         },
       ],
       gameState: null,
+      isSummaryVisible: false,
+      summaryTimer: null,
     });
 
     socket.join(roomId);
@@ -229,7 +263,6 @@ io.on("connection", (socket) => {
     );
   });
 
-  // ====================== ENTRAR NA SALA ======================
   socket.on("join-room", async (data) => {
     const { roomId, playerName } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -259,6 +292,7 @@ io.on("connection", (socket) => {
       name: playerName,
       chips: userChips,
       isReady: false,
+      hasClosedSummary: false,
     });
     socket.join(normalizedRoomId);
 
@@ -270,7 +304,6 @@ io.on("connection", (socket) => {
     );
   });
 
-  // ====================== PRONTO ======================
   socket.on("player-ready", (data) => {
     const { roomId } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -289,7 +322,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ====================== INICIAR JOGO ======================
   function startGame(roomId) {
     const room = rooms.get(roomId);
     if (!room) return;
@@ -311,6 +343,7 @@ io.on("connection", (socket) => {
         isAllIn: false,
         isActive: true,
         hasActed: false,
+        hasClosedSummary: false,
       })),
       pot: 0,
       currentBet: 0,
@@ -361,11 +394,12 @@ io.on("connection", (socket) => {
     gameState.roundStartIndex = gameState.currentPlayerIndex;
 
     room.gameState = gameState;
-    io.to(roomId).emit("game-started", gameState);
+
+    const safeGameState = sanitizeGameState(gameState);
+    io.to(roomId).emit("game-started", safeGameState);
     console.log(`🎮 Jogo iniciado na sala ${roomId}`);
   }
 
-  // ====================== AÇÕES ======================
   socket.on("player-action", (data) => {
     const { roomId, action, amount } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -483,7 +517,6 @@ io.on("connection", (socket) => {
     advanceGame(normalizedRoomId);
   });
 
-  // ====================== FUNÇÕES DE JOGO ======================
   function advanceGame(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -555,7 +588,9 @@ io.on("connection", (socket) => {
     }
 
     gameState.currentPlayerIndex = nextIndex;
-    io.to(roomId).emit("game-update", gameState);
+
+    const safeGameState = sanitizeGameState(gameState);
+    io.to(roomId).emit("game-update", safeGameState);
     io.to(roomId).emit("player-turn", { playerId: players[nextIndex].id });
   }
 
@@ -620,13 +655,113 @@ io.on("connection", (socket) => {
     gameState.currentPlayerIndex = firstActive;
     gameState.roundStartIndex = firstActive;
 
-    io.to(roomId).emit("game-update", gameState);
+    const safeGameState = sanitizeGameState(gameState);
+    io.to(roomId).emit("game-update", safeGameState);
     io.to(roomId).emit("player-turn", { playerId: players[firstActive].id });
     console.log(
       `📢 Fase: ${gameState.phase} - Começa com ${players[firstActive].name}`,
     );
   }
 
+  // ====================== FECHAR RESUMO (APENAS PARA QUEM CLICOU) ======================
+  socket.on("close-summary", async (data) => {
+    const { roomId } = data;
+    const normalizedRoomId = roomId.toUpperCase();
+    const room = rooms.get(normalizedRoomId);
+
+    if (!room) {
+      socket.emit("error", { message: "Sala não encontrada." });
+      return;
+    }
+
+    const player = room.players.find((p) => p.id === socket.id);
+    if (!player) {
+      socket.emit("error", { message: "Jogador não encontrado na sala." });
+      return;
+    }
+
+    // 🔥 Marcar que este jogador já fechou
+    player.hasClosedSummary = true;
+
+    // Atualizar no gameState também
+    if (room.gameState) {
+      const gamePlayer = room.gameState.players.find((p) => p.id === socket.id);
+      if (gamePlayer) {
+        gamePlayer.hasClosedSummary = true;
+      }
+    }
+
+    const closedCount = room.players.filter((p) => p.hasClosedSummary).length;
+    const totalPlayers = room.players.length;
+
+    console.log(
+      `📊 ${player.name} fechou o resumo (${closedCount}/${totalPlayers})`,
+    );
+
+    // 🔥 EMITIR APENAS PARA QUEM CLICOU
+    socket.emit("summary-closed", {
+      roomId: normalizedRoomId,
+      playerId: socket.id,
+    });
+
+    // 🔥 Verificar se TODOS os jogadores já fecharam
+    const allClosed = room.players.every((p) => p.hasClosedSummary === true);
+
+    if (allClosed) {
+      console.log(
+        `✅ Todos os jogadores fecharam! Resetando sala ${normalizedRoomId}`,
+      );
+
+      // Limpar timer se existir
+      if (room.summaryTimer) {
+        clearTimeout(room.summaryTimer);
+        room.summaryTimer = null;
+      }
+
+      // Resetar o jogo para todos
+      if (room.gameState) {
+        for (const p of room.gameState.players) {
+          await saveChipsToDatabase(p.name, p.chips);
+        }
+
+        room.gameState = null;
+        room.isSummaryVisible = false;
+
+        room.players.forEach((p) => {
+          p.isReady = false;
+          p.cards = [];
+          p.bet = 0;
+          p.isFolded = false;
+          p.isAllIn = false;
+          p.isActive = true;
+          p.hasActed = false;
+          p.hasClosedSummary = false;
+        });
+
+        io.to(normalizedRoomId).emit("room-update", room);
+        io.to(normalizedRoomId).emit("game-reset");
+
+        await broadcastRoomList();
+
+        console.log(
+          `🔄 Jogo resetado na sala ${normalizedRoomId} (todos fecharam)`,
+        );
+      }
+    } else {
+      // 🔥 Notificar todos sobre o progresso (quem já fechou)
+      io.to(normalizedRoomId).emit("summary-progress", {
+        roomId: normalizedRoomId,
+        closedCount: closedCount,
+        totalPlayers: totalPlayers,
+        players: room.players.map((p) => ({
+          name: p.name,
+          hasClosed: p.hasClosedSummary,
+        })),
+      });
+    }
+  });
+
+  // ====================== ENCERRAR RODADA (COM TIMER DE 25s) ======================
   async function endRound(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -678,7 +813,18 @@ io.on("connection", (socket) => {
         await saveChipsToDatabase(p.name, p.chips);
       }
 
-      io.to(roomId).emit("round-ended", {
+      room.isSummaryVisible = true;
+
+      // 🔥 Resetar estado de fechamento dos jogadores
+      room.players.forEach((p) => {
+        p.hasClosedSummary = false;
+      });
+      gameState.players.forEach((p) => {
+        p.hasClosedSummary = false;
+      });
+
+      // 🔥 Emitir resultado
+      const roundEndData = {
         winner: {
           name: winner.name,
           chips: winner.chips,
@@ -689,38 +835,64 @@ io.on("connection", (socket) => {
         players: gameState.players.map((p) => ({
           name: p.name,
           chips: p.chips,
+          hasClosedSummary: p.hasClosedSummary || false,
         })),
-      });
+      };
+
+      io.to(roomId).emit("round-ended", roundEndData);
 
       console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
-    }
+      console.log(`📊 Resumo enviado. Aguardando cliques individuais...`);
 
-    // ✅ TEMPO AUMENTADO PARA 8 SEGUNDOS (8000ms)
-    setTimeout(async () => {
-      gameState.players.forEach((p) => {
-        const playerInRoom = room.players.find((rp) => rp.id === p.id);
-        if (playerInRoom) {
-          playerInRoom.chips = p.chips;
+      // 🔥 TIMER DE 25 SEGUNDOS (FALLBACK)
+      if (room.summaryTimer) {
+        clearTimeout(room.summaryTimer);
+      }
+
+      room.summaryTimer = setTimeout(async () => {
+        // Verificar se o resumo ainda está visível
+        if (room.isSummaryVisible) {
+          console.log(
+            `⏰ Timer de 25s - Fechando resumo da sala ${roomId} (fallback)`,
+          );
+
+          // Forçar fechamento para todos
+          io.to(roomId).emit("summary-closed", {
+            roomId: roomId,
+            forced: true,
+          });
+
+          // Resetar o jogo
+          if (room.gameState) {
+            for (const p of room.gameState.players) {
+              await saveChipsToDatabase(p.name, p.chips);
+            }
+
+            room.gameState = null;
+            room.isSummaryVisible = false;
+
+            room.players.forEach((p) => {
+              p.isReady = false;
+              p.cards = [];
+              p.bet = 0;
+              p.isFolded = false;
+              p.isAllIn = false;
+              p.isActive = true;
+              p.hasActed = false;
+              p.hasClosedSummary = false;
+            });
+
+            io.to(roomId).emit("room-update", room);
+            io.to(roomId).emit("game-reset");
+
+            await broadcastRoomList();
+
+            console.log(`🔄 Jogo resetado na sala ${roomId} (timer fallback)`);
+          }
         }
-      });
-
-      room.gameState = null;
-      room.players.forEach((p) => {
-        p.isReady = false;
-        p.cards = [];
-        p.bet = 0;
-        p.isFolded = false;
-        p.isAllIn = false;
-        p.isActive = true;
-        p.hasActed = false;
-      });
-      io.to(roomId).emit("room-update", room);
-      io.to(roomId).emit("game-reset");
-
-      await broadcastRoomList();
-
-      console.log(`🔄 Nova mão disponível na sala ${roomId}`);
-    }, 8000); // ✅ 8 segundos
+        room.summaryTimer = null;
+      }, 25000); // 🔥 25 SEGUNDOS
+    }
   }
 
   // ====================== SAIR ======================
@@ -743,6 +915,10 @@ io.on("connection", (socket) => {
     socket.leave(normalizedRoomId);
 
     if (room.players.length === 0) {
+      if (room.summaryTimer) {
+        clearTimeout(room.summaryTimer);
+        room.summaryTimer = null;
+      }
       rooms.delete(normalizedRoomId);
       console.log(`🗑️ Sala ${normalizedRoomId} removida`);
     } else {
@@ -759,6 +935,10 @@ io.on("connection", (socket) => {
       if (idx !== -1) {
         room.players.splice(idx, 1);
         if (room.players.length === 0) {
+          if (room.summaryTimer) {
+            clearTimeout(room.summaryTimer);
+            room.summaryTimer = null;
+          }
           rooms.delete(roomId);
           console.log(`🗑️ Sala ${roomId} removida`);
         } else {
@@ -780,3 +960,7 @@ console.log(`💡 Para testar:`);
 console.log(`  - Abra duas janelas (Edge e Chrome)`);
 console.log(`  - Entre na mesma sala`);
 console.log(`  - Ambos cliquem em "Pronto para jogar"\n`);
+console.log(`🆕 NOVIDADES:`);
+console.log(`   ✅ Cada jogador fecha o resumo individualmente`);
+console.log(`   ✅ Timer de 25 segundos como fallback`);
+console.log(`   ✅ Indicador de progresso (quem já fechou)`);

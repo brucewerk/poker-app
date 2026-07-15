@@ -1,28 +1,38 @@
 // app/api/get-hand-history/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { connectDB } from "@/lib/mongodb";
+import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
 
-export async function GET(req) {
+export async function GET(request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
     if (!session) {
       return NextResponse.json(
-        { success: false, error: "Não autenticado" },
+        { success: false, error: "Não autorizado" },
         { status: 401 },
       );
     }
 
-    await connectDB();
+    const { searchParams } = new URL(request.url);
+    const username = searchParams.get("username") || session.user.username;
 
-    const user = await User.findOne({ username: session.user.username });
-    if (!user) {
+    if (!username) {
       return NextResponse.json(
-        { success: false, error: "Usuário não encontrado" },
-        { status: 404 },
+        { success: false, error: "Username não fornecido" },
+        { status: 400 },
       );
+    }
+
+    await dbConnect();
+
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return NextResponse.json({
+        success: true,
+        handHistory: [],
+      });
     }
 
     return NextResponse.json({
@@ -32,7 +42,7 @@ export async function GET(req) {
   } catch (error) {
     console.error("Erro ao buscar histórico:", error);
     return NextResponse.json(
-      { success: false, error: "Erro interno do servidor" },
+      { success: false, error: error.message },
       { status: 500 },
     );
   }

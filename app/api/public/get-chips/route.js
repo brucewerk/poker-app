@@ -1,38 +1,39 @@
 // app/api/public/get-chips/route.js
 import { NextResponse } from "next/server";
-import { connectDB } from "@/lib/mongodb";
+import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
 
-export async function POST(req) {
+export async function POST(request) {
   try {
-    const { username } = await req.json();
+    const { username } = await request.json();
 
     if (!username) {
       return NextResponse.json(
-        { success: false, error: "Usuário não informado" },
+        { success: false, error: "Username não fornecido" },
         { status: 400 },
       );
     }
 
-    await connectDB();
+    await dbConnect();
 
     const user = await User.findOne({ username });
+
     if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Usuário não encontrado" },
-        { status: 404 },
-      );
+      return NextResponse.json({
+        success: true,
+        chips: 1000,
+        message: "Usuário não encontrado, usando valor padrão",
+      });
     }
 
     return NextResponse.json({
       success: true,
       chips: user.chips || 1000,
-      username: user.username,
     });
   } catch (error) {
-    console.error("❌ Erro ao buscar fichas:", error);
+    console.error("Erro ao buscar fichas:", error);
     return NextResponse.json(
-      { success: false, error: "Erro interno do servidor" },
+      { success: false, error: error.message },
       { status: 500 },
     );
   }

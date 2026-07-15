@@ -1,25 +1,37 @@
 // app/api/save-hand-history/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { connectDB } from "@/lib/mongodb";
+import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
 
-export async function POST(req) {
+export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
     if (!session) {
       return NextResponse.json(
-        { success: false, error: "Não autenticado" },
+        { success: false, error: "Não autorizado" },
         { status: 401 },
       );
     }
 
-    const { handData } = await req.json();
+    const { username, handData } = await request.json();
 
-    await connectDB();
+    if (!username || !handData) {
+      return NextResponse.json(
+        { success: false, error: "Dados incompletos" },
+        { status: 400 },
+      );
+    }
 
-    const user = await User.findOne({ username: session.user.username });
+    await dbConnect();
+
+    // Adicionar timestamp se não tiver
+    if (!handData.timestamp) {
+      handData.timestamp = new Date().toISOString();
+    }
+
+    const user = await User.findOne({ username });
+
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Usuário não encontrado" },
@@ -27,36 +39,29 @@ export async function POST(req) {
       );
     }
 
-    // Inicializar histórico se não existir
+    // Inicializar array se não existir
     if (!user.handHistory) {
       user.handHistory = [];
     }
 
-    // Adicionar nova mão no início
-    user.handHistory.unshift({
-      ...handData,
-      timestamp: new Date(),
-    });
+    // Adicionar no início (mais recente primeiro)
+    user.handHistory.unshift(handData);
 
-    // Manter apenas as últimas 20 mãos
-    if (user.handHistory.length > 20) {
-      user.handHistory = user.handHistory.slice(0, 20);
+    // Manter apenas as últimas 100 mãos
+    if (user.handHistory.length > 100) {
+      user.handHistory = user.handHistory.slice(0, 100);
     }
 
-    // ✅ Usar updateOne com $set para evitar conflitos
-    await User.updateOne(
-      { username: session.user.username },
-      { $set: { handHistory: user.handHistory } },
-    );
+    await user.save();
 
     return NextResponse.json({
       success: true,
-      count: user.handHistory.length,
+      message: "Histórico salvo com sucesso",
     });
   } catch (error) {
     console.error("Erro ao salvar histórico:", error);
     return NextResponse.json(
-      { success: false, error: "Erro interno do servidor" },
+      { success: false, error: error.message },
       { status: 500 },
     );
   }

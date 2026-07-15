@@ -92,6 +92,12 @@ export default function PokerGame() {
   const gameInitialized = useRef(false);
   const chipsSyncedRef = useRef(false);
   const hasLeftOnlineRef = useRef(false);
+  const updateLockRef = useRef(false);
+  const pendingChipsUpdateRef = useRef(null);
+  const refreshTimeoutRef = useRef(null);
+  const startNewHandTimeoutRef = useRef(null);
+  const saveStateTimeoutRef = useRef(null);
+  const modalOpenTimeoutRef = useRef(null);
 
   const currentUser = session?.user?.username || null;
   const userChips = session?.user?.chips || 0;
@@ -121,83 +127,157 @@ export default function PokerGame() {
 
   // ====================== ATUALIZAR FICHAS DO USUÁRIO ======================
   const refreshUserChips = useCallback(async () => {
-    if (isRefreshingChips) return;
+    if (updateLockRef.current || isRefreshingChips) {
+      console.log("⏳ Atualização de fichas em andamento, ignorando...");
+      return;
+    }
+
+    updateLockRef.current = true;
     setIsRefreshingChips(true);
 
     try {
       const chips = await fetchChipsFromDB();
-      if (chips !== null) {
+      if (chips !== null && chips !== currentChips) {
+        console.log(`🔄 Atualizando saldo: ${currentChips} -> ${chips}`);
         setCurrentChips(chips);
 
         if (!isCpuGamePaused) {
           setGame((prev) => {
             if (!prev.handActive || prev.playerMoney !== chips) {
-              console.log(
-                `🔄 Atualizando saldo do jogo: ${prev.playerMoney} -> ${chips}`,
-              );
               return { ...prev, playerMoney: chips };
             }
             return prev;
           });
         }
 
-        await update();
-        console.log(
-          `🔄 Sessão atualizada: ${currentUser} agora tem ${chips} fichas`,
-        );
+        if (Math.abs(chips - (session?.user?.chips || 0)) > 1) {
+          await update();
+          console.log(
+            `🔄 Sessão atualizada: ${currentUser} agora tem ${chips} fichas`,
+          );
+        }
       }
     } catch (error) {
       console.error("Erro ao atualizar fichas:", error);
     } finally {
       setIsRefreshingChips(false);
+      updateLockRef.current = false;
+      if (pendingChipsUpdateRef.current) {
+        const pending = pendingChipsUpdateRef.current;
+        pendingChipsUpdateRef.current = null;
+        setTimeout(() => refreshUserChips(), 100);
+      }
     }
-  }, [fetchChipsFromDB, currentUser, update, isCpuGamePaused]);
+  }, [
+    fetchChipsFromDB,
+    currentUser,
+    update,
+    isCpuGamePaused,
+    currentChips,
+    session,
+  ]);
+
+  // ====================== SALVAR FICHAS ======================
+  const saveChips = useCallback(
+    async (user, chips, force = false) => {
+      if (!user) return;
+      if (isSaving && !force) {
+        pendingSaveRef.current = true;
+        return;
+      }
+      if (chips === currentChips && !force) {
+        return;
+      }
+
+      setIsSaving(true);
+      pendingSaveRef.current = false;
+
+      try {
+        const res = await fetch("/api/save-chips", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: user, chips }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (chips !== currentChips) {
+            setCurrentChips(chips);
+            if (!isCpuGamePaused) {
+              setGame((prev) => ({ ...prev, playerMoney: chips }));
+            }
+          }
+          if (Math.abs(chips - (session?.user?.chips || 0)) > 1) {
+            await update();
+            console.log(
+              `🔄 Sessão atualizada: ${user} agora tem ${chips} fichas`,
+            );
+          }
+        } else {
+          setTimeout(() => saveChips(user, chips, true), 2000);
+        }
+      } catch {
+        setTimeout(() => saveChips(user, chips, true), 3000);
+      } finally {
+        setIsSaving(false);
+        if (pendingSaveRef.current && user) {
+          saveChips(user, chips, true);
+        }
+      }
+    },
+    [isSaving, update, isCpuGamePaused, currentChips, session],
+  );
 
   // ====================== SALVAR ESTADO DO JOGO ======================
   const saveGameState = useCallback(
     async (state) => {
       if (!currentUser || !state.handActive || state.gameOver) return;
 
-      try {
-        const gameStateToSave = {
-          deck: state.deck.slice(0, 20),
-          community: state.community,
-          playerCards: state.playerCards,
-          cpuCards: state.cpuCards,
-          pot: state.pot,
-          playerMoney: state.playerMoney,
-          cpuMoney: state.cpuMoney,
-          currentBet: state.currentBet,
-          playerBet: state.playerBet,
-          cpuBet: state.cpuBet,
-          stage: state.stage,
-          handActive: state.handActive,
-          waitingPlayer: state.waitingPlayer,
-          gameOver: state.gameOver,
-          playerAllin: state.playerAllin,
-          cpuAllin: state.cpuAllin,
-          raiseCounter: state.raiseCounter,
-          showdownStarted: state.showdownStarted,
-          playerHandName: state.playerHandName,
-          cpuHandName: state.cpuHandName,
-          winnerMsg: state.winnerMsg,
-          cpuThought: state.cpuThought,
-          playerSuggestion: state.playerSuggestion,
-          gameStatus: state.gameStatus,
-          timestamp: Date.now(),
-        };
-
-        await fetch("/api/save-game-state", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: currentUser,
-            gameState: gameStateToSave,
-          }),
-        });
-      } catch (error) {
-        console.error("Erro ao salvar estado do jogo:", error);
+      if (saveStateTimeoutRef.current) {
+        clearTimeout(saveStateTimeoutRef.current);
       }
+
+      saveStateTimeoutRef.current = setTimeout(async () => {
+        try {
+          const gameStateToSave = {
+            deck: state.deck.slice(0, 20),
+            community: state.community,
+            playerCards: state.playerCards,
+            cpuCards: state.cpuCards,
+            pot: state.pot,
+            playerMoney: state.playerMoney,
+            cpuMoney: state.cpuMoney,
+            currentBet: state.currentBet,
+            playerBet: state.playerBet,
+            cpuBet: state.cpuBet,
+            stage: state.stage,
+            handActive: state.handActive,
+            waitingPlayer: state.waitingPlayer,
+            gameOver: state.gameOver,
+            playerAllin: state.playerAllin,
+            cpuAllin: state.cpuAllin,
+            raiseCounter: state.raiseCounter,
+            showdownStarted: state.showdownStarted,
+            playerHandName: state.playerHandName,
+            cpuHandName: state.cpuHandName,
+            winnerMsg: state.winnerMsg,
+            cpuThought: state.cpuThought,
+            playerSuggestion: state.playerSuggestion,
+            gameStatus: state.gameStatus,
+            timestamp: Date.now(),
+          };
+
+          const baseUrl = window.location.origin;
+          await fetch(`${baseUrl}/api/save-game-state`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: currentUser,
+              gameState: gameStateToSave,
+            }),
+          });
+        } catch (error) {}
+      }, 2000);
     },
     [currentUser],
   );
@@ -321,48 +401,6 @@ export default function PokerGame() {
     setTimeout(() => setNotification((n) => ({ ...n, visible: false })), 2000);
   }, []);
 
-  // ====================== SALVAR FICHAS ======================
-  const saveChips = useCallback(
-    async (user, chips, force = false) => {
-      if (!user) return;
-      if (isSaving && !force) {
-        pendingSaveRef.current = true;
-        return;
-      }
-      setIsSaving(true);
-      pendingSaveRef.current = false;
-      try {
-        const res = await fetch("/api/save-chips", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: user, chips }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          setCurrentChips(chips);
-          if (!isCpuGamePaused) {
-            setGame((prev) => ({ ...prev, playerMoney: chips }));
-          }
-          await update();
-          console.log(
-            `🔄 Sessão atualizada: ${user} agora tem ${chips} fichas`,
-          );
-        }
-        if (!data.success) {
-          setTimeout(() => saveChips(user, chips, true), 2000);
-        }
-      } catch {
-        setTimeout(() => saveChips(user, chips, true), 3000);
-      } finally {
-        setIsSaving(false);
-        if (pendingSaveRef.current && user) {
-          saveChips(user, chips, true);
-        }
-      }
-    },
-    [isSaving, update, isCpuGamePaused],
-  );
-
   // ====================== SALVAR ESTADO AUTOMATICAMENTE ======================
   useEffect(() => {
     if (
@@ -374,7 +412,7 @@ export default function PokerGame() {
     ) {
       const saveInterval = setInterval(() => {
         saveGameState(game);
-      }, 10000);
+      }, 15000);
 
       return () => clearInterval(saveInterval);
     }
@@ -538,7 +576,7 @@ export default function PokerGame() {
     return doShowdown(state, user);
   }
 
-  // ====================== SHOWDOWN ANIMADO (SEM VICTORYMODAL) ======================
+  // ====================== DO SHOWDOWN (CORRIGIDO - SEM FLICK) ======================
   async function doShowdown(g, user) {
     if (!g.handActive || g.showdownStarted) return g;
 
@@ -568,6 +606,7 @@ export default function PokerGame() {
         ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador"
         : currentUser || "Jogador";
 
+    // 🔥 ATUALIZAÇÃO ÚNICA - estado inicial do showdown
     setGame((prev) => ({
       ...prev,
       ...state,
@@ -578,6 +617,7 @@ export default function PokerGame() {
 
     return new Promise((resolve) => {
       setTimeout(() => {
+        // 🔥 ATUALIZAÇÃO 2 - mostrar mão da CPU
         setGame((prev) => ({
           ...prev,
           cpuHandName: `🤖 ${cName}`,
@@ -586,6 +626,7 @@ export default function PokerGame() {
         }));
 
         setTimeout(async () => {
+          // 🔥 ATUALIZAÇÃO 3 - comparando
           setGame((prev) => ({
             ...prev,
             gameStatus: "Comparando mãos...",
@@ -617,27 +658,49 @@ export default function PokerGame() {
                 wasAllIn: state.playerAllin,
               });
 
-              // ✅ ABRIR APENAS O MODAL DE RESULTADO
-              setResultData({
-                winner: "player",
-                playerName: playerName,
-                playerHand: pName,
-                cpuHand: cName,
-                pot: finalState.pot,
-                chipsWon: won,
-                isSpecial: won >= 500 || pScore / 10 ** 10 >= 7,
-                winnerMsg: `🏆 ${playerName} venceu com ${pName}!`,
-                cpuThought: `🤖 CPU: '${cName}... Você foi melhor!'`,
-              });
-              setResultModalOpen(true);
+              await saveChips(u, finalState.playerMoney);
 
-              // ✅ NÃO CHAMAR setVictoryModal
-              saveChips(u, finalState.playerMoney);
-              fetch("/api/save-game-state", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username: u, gameState: null }),
-              }).catch(() => {});
+              try {
+                const baseUrl = window.location.origin;
+                await fetch(`${baseUrl}/api/save-game-state`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ username: u, gameState: null }),
+                });
+              } catch (e) {}
+
+              // 🔥 ATUALIZAÇÃO 4 - estado final (AGRUPADO)
+              setGame((prev) => ({
+                ...prev,
+                ...finalState,
+                showdownStarted: true,
+                handActive: false,
+                stage: "showdown",
+                playerHandName: `🏆 ${pName}`,
+                winnerMsg: finalState.winnerMsg,
+                cpuThought: finalState.cpuThought,
+                gameStatus: finalState.gameStatus,
+              }));
+
+              // 🔥 Abrir modal APÓS atualizar o estado (com delay mínimo)
+              if (modalOpenTimeoutRef.current) {
+                clearTimeout(modalOpenTimeoutRef.current);
+              }
+              modalOpenTimeoutRef.current = setTimeout(() => {
+                setResultData({
+                  winner: "player",
+                  playerName: playerName,
+                  playerHand: pName,
+                  cpuHand: cName,
+                  pot: finalState.pot,
+                  chipsWon: won,
+                  isSpecial: won >= 500 || pScore / 10 ** 10 >= 7,
+                  winnerMsg: finalState.winnerMsg,
+                  cpuThought: finalState.cpuThought,
+                });
+                setResultModalOpen(true);
+                modalOpenTimeoutRef.current = null;
+              }, 50);
             } else if (cScore > pScore) {
               finalState.cpuMoney += finalState.pot;
               const lost = finalState.pot;
@@ -659,27 +722,47 @@ export default function PokerGame() {
                 wasAllIn: state.playerAllin,
               });
 
-              // ✅ ABRIR APENAS O MODAL DE RESULTADO
-              setResultData({
-                winner: "cpu",
-                playerName: playerName,
-                playerHand: pName,
-                cpuHand: cName,
-                pot: finalState.pot,
-                chipsLost: lost,
-                isSpecial: false,
-                winnerMsg: `🤖 CPU venceu com ${cName}!`,
-                cpuThought: `🤖 CPU: '${cName}! Ganhei!'`,
-              });
-              setResultModalOpen(true);
+              await saveChips(u, finalState.playerMoney);
 
-              // ✅ NÃO CHAMAR setVictoryModal
-              saveChips(u, finalState.playerMoney);
-              fetch("/api/save-game-state", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username: u, gameState: null }),
-              }).catch(() => {});
+              try {
+                const baseUrl = window.location.origin;
+                await fetch(`${baseUrl}/api/save-game-state`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ username: u, gameState: null }),
+                });
+              } catch (e) {}
+
+              setGame((prev) => ({
+                ...prev,
+                ...finalState,
+                showdownStarted: true,
+                handActive: false,
+                stage: "showdown",
+                playerHandName: `🏆 ${pName}`,
+                winnerMsg: finalState.winnerMsg,
+                cpuThought: finalState.cpuThought,
+                gameStatus: finalState.gameStatus,
+              }));
+
+              if (modalOpenTimeoutRef.current) {
+                clearTimeout(modalOpenTimeoutRef.current);
+              }
+              modalOpenTimeoutRef.current = setTimeout(() => {
+                setResultData({
+                  winner: "cpu",
+                  playerName: playerName,
+                  playerHand: pName,
+                  cpuHand: cName,
+                  pot: finalState.pot,
+                  chipsLost: lost,
+                  isSpecial: false,
+                  winnerMsg: finalState.winnerMsg,
+                  cpuThought: finalState.cpuThought,
+                });
+                setResultModalOpen(true);
+                modalOpenTimeoutRef.current = null;
+              }, 50);
             } else {
               const split = Math.floor(finalState.pot / 2);
               finalState.playerMoney += split;
@@ -699,42 +782,54 @@ export default function PokerGame() {
                 communityCards: state.community,
               });
 
-              // ✅ ABRIR APENAS O MODAL DE RESULTADO
-              setResultData({
-                winner: "tie",
-                playerName: playerName,
-                playerHand: pName,
-                cpuHand: cName,
-                pot: finalState.pot,
-                split: split,
-                isSpecial: false,
-                winnerMsg: `🤝 Empate! ${pName} — Pote dividido.`,
-                cpuThought: "🤖 CPU: 'Empate justo.'",
-              });
-              setResultModalOpen(true);
+              await saveChips(u, finalState.playerMoney);
 
-              // ✅ NÃO CHAMAR setVictoryModal
-              saveChips(u, finalState.playerMoney);
-              fetch("/api/save-game-state", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username: u, gameState: null }),
-              }).catch(() => {});
+              try {
+                const baseUrl = window.location.origin;
+                await fetch(`${baseUrl}/api/save-game-state`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ username: u, gameState: null }),
+                });
+              } catch (e) {}
+
+              setGame((prev) => ({
+                ...prev,
+                ...finalState,
+                showdownStarted: true,
+                handActive: false,
+                stage: "showdown",
+                playerHandName: `🏆 ${pName}`,
+                winnerMsg: finalState.winnerMsg,
+                cpuThought: finalState.cpuThought,
+                gameStatus: finalState.gameStatus,
+              }));
+
+              if (modalOpenTimeoutRef.current) {
+                clearTimeout(modalOpenTimeoutRef.current);
+              }
+              modalOpenTimeoutRef.current = setTimeout(() => {
+                setResultData({
+                  winner: "tie",
+                  playerName: playerName,
+                  playerHand: pName,
+                  cpuHand: cName,
+                  pot: finalState.pot,
+                  split: split,
+                  isSpecial: false,
+                  winnerMsg: finalState.winnerMsg,
+                  cpuThought: finalState.cpuThought,
+                });
+                setResultModalOpen(true);
+                modalOpenTimeoutRef.current = null;
+              }, 50);
 
               setTimeout(() => {
                 setGame((prev) => ({ ...prev, showdownStarted: false }));
                 switchToNextPlayer();
-                startNewHand(u, undefined);
+                startNewHand(u, finalState.playerMoney);
               }, delays.nextHandDelay);
             }
-
-            setGame((prev) => ({
-              ...prev,
-              ...finalState,
-              showdownStarted: true,
-              handActive: false,
-              stage: "showdown",
-            }));
 
             resolve(finalState);
           }, delays.resultDelay);
@@ -743,38 +838,52 @@ export default function PokerGame() {
     });
   }
 
-  // ====================== FECHAR MODAL DE RESULTADO ======================
+  // ====================== FECHAR MODAL DE RESULTADO (CORRIGIDO) ======================
   const closeResultModal = useCallback(() => {
+    // 🔥 Prevenir múltiplos fechamentos
+    if (!resultModalOpen) return;
+
+    // 🔥 Limpar timeouts pendentes
+    if (startNewHandTimeoutRef.current) {
+      clearTimeout(startNewHandTimeoutRef.current);
+      startNewHandTimeoutRef.current = null;
+    }
+    if (modalOpenTimeoutRef.current) {
+      clearTimeout(modalOpenTimeoutRef.current);
+      modalOpenTimeoutRef.current = null;
+    }
+
+    // 🔥 Fechar modal IMEDIATAMENTE
     setResultModalOpen(false);
     const data = resultData;
     setResultData(null);
 
     // ✅ Iniciar nova mão após fechar o modal
     if (data) {
-      const delays = getDelays();
       const u = currentUser;
 
       if (data.winner === "tie") {
-        // Se foi empate, a nova mão já foi iniciada dentro do doShowdown
-        // Não fazer nada aqui para evitar duplicação
         return;
       }
 
-      setTimeout(() => {
+      // 🔥 Delay para garantir que o modal fechou
+      startNewHandTimeoutRef.current = setTimeout(() => {
         if (isMultiplayer && multiplayerModeActive) {
           switchToNextPlayer();
         }
-        startNewHand(u, currentChips || session?.user?.chips || 1000);
+        const chipsToUse = currentChips || session?.user?.chips || 1000;
+        startNewHand(u, chipsToUse);
+        startNewHandTimeoutRef.current = null;
       }, 300);
     }
   }, [
+    resultModalOpen,
     resultData,
     currentUser,
     currentChips,
     session,
     isMultiplayer,
     multiplayerModeActive,
-    getDelays,
   ]);
 
   // ====================== ALTERNAR JOGADOR ======================
@@ -799,8 +908,6 @@ export default function PokerGame() {
     showNotification,
   ]);
 
-  // app/page.jsx - PARTE DO advanceStage com prevenção de flash
-
   // ====================== AVANÇAR FASE ======================
   function advanceStage(g, user) {
     let state = { ...g };
@@ -811,18 +918,14 @@ export default function PokerGame() {
     }
     state.raiseCounter = 0;
 
-    // ✅ Usar requestAnimationFrame para evitar flash
     if (state.stage === "preflop") {
       state.stage = "flop";
-      // Adicionar as cartas com um pequeno delay para animação
       const flopCards = [];
       for (let i = 0; i < 3 && state.deck.length > 0; i++) {
         flopCards.push(state.deck.pop());
       }
-      // Usar setTimeout para dar tempo da animação
       requestAnimationFrame(() => {
         state.community = [...state.community, ...flopCards];
-        // ✅ Forçar atualização suave
         setGame((prev) => ({
           ...prev,
           community: state.community,
@@ -876,6 +979,10 @@ export default function PokerGame() {
   // ====================== INICIAR MÃO ======================
   function startNewHand(user, initialMoney) {
     if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
+    if (startNewHandTimeoutRef.current) {
+      clearTimeout(startNewHandTimeoutRef.current);
+      startNewHandTimeoutRef.current = null;
+    }
 
     setGame((prev) => {
       let playerMoney =
@@ -1114,14 +1221,18 @@ export default function PokerGame() {
         true,
       );
       saveChips(currentUser, state.playerMoney);
-      fetch("/api/save-game-state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: currentUser,
-          gameState: null,
-        }),
-      }).catch(() => {});
+
+      try {
+        const baseUrl = window.location.origin;
+        fetch(`${baseUrl}/api/save-game-state`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: currentUser,
+            gameState: null,
+          }),
+        }).catch(() => {});
+      } catch (e) {}
 
       setTimeout(() => {
         if (isMultiplayer && multiplayerModeActive) {
@@ -1264,14 +1375,17 @@ export default function PokerGame() {
   function resetSession() {
     if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
 
-    fetch("/api/save-game-state", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: currentUser,
-        gameState: null,
-      }),
-    }).catch(() => {});
+    try {
+      const baseUrl = window.location.origin;
+      fetch(`${baseUrl}/api/save-game-state`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: currentUser,
+          gameState: null,
+        }),
+      }).catch(() => {});
+    } catch (e) {}
 
     setGame((prev) => {
       const money =
@@ -1381,25 +1495,31 @@ export default function PokerGame() {
     return "";
   }
 
-  // ====================== MODAL DE RESULTADO ======================
+  // ====================== MODAL DE RESULTADO (CORRIGIDO - SEM FLICK) ======================
   function ResultModal({ data, onClose }) {
     if (!data) return null;
 
     const isWin = data.winner === "player";
     const isTie = data.winner === "tie";
+    const [isClosing, setIsClosing] = useState(false);
 
-    // ✅ Usar useEffect para prevenir scroll/refresh indesejado
+    // ✅ Usar useEffect para prevenir scroll
     useEffect(() => {
-      // Prevenir scroll da página quando o modal está aberto
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = "";
       };
     }, []);
 
+    const handleClose = () => {
+      if (isClosing) return;
+      setIsClosing(true);
+      onClose();
+    };
+
     return (
       <div style={modalOverlayStyle()}>
-        <div style={modalContentStyle(isWin, isTie)} className="fade-in">
+        <div style={modalContentStyle(isWin, isTie)}>
           <div style={modalHeaderStyle()}>
             <span style={modalIconStyle(isWin, isTie)}>
               {isWin ? "🏆" : isTie ? "🤝" : "💔"}
@@ -1449,8 +1569,12 @@ export default function PokerGame() {
 
           <div style={modalCpuThoughtStyle()}>{data.cpuThought}</div>
 
-          <button onClick={onClose} style={modalCloseButtonStyle()}>
-            CONTINUAR
+          <button
+            onClick={handleClose}
+            style={modalCloseButtonStyle()}
+            disabled={isClosing}
+          >
+            {isClosing ? "⏳" : "CONTINUAR"}
           </button>
         </div>
       </div>
@@ -1583,7 +1707,7 @@ export default function PokerGame() {
         />
       )}
 
-      {/* ✅ APENAS O MODAL DE RESULTADO - SEM VICTORYMODAL */}
+      {/* ✅ MODAL DE RESULTADO */}
       {resultModalOpen && resultData && (
         <ResultModal data={resultData} onClose={closeResultModal} />
       )}

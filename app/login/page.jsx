@@ -8,7 +8,8 @@ import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ username: "", password: "" });
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -19,21 +20,32 @@ export default function LoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        username: form.username,
-        password: form.password,
+        username,
+        password,
         redirect: false,
+        callbackUrl: "/",
       });
+
+      console.log("Resultado do login:", result);
 
       if (result?.error) {
         setError("Usuário ou senha inválidos");
+        console.error("Erro no login:", result.error);
         setLoading(false);
         return;
       }
 
-      router.push("/");
-      router.refresh();
-    } catch (err) {
-      setError("Erro ao fazer login");
+      if (result?.ok) {
+        console.log("✅ Login bem-sucedido!");
+        router.push("/");
+        router.refresh();
+      } else {
+        setError("Erro ao fazer login. Tente novamente.");
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error("Erro ao fazer login:", error);
+      setError("Erro de conexão. Verifique o servidor.");
       setLoading(false);
     }
   };
@@ -47,108 +59,146 @@ export default function LoginPage() {
         justifyContent: "center",
         alignItems: "center",
         padding: 20,
+        fontFamily: "'Segoe UI','Poppins',system-ui,sans-serif",
       }}
     >
       <div
         style={{
-          background: "linear-gradient(145deg,#2a6e3a,#0a4122)",
-          padding: "40px 50px",
-          borderRadius: 50,
-          textAlign: "center",
-          color: "#ffefb9",
-          boxShadow: "0 0 50px rgba(0,0,0,0.5)",
-          border: "2px solid gold",
+          background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
+          padding: "40px",
+          borderRadius: 30,
           maxWidth: 400,
           width: "100%",
+          border: "2px solid gold",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
         }}
       >
-        <h2 style={{ margin: "0 0 20px", fontSize: "2rem" }}>
-          🎴 TEXAS HOLD'EM 🎴
-        </h2>
-        <p style={{ marginBottom: 20 }}>Faça login para jogar:</p>
+        <div style={{ textAlign: "center", marginBottom: 30 }}>
+          <div style={{ fontSize: "4rem" }}>♠️</div>
+          <h1 style={{ color: "gold", margin: "10px 0 5px", fontSize: "2rem" }}>
+            Poker App
+          </h1>
+          <p style={{ color: "#aaa", fontSize: "0.9rem" }}>
+            Faça login para continuar
+          </p>
+        </div>
+
+        {error && (
+          <div
+            style={{
+              background: "rgba(244,67,54,0.15)",
+              border: "1px solid #f44336",
+              borderRadius: 15,
+              padding: "10px 15px",
+              color: "#f44336",
+              marginBottom: 20,
+              textAlign: "center",
+              fontSize: "0.9rem",
+            }}
+          >
+            ❌ {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Usuário"
-            value={form.username}
-            onChange={(e) => setForm({ ...form, username: e.target.value })}
-            required
-            style={{
-              padding: "12px 20px",
-              fontSize: "1rem",
-              borderRadius: 50,
-              border: "none",
-              textAlign: "center",
-              fontWeight: "bold",
-              marginBottom: 12,
-              width: "100%",
-              boxSizing: "border-box",
-            }}
-          />
+          <div style={{ marginBottom: 15 }}>
+            <label
+              style={{
+                color: "#ffefb9",
+                fontSize: "0.9rem",
+                fontWeight: "bold",
+                display: "block",
+                marginBottom: 5,
+              }}
+            >
+              Usuário
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px 15px",
+                borderRadius: 15,
+                border: "1px solid rgba(255,215,0,0.3)",
+                background: "rgba(0,0,0,0.3)",
+                color: "white",
+                fontSize: "1rem",
+                boxSizing: "border-box",
+              }}
+              placeholder="Digite seu usuário"
+              required
+              disabled={loading}
+            />
+          </div>
 
-          <input
-            type="password"
-            placeholder="Senha"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
-            style={{
-              padding: "12px 20px",
-              fontSize: "1rem",
-              borderRadius: 50,
-              border: "none",
-              textAlign: "center",
-              fontWeight: "bold",
-              marginBottom: 20,
-              width: "100%",
-              boxSizing: "border-box",
-            }}
-          />
+          <div style={{ marginBottom: 20 }}>
+            <label
+              style={{
+                color: "#ffefb9",
+                fontSize: "0.9rem",
+                fontWeight: "bold",
+                display: "block",
+                marginBottom: 5,
+              }}
+            >
+              Senha
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px 15px",
+                borderRadius: 15,
+                border: "1px solid rgba(255,215,0,0.3)",
+                background: "rgba(0,0,0,0.3)",
+                color: "white",
+                fontSize: "1rem",
+                boxSizing: "border-box",
+              }}
+              placeholder="Digite sua senha"
+              required
+              disabled={loading}
+            />
+          </div>
 
           <button
             type="submit"
             disabled={loading}
             style={{
-              background: "radial-gradient(#f7d97c,#d6a12e)",
+              background: loading
+                ? "rgba(255,255,255,0.1)"
+                : "radial-gradient(#f7d97c,#d6a12e)",
               border: "none",
               fontWeight: "bold",
               fontSize: "1rem",
-              padding: "12px 30px",
+              padding: "14px 30px",
               borderRadius: 60,
               cursor: loading ? "not-allowed" : "pointer",
-              boxShadow: "0 4px 0 #7a4c1a",
-              color: "#2e241f",
+              boxShadow: loading ? "none" : "0 4px 0 #7a4c1a",
+              color: loading ? "#666" : "#2e241f",
               width: "100%",
-              opacity: loading ? 0.7 : 1,
+              opacity: loading ? 0.5 : 1,
+              transition: "all 0.3s ease",
             }}
           >
-            {loading ? "ENTRANDO..." : "ENTRAR"}
+            {loading ? "⏳ Entrando..." : "🎯 Entrar"}
           </button>
         </form>
 
-        {error && (
-          <div
-            style={{
-              color: "#ff8888",
-              fontSize: "0.9rem",
-              marginTop: 15,
-              background: "rgba(255,0,0,0.1)",
-              padding: "10px",
-              borderRadius: 30,
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        <div style={{ marginTop: 20, fontSize: "0.9rem" }}>
-          Não tem conta?{" "}
+        <div style={{ textAlign: "center", marginTop: 20 }}>
           <Link
             href="/register"
-            style={{ color: "#ffd700", textDecoration: "none" }}
+            style={{
+              color: "#aaa",
+              fontSize: "0.9rem",
+              textDecoration: "none",
+            }}
           >
-            Cadastre-se
+            Não tem conta? <span style={{ color: "gold" }}>Cadastre-se</span>
           </Link>
         </div>
       </div>

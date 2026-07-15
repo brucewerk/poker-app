@@ -10,12 +10,17 @@ export default function LevelDisplay({ username }) {
   useEffect(() => {
     if (username) {
       fetchLevelData();
+    } else {
+      setLoading(false);
     }
   }, [username]);
 
   const fetchLevelData = async () => {
     try {
-      const res = await fetch("/api/get-level");
+      setLoading(true);
+      // 🔥 Enviar username como query parameter
+      const url = `/api/get-level?username=${encodeURIComponent(username)}`;
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
         setLevelData(data);

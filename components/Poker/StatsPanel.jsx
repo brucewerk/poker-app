@@ -23,7 +23,10 @@ export default function StatsPanel({ username, onShowAchievements }) {
     try {
       setLoading(true);
       setError(false);
-      const res = await fetch("/api/get-stats");
+
+      // 🔥 Enviar username como query parameter
+      const url = `/api/get-stats?username=${encodeURIComponent(username)}`;
+      const res = await fetch(url);
       const data = await res.json();
 
       if (data.success) {
@@ -165,7 +168,7 @@ export default function StatsPanel({ username, onShowAchievements }) {
   );
 }
 
-// ====================== ESTILOS (mesmos de antes) ======================
+// ====================== ESTILOS ======================
 function panelStyle() {
   return {
     background: "#1a2a1ecc",
