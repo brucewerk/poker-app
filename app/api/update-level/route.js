@@ -1,27 +1,38 @@
 // app/api/update-level/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/lib/models/User";
-import { getXpToNextLevel, getLevelTitle } from "@/lib/level";
+import {
+  getXpToNextLevel,
+  getLevelTitle,
+  checkLevelUp,
+  calculateLevel,
+} from "@/lib/level";
 import { checkFindings } from "@/lib/findings";
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
     if (!session) {
       return NextResponse.json(
-        { success: false, error: "Não autenticado" },
+        { success: false, error: "Não autorizado" },
         { status: 401 },
       );
     }
 
-    const { xpGained, stats } = await req.json();
+    const { username, xpGain, chipsGain } = await req.json();
+
+    if (!username) {
+      return NextResponse.json(
+        { success: false, error: "Username não fornecido" },
+        { status: 400 },
+      );
+    }
 
     await connectDB();
 
-    const user = await User.findOne({ username: session.user.username });
+    const user = await User.findOne({ username });
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Usuário não encontrado" },
@@ -29,63 +40,52 @@ export async function POST(req) {
       );
     }
 
-    // Adicionar XP
-    let newXp = (user.xp || 0) + xpGained;
-    let newLevel = user.level || 1;
-    let xpToNext = getXpToNextLevel(newLevel);
-    let leveledUp = false;
+    // 🔥 Atualizar XP
+    let newXp = (user.xp || 0) + (xpGain || 0);
+    let currentLevel = user.level || 1;
 
-    // Verificar se subiu de nível
-    while (newXp >= xpToNext) {
-      newXp -= xpToNext;
-      newLevel++;
-      xpToNext = getXpToNextLevel(newLevel);
-      leveledUp = true;
+    // 🔥 Verificar se subiu de nível
+    const levelResult = checkLevelUp(currentLevel, newXp);
+
+    if (levelResult.leveledUp) {
+      user.level = levelResult.newLevel;
+      console.log(`🎉 ${username} subiu para Nível ${levelResult.newLevel}!`);
     }
 
-    // Verificar findings
-    const userStats = user.stats || {};
-    const currentFindings = user.findings || [];
-    const newFindings = checkFindings(userStats, currentFindings);
-
-    let findingsGained = [];
-    if (newFindings.length > 0) {
-      const findingIds = newFindings.map((f) => f.id);
-      user.findings = [...currentFindings, ...findingIds];
-      findingsGained = newFindings;
-
-      // Adicionar XP extra dos findings
-      const extraXp = newFindings.reduce((sum, f) => sum + (f.xp || 0), 0);
-      newXp += extraXp;
-
-      // Re-verificar level-up com o XP extra
-      while (newXp >= xpToNext) {
-        newXp -= xpToNext;
-        newLevel++;
-        xpToNext = getXpToNextLevel(newLevel);
-        leveledUp = true;
-      }
-    }
-
-    // Atualizar
     user.xp = newXp;
-    user.level = newLevel;
-    user.xpToNextLevel = xpToNext;
+
+    // 🔥 Atualizar fichas se houver ganho
+    if (chipsGain) {
+      user.chips = (user.chips || 0) + chipsGain;
+    }
+
+    // 🔥 Verificar novos achados
+    const findings = await checkFindings(username, user.stats || {});
+    if (findings && findings.length > 0) {
+      user.findings = [...(user.findings || []), ...findings];
+    }
+
     await user.save();
+
+    // 🔥 Buscar dados atualizados
+    const xpToNext = getXpToNextLevel(user.level);
+    const levelTitle = getLevelTitle(user.level);
 
     return NextResponse.json({
       success: true,
-      leveledUp,
-      newLevel,
-      xp: newXp,
+      level: user.level,
+      xp: user.xp,
       xpToNextLevel: xpToNext,
-      levelTitle: getLevelTitle(newLevel),
-      findingsGained,
+      levelTitle: levelTitle,
+      leveledUp: levelResult.leveledUp,
+      newLevel: levelResult.newLevel,
+      chips: user.chips,
+      findings: user.findings || [],
     });
   } catch (error) {
     console.error("Erro ao atualizar nível:", error);
     return NextResponse.json(
-      { success: false, error: "Erro interno do servidor" },
+      { success: false, error: error.message },
       { status: 500 },
     );
   }

@@ -1,9 +1,14 @@
 // app/api/get-level/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import dbConnect from "@/lib/mongoose";
+import { connectDB } from "@/lib/mongodb";
 import User from "@/lib/models/User";
-import { getLevelInfo } from "@/lib/level";
+import {
+  getXpToNextLevel,
+  getLevelTitle,
+  getLevelIcon,
+  calculateLevel,
+} from "@/lib/level";
 
 export async function GET(request) {
   try {
@@ -25,7 +30,7 @@ export async function GET(request) {
       );
     }
 
-    await dbConnect();
+    await connectDB();
 
     const user = await User.findOne({ username });
 
@@ -41,15 +46,17 @@ export async function GET(request) {
       });
     }
 
-    const levelInfo = getLevelInfo(user.level || 1);
+    const xpToNext = getXpToNextLevel(user.level || 1);
+    const levelTitle = getLevelTitle(user.level || 1);
+    const levelIcon = getLevelIcon(user.level || 1);
 
     return NextResponse.json({
       success: true,
       level: user.level || 1,
       xp: user.xp || 0,
-      xpToNextLevel: levelInfo.xpToNextLevel || 100,
-      levelTitle: levelInfo.title || "Iniciante",
-      levelIcon: levelInfo.icon || "🎴",
+      xpToNextLevel: xpToNext,
+      levelTitle: levelTitle,
+      levelIcon: levelIcon,
       findings: user.findings || [],
     });
   } catch (error) {
