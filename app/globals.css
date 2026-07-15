@@ -26,40 +26,107 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* app/globals.css - adicionar no final */
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(0.95); }
-}
+/* ====================== ANIMAÇÕES ====================== */
 
-.pulse-countdown {
-  animation: pulse 1s ease-in-out infinite;
-}
-
-/* app/globals.css - adicionar no final */
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(0.95); }
-}
-
+/* ✅ Animação suave para o modal */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-@keyframes slideIn {
-  from { transform: translateX(-20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+/* ✅ Animação para as cartas sendo reveladas */
+@keyframes cardReveal {
+  0% {
+    transform: rotateY(90deg) scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: rotateY(-10deg) scale(1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: rotateY(0deg) scale(1);
+    opacity: 1;
+  }
 }
 
-.pulse-countdown {
-  animation: pulse 1s ease-in-out infinite;
+/* ✅ Animação para o flop (cartas da mesa) */
+@keyframes flopReveal {
+  0% {
+    transform: translateY(-20px) scale(0.9);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(5px) scale(1.02);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 
+/* ✅ Animação para o turn e river */
+@keyframes cardSlide {
+  0% {
+    transform: translateX(-30px) scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* ✅ Pulso suave para o modal */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* ✅ Classes utilitárias */
 .fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
-.slide-in {
-  animation: slideIn 0.3s ease-out forwards;
+.card-reveal {
+  animation: cardReveal 0.5s ease-out forwards;
+}
+
+.flop-reveal {
+  animation: flopReveal 0.4s ease-out forwards;
+}
+
+.card-slide {
+  animation: cardSlide 0.35s ease-out forwards;
+}
+
+.pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ✅ Evitar flash durante o jogo */
+.no-flash {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+/* ✅ Para as cartas */
+.card-smooth {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
