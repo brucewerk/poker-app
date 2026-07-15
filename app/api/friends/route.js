@@ -28,7 +28,6 @@ export async function GET(request) {
     await dbConnect();
 
     const user = await User.findOne({ username });
-
     if (!user) {
       return NextResponse.json({
         success: true,
@@ -36,32 +35,43 @@ export async function GET(request) {
       });
     }
 
-    // 🔥 Buscar dados atualizados de cada amigo
-    const friendUsernames = (user.friends || []).map((f) => f.username);
+    // 🔥 Se não tiver amigos, retorna vazio
+    if (!user.friends || user.friends.length === 0) {
+      return NextResponse.json({
+        success: true,
+        friends: [],
+      });
+    }
+
+    // 🔥 Buscar dados atualizados de CADA amigo
+    const friendUsernames = user.friends.map((f) => f.username);
     const friendUsers = await User.find({
       username: { $in: friendUsernames },
     });
 
-    // 🔥 Criar mapa de amigos com dados atualizados
+    // 🔥 Criar mapa de amigos com dados ATUALIZADOS
     const friendsMap = {};
     friendUsers.forEach((f) => {
       friendsMap[f.username] = {
-        username: f.username,
+        username: f.username || "Desconhecido",
         level: f.level || 1,
         chips: f.chips || 0,
-        isOnline: false, // Poderia ser implementado com WebSocket
+        isOnline: false,
       };
     });
 
-    // 🔥 Manter a ordem original e preencher dados
-    const friends = (user.friends || []).map((f) => {
-      const friendData = friendsMap[f.username];
+    // 🔥 Construir lista final de amigos
+    const friends = user.friends.map((f) => {
+      const username = f.username || "Desconhecido";
+      const friendData = friendsMap[username];
+
       if (friendData) {
         return friendData;
       }
+
       // Se o amigo não existe mais no banco, retorna dados básicos
       return {
-        username: f.username || "Desconhecido",
+        username: username,
         level: f.level || 1,
         chips: f.chips || 0,
         isOnline: f.isOnline || false,
@@ -69,6 +79,7 @@ export async function GET(request) {
     });
 
     console.log(`📊 ${friends.length} amigos encontrados para ${username}`);
+    console.log(`📊 Amigos:`, friends.map((f) => f.username).join(", "));
 
     return NextResponse.json({
       success: true,
@@ -125,37 +136,45 @@ export async function POST(request) {
     const friend = await User.findOne({ username: friendUsername });
     if (!friend && action === "add") {
       return NextResponse.json(
-        { success: false, error: "Usuário não encontrado" },
+        { success: false, error: `Usuário "${friendUsername}" não encontrado` },
         { status: 404 },
       );
     }
 
-    let friends = user.friends || [];
+    // 🔥 Inicializar array de amigos se não existir
+    if (!user.friends) {
+      user.friends = [];
+    }
 
     if (action === "add") {
-      // Verificar se já é amigo
-      if (friends.find((f) => f.username === friendUsername)) {
+      // 🔥 Verificar se já é amigo
+      const alreadyFriend = user.friends.some(
+        (f) => f.username === friendUsername,
+      );
+      if (alreadyFriend) {
         return NextResponse.json(
-          { success: false, error: "Este usuário já é seu amigo" },
+          { success: false, error: `${friendUsername} já é seu amigo` },
           { status: 400 },
         );
       }
 
-      // Adicionar amigo com dados atualizados
-      friends.push({
-        username: friendUsername,
+      // 🔥 Adicionar amigo com dados COMPLETOS do banco
+      user.friends.push({
+        username: friend.username,
         level: friend.level || 1,
         chips: friend.chips || 0,
         isOnline: false,
       });
 
-      user.friends = friends;
       await user.save();
 
       console.log(`✅ ${username} adicionou ${friendUsername} como amigo`);
+      console.log(
+        `📊 Dados do amigo: Nível ${friend.level || 1}, ${friend.chips || 0} fichas`,
+      );
     } else if (action === "remove") {
-      friends = friends.filter((f) => f.username !== friendUsername);
-      user.friends = friends;
+      // 🔥 Remover amigo
+      user.friends = user.friends.filter((f) => f.username !== friendUsername);
       await user.save();
 
       console.log(`✅ ${username} removeu ${friendUsername} dos amigos`);
@@ -166,8 +185,8 @@ export async function POST(request) {
       );
     }
 
-    // 🔥 Buscar dados atualizados de todos os amigos
-    const friendUsernames = friends.map((f) => f.username);
+    // 🔥 Buscar dados atualizados de TODOS os amigos
+    const friendUsernames = user.friends.map((f) => f.username);
     const friendUsers = await User.find({
       username: { $in: friendUsernames },
     });
@@ -175,14 +194,14 @@ export async function POST(request) {
     const friendsMap = {};
     friendUsers.forEach((f) => {
       friendsMap[f.username] = {
-        username: f.username,
+        username: f.username || "Desconhecido",
         level: f.level || 1,
         chips: f.chips || 0,
         isOnline: false,
       };
     });
 
-    const updatedFriends = friends.map((f) => {
+    const updatedFriends = user.friends.map((f) => {
       const friendData = friendsMap[f.username];
       if (friendData) {
         return friendData;
@@ -198,6 +217,10 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       friends: updatedFriends,
+      message:
+        action === "add"
+          ? `${friendUsername} adicionado com sucesso!`
+          : `${friendUsername} removido com sucesso!`,
     });
   } catch (error) {
     console.error("Erro ao gerenciar amigos:", error);
