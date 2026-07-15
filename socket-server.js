@@ -122,7 +122,8 @@ const io = new Server({
 });
 
 // ====================== FUNÇÕES PARA API PÚBLICA ======================
-const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL || "https://poker-chi-neon.vercel.app";
 
 async function getChipsFromDatabase(playerName) {
   try {
@@ -133,8 +134,10 @@ async function getChipsFromDatabase(playerName) {
     });
     const data = await response.json();
     if (data.success) {
+      console.log(`💰 ${playerName} tem ${data.chips} fichas no MongoDB`);
       return data.chips || 1000;
     }
+    console.log(`⚠️ Erro ao buscar fichas de ${playerName}: ${data.error}`);
     return 1000;
   } catch (error) {
     console.error(`❌ Erro ao buscar fichas de ${playerName}:`, error.message);
@@ -169,6 +172,7 @@ async function broadcastRoomList() {
   for (const [roomId, room] of rooms) {
     const updatedPlayers = [];
     for (const player of room.players) {
+      // ✅ SEMPRE BUSCAR DO MONGODB
       const currentChips = await getChipsFromDatabase(player.name);
       updatedPlayers.push({
         name: player.name,
@@ -252,7 +256,6 @@ io.on("connection", (socket) => {
     }
 
     const userChips = await getChipsFromDatabase(playerName);
-    console.log(`💰 ${playerName} tem ${userChips} fichas no MongoDB`);
 
     room.players.push({
       id: socket.id,
@@ -716,7 +719,6 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("room-update", room);
       io.to(roomId).emit("game-reset");
 
-      // ✅ AGORA await está dentro de uma função async (setTimeout com async)
       await broadcastRoomList();
 
       console.log(`🔄 Nova mão disponível na sala ${roomId}`);
