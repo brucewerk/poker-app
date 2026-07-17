@@ -1,28 +1,90 @@
 // components/Poker/SoundToggle.jsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { soundManager } from "@/lib/sound.js";
+import { useState, useEffect, useRef } from "react";
+import { soundManager } from "@/lib/sound";
 
 export default function SoundToggle() {
-  const [enabled, setEnabled] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const isInitialized = useRef(false);
+  const testAttempted = useRef(false);
 
   useEffect(() => {
-    // Carregar sons quando o componente montar
-    soundManager.loadSounds();
-    // Recuperar preferência salva
-    const saved = localStorage.getItem("sound-enabled");
-    if (saved !== null) {
-      const isEnabled = saved === "true";
-      setEnabled(isEnabled);
-      soundManager.enabled = isEnabled;
-    }
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
+    // 🔥 CARREGAR ESTADO SALVO
+    const saved = localStorage.getItem("sound-muted");
+    const muted = saved === "true";
+    setIsMuted(muted);
+    soundManager.setMuted(muted);
+
+    // 🔥 FUNÇÃO PARA INICIALIZAR ÁUDIO
+    const initSound = () => {
+      console.log("🔊 Inicializando áudio por interação do usuário");
+      soundManager.initAudioContext();
+      soundManager.loadSounds();
+
+      // 🔥 TOCAR SOM DE TESTE APÓS INICIALIZAR
+      setTimeout(() => {
+        if (!soundManager.getMuted()) {
+          soundManager.testSound();
+        }
+      }, 200);
+
+      document.removeEventListener("click", initSound);
+      document.removeEventListener("keydown", initSound);
+      document.removeEventListener("touchstart", initSound);
+    };
+
+    // 🔥 AGUARDAR INTERAÇÃO DO USUÁRIO
+    document.addEventListener("click", initSound, { once: true });
+    document.addEventListener("keydown", initSound, { once: true });
+    document.addEventListener("touchstart", initSound, { once: true });
+
+    // 🔥 TENTAR INICIAR AUTOMATICAMENTE
+    const tryAutoInit = () => {
+      if (!soundManager.isInitialized && document.hasFocus()) {
+        console.log("🔊 Tentando iniciar áudio automaticamente");
+        soundManager.initAudioContext();
+        soundManager.loadSounds();
+
+        if (!soundManager.getMuted()) {
+          setTimeout(() => {
+            soundManager.testSound();
+          }, 300);
+        }
+      }
+    };
+
+    setTimeout(tryAutoInit, 1000);
+
+    // 🔥 TENTAR NOVAMENTE APÓS 3 SEGUNDOS
+    setTimeout(tryAutoInit, 3000);
+
+    return () => {
+      document.removeEventListener("click", initSound);
+      document.removeEventListener("keydown", initSound);
+      document.removeEventListener("touchstart", initSound);
+    };
   }, []);
 
   const toggleSound = () => {
-    const newState = soundManager.toggle();
-    setEnabled(newState);
-    localStorage.setItem("sound-enabled", String(newState));
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    soundManager.setMuted(newMuted);
+
+    if (!newMuted) {
+      // 🔥 INICIALIZAR E TESTAR SOM
+      console.log("🔊 Ativando som...");
+      soundManager.initAudioContext();
+      soundManager.loadSounds();
+      setTimeout(() => {
+        soundManager.testSound();
+      }, 150);
+    } else {
+      console.log("🔇 Som desativado");
+    }
   };
 
   return (
@@ -30,33 +92,26 @@ export default function SoundToggle() {
       onClick={toggleSound}
       style={{
         position: "fixed",
-        bottom: 20,
-        left: 20,
+        top: 70,
+        right: 10,
         zIndex: 100,
-        background: enabled ? "rgba(76,175,80,0.3)" : "rgba(244,67,54,0.3)",
-        color: "white",
-        border: `2px solid ${enabled ? "#4caf50" : "#f44336"}`,
+        background: "rgba(0,0,0,0.6)",
+        border: "1px solid rgba(255,255,255,0.2)",
         borderRadius: "50%",
-        width: 50,
-        height: 50,
-        fontSize: "1.5rem",
+        width: 40,
+        height: 40,
+        color: "white",
+        fontSize: "1.2rem",
         cursor: "pointer",
         backdropFilter: "blur(4px)",
-        transition: "all 0.3s ease",
-        boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
         display: "flex",
-        alignItems: "center",
         justifyContent: "center",
+        alignItems: "center",
+        transition: "all 0.3s ease",
       }}
-      onMouseEnter={(e) => {
-        e.target.style.transform = "scale(1.1)";
-      }}
-      onMouseLeave={(e) => {
-        e.target.style.transform = "scale(1)";
-      }}
-      title={enabled ? "Sons ativados" : "Sons desativados"}
+      title={isMuted ? "Ativar som" : "Desativar som"}
     >
-      {enabled ? "🔊" : "🔇"}
+      {isMuted ? "🔇" : "🔊"}
     </button>
   );
 }

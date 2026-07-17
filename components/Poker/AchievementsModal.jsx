@@ -4,22 +4,42 @@
 import { useState, useEffect } from "react";
 import { ACHIEVEMENTS } from "@/lib/achievements";
 
-export default function AchievementsModal({ onClose, newAchievements = [] }) {
+export default function AchievementsModal({
+  onClose,
+  newAchievements = [],
+  username,
+}) {
   const [achievements, setAchievements] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [displayNewAchievements, setDisplayNewAchievements] =
+    useState(newAchievements);
+
+  useEffect(() => {
+    if (newAchievements && newAchievements.length > 0) {
+      setDisplayNewAchievements(newAchievements);
+    }
+  }, [newAchievements]);
 
   useEffect(() => {
     fetchAchievements();
-  }, []);
+    const interval = setInterval(fetchAchievements, 5000);
+    return () => clearInterval(interval);
+  }, [username]);
 
   const fetchAchievements = async () => {
     try {
-      const res = await fetch("/api/get-stats");
+      const url = username
+        ? `/api/get-stats?username=${encodeURIComponent(username)}&t=${Date.now()}`
+        : "/api/get-stats";
+      const res = await fetch(url, { cache: "no-store" });
       const data = await res.json();
       if (data.success) {
         setAchievements(data.achievements || []);
         setStats(data.stats);
+        if (data.newAchievements && data.newAchievements.length > 0) {
+          setDisplayNewAchievements(data.newAchievements);
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar conquistas:", error);
@@ -30,6 +50,8 @@ export default function AchievementsModal({ onClose, newAchievements = [] }) {
 
   const allAchievements = Object.values(ACHIEVEMENTS);
   const unlockedIds = achievements.map((a) => a.id);
+  const totalCount = allAchievements.length;
+  const unlockedCount = unlockedIds.length;
 
   if (loading) {
     return (
@@ -51,13 +73,13 @@ export default function AchievementsModal({ onClose, newAchievements = [] }) {
 
         <h2 style={titleStyle()}>🏅 CONQUISTAS</h2>
 
-        {newAchievements.length > 0 && (
+        {displayNewAchievements.length > 0 && (
           <div style={newAchievementsStyle()}>
             <h3 style={{ color: "gold", margin: "0 0 10px" }}>
               🎉 Novas Conquistas!
             </h3>
             <div style={newAchievementListStyle()}>
-              {newAchievements.map((ach, i) => (
+              {displayNewAchievements.map((ach, i) => (
                 <div key={i} style={newAchievementItemStyle()}>
                   <span style={achievementIconStyle()}>{ach.icon || "🏅"}</span>
                   <div>
@@ -72,13 +94,13 @@ export default function AchievementsModal({ onClose, newAchievements = [] }) {
 
         <div style={progressStyle()}>
           <span style={{ color: "#ddd" }}>
-            Progresso: {unlockedIds.length}/{allAchievements.length}
+            Progresso: {unlockedCount}/{totalCount}
           </span>
           <div style={progressBarStyle()}>
             <div
               style={{
                 ...progressFillStyle(),
-                width: `${(unlockedIds.length / allAchievements.length) * 100}%`,
+                width: `${(unlockedCount / totalCount) * 100}%`,
               }}
             />
           </div>
@@ -98,14 +120,6 @@ export default function AchievementsModal({ onClose, newAchievements = [] }) {
                     {unlocked && " ✅"}
                   </div>
                   <div style={achievementDescStyle()}>{ach.description}</div>
-                  {!unlocked && stats && (
-                    <div style={achievementProgressStyle()}>
-                      <span style={progressLabelStyle()}>Progresso: </span>
-                      <span style={progressValueStyle()}>
-                        {ach.condition(stats) ? "100%" : "Em progresso..."}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             );
@@ -252,26 +266,6 @@ function achievementDescStyle() {
     fontSize: "0.8rem",
     color: "#ccc",
     marginTop: "2px",
-  };
-}
-
-function achievementProgressStyle() {
-  return {
-    fontSize: "0.7rem",
-    color: "#888",
-    marginTop: "3px",
-  };
-}
-
-function progressLabelStyle() {
-  return {
-    color: "#888",
-  };
-}
-
-function progressValueStyle() {
-  return {
-    color: "#4caf50",
   };
 }
 

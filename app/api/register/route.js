@@ -44,7 +44,7 @@ export async function POST(request) {
     // Hash da senha
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Criar usuário
+    // 🔥 Criar usuário - SEM EMAIL
     const user = new User({
       username,
       password: hashedPassword,
@@ -63,6 +63,9 @@ export async function POST(request) {
       achievements: [],
       findings: [],
       savedGameState: null,
+      friends: [],
+      missions: [],
+      handHistory: [],
     });
 
     await user.save();

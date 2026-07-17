@@ -1,4 +1,4 @@
-// app/api/save-chips/route.js
+// app/api/clear-hand-history/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -15,18 +15,12 @@ export async function POST(request) {
       );
     }
 
-    const { username, chips } = await request.json();
+    const body = await request.json();
+    const { username } = body;
 
     if (!username) {
       return NextResponse.json(
         { success: false, error: "Username não fornecido" },
-        { status: 400 },
-      );
-    }
-
-    if (typeof chips !== "number" || chips < 0) {
-      return NextResponse.json(
-        { success: false, error: "Valor de fichas inválido" },
         { status: 400 },
       );
     }
@@ -41,19 +35,18 @@ export async function POST(request) {
       );
     }
 
-    // 🔥 REMOVER BLOQUEIO - PERMITIR ZERO
-    // A validação agora é feita no frontend com a flag isAllIn
+    // 🔥 LIMPAR HISTÓRICO
+    user.handHistory = [];
+    await user.save();
 
-    await User.updateOne({ username }, { $set: { chips } });
-
-    console.log(`💰 ${username}: ${chips} fichas salvas`);
+    console.log(`🗑️ Histórico de ${username} foi limpo`);
 
     return NextResponse.json({
       success: true,
-      chips,
+      message: "Histórico limpo com sucesso!",
     });
   } catch (error) {
-    console.error("Erro ao salvar fichas:", error);
+    console.error("❌ Erro ao limpar histórico:", error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 },

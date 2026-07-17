@@ -1,12 +1,14 @@
 // app/api/get-game-state/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
 
 export async function GET(request) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
+
     if (!session) {
       return NextResponse.json(
         { success: false, error: "Não autorizado" },
@@ -16,6 +18,8 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const username = searchParams.get("username") || session.user.username;
+
+    console.log("📊 GET /api/get-game-state - Usuário:", username);
 
     if (!username) {
       return NextResponse.json(
@@ -28,23 +32,41 @@ export async function GET(request) {
 
     const user = await User.findOne({ username });
 
-    if (!user || !user.savedGameState) {
+    if (!user) {
       return NextResponse.json({
         success: true,
         gameState: null,
-        message: "Nenhum estado salvo encontrado",
+        message: "Usuário não encontrado",
+      });
+    }
+
+    const savedState = user.savedGameState;
+    if (!savedState || typeof savedState !== "object") {
+      return NextResponse.json({
+        success: true,
+        gameState: null,
+        message: "Nenhum estado salvo",
+      });
+    }
+
+    if (!savedState.handActive) {
+      return NextResponse.json({
+        success: true,
+        gameState: null,
+        message: "Jogo não está ativo",
       });
     }
 
     return NextResponse.json({
       success: true,
-      gameState: user.savedGameState,
+      gameState: savedState,
     });
   } catch (error) {
-    console.error("Erro ao recuperar estado do jogo:", error);
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 },
-    );
+    console.error("❌ Erro ao recuperar estado do jogo:", error);
+    return NextResponse.json({
+      success: true,
+      gameState: null,
+      message: "Erro ao carregar estado",
+    });
   }
 }

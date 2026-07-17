@@ -3,58 +3,108 @@
 
 import { useState, useEffect } from "react";
 
-export default function LevelDisplay({ username }) {
-  const [levelData, setLevelData] = useState(null);
+export default function LevelDisplay({
+  username,
+  onShowAchievements,
+  onShowFindings,
+  isResultModalOpen = false,
+}) {
+  const [levelInfo, setLevelInfo] = useState({
+    level: 1,
+    xp: 0,
+    xpToNextLevel: 100,
+    levelTitle: "Iniciante",
+    levelIcon: "🎴",
+    findings: [],
+    findingsCount: 0,
+    achievements: [],
+    achievementsCount: 0,
+  });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (username) {
-      fetchLevelData();
-    } else {
-      setLoading(false);
-    }
-  }, [username]);
+  const fetchLevelInfo = async () => {
+    if (!username) return;
 
-  const fetchLevelData = async () => {
     try {
-      setLoading(true);
-      // 🔥 Enviar username como query parameter
-      const url = `/api/get-level?username=${encodeURIComponent(username)}`;
-      const res = await fetch(url);
+      const res = await fetch(
+        `/api/get-level?username=${encodeURIComponent(username)}&t=${Date.now()}`,
+      );
       const data = await res.json();
       if (data.success) {
-        setLevelData(data);
+        setLevelInfo({
+          level: data.level || 1,
+          xp: data.xp || 0,
+          xpToNextLevel: data.xpToNextLevel || 100,
+          levelTitle: data.levelTitle || "Iniciante",
+          levelIcon: data.levelIcon || "🎴",
+          findings: data.findings || [],
+          findingsCount: data.findingsCount || 0,
+          achievements: data.achievements || [],
+          achievementsCount: data.achievementsCount || 0,
+        });
       }
     } catch (error) {
-      console.error("Erro ao carregar nível:", error);
+      console.error("Erro ao buscar nível:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading || !levelData) {
+  useEffect(() => {
+    if (username) {
+      fetchLevelInfo();
+    }
+  }, [username]);
+
+  useEffect(() => {
+    const handleLevelUpdate = () => {
+      fetchLevelInfo();
+    };
+
+    window.addEventListener("level-updated", handleLevelUpdate);
+    window.addEventListener("chips-updated", handleLevelUpdate);
+
+    return () => {
+      window.removeEventListener("level-updated", handleLevelUpdate);
+      window.removeEventListener("chips-updated", handleLevelUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isResultModalOpen) {
+        return;
+      }
+      if (username) {
+        fetchLevelInfo();
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [username, isResultModalOpen]);
+
+  if (loading) {
     return (
       <div style={panelStyle()}>
-        <p style={loadingStyle()}>Carregando nível...</p>
+        <div style={levelStyle()}>
+          <span style={iconStyle()}>🎴</span>
+          <span style={levelTextStyle()}>Nível 1</span>
+        </div>
       </div>
     );
   }
 
-  const { level, xp, xpToNextLevel, levelTitle, levelIcon, findings } =
-    levelData;
-  const progress = Math.min((xp / xpToNextLevel) * 100, 100);
+  const progress = Math.min(
+    (levelInfo.xp / levelInfo.xpToNextLevel) * 100,
+    100,
+  );
 
   return (
     <div style={panelStyle()}>
-      <div style={headerStyle()}>
-        <span style={levelIconStyle()}>{levelIcon || "🎴"}</span>
-        <div style={levelInfoStyle()}>
-          <span style={levelNumberStyle()}>Nível {level}</span>
-          <span style={levelTitleStyle()}>{levelTitle}</span>
-        </div>
-        {findings && findings.length > 0 && (
-          <span style={findingsBadgeStyle()}>🏅 {findings.length}</span>
-        )}
+      <div style={levelStyle()}>
+        <span style={iconStyle()}>{levelInfo.levelIcon}</span>
+        <span style={levelTextStyle()}>Nível {levelInfo.level}</span>
+        <span style={titleStyle()}>{levelInfo.levelTitle}</span>
       </div>
 
       <div style={xpBarStyle()}>
@@ -67,10 +117,30 @@ export default function LevelDisplay({ username }) {
       </div>
 
       <div style={xpTextStyle()}>
-        <span>
-          {xp} / {xpToNextLevel} XP
-        </span>
-        <span style={xpProgressStyle()}>{Math.round(progress)}%</span>
+        {levelInfo.xp} / {levelInfo.xpToNextLevel} XP
+      </div>
+
+      <div style={badgesStyle()}>
+        <button
+          onClick={() => {
+            if (onShowAchievements) {
+              onShowAchievements();
+            }
+          }}
+          style={badgeButtonStyle()}
+        >
+          🏅 {levelInfo.achievementsCount || 0} conquistas
+        </button>
+        <button
+          onClick={() => {
+            if (onShowFindings) {
+              onShowFindings();
+            }
+          }}
+          style={badgeButtonStyle()}
+        >
+          🔍 {levelInfo.findingsCount || 0} achados
+        </button>
       </div>
     </div>
   );
@@ -82,67 +152,41 @@ function panelStyle() {
     background: "#1a2a1ecc",
     backdropFilter: "blur(4px)",
     borderRadius: 20,
-    padding: "12px 15px",
+    padding: 15,
+    marginTop: 10,
     color: "white",
     border: "1px solid rgba(255,215,0,0.2)",
-    marginTop: "10px",
   };
 }
 
-function loadingStyle() {
-  return {
-    textAlign: "center",
-    color: "#888",
-    fontSize: "0.8rem",
-    margin: "5px 0",
-  };
-}
-
-function headerStyle() {
+function levelStyle() {
   return {
     display: "flex",
     alignItems: "center",
-    gap: "12px",
+    gap: "8px",
+    marginBottom: "8px",
   };
 }
 
-function levelIconStyle() {
+function iconStyle() {
   return {
-    fontSize: "2rem",
+    fontSize: "1.5rem",
   };
 }
 
-function levelInfoStyle() {
+function levelTextStyle() {
   return {
-    display: "flex",
-    flexDirection: "column",
-    flex: 1,
-  };
-}
-
-function levelNumberStyle() {
-  return {
-    fontSize: "1.2rem",
     fontWeight: "bold",
+    fontSize: "1.1rem",
     color: "gold",
   };
 }
 
-function levelTitleStyle() {
+function titleStyle() {
   return {
-    fontSize: "0.7rem",
+    fontSize: "0.8rem",
     color: "#aaa",
-  };
-}
-
-function findingsBadgeStyle() {
-  return {
-    background: "rgba(255,215,0,0.15)",
-    padding: "2px 10px",
-    borderRadius: 12,
-    fontSize: "0.7rem",
-    color: "gold",
-    border: "1px solid rgba(255,215,0,0.2)",
+    marginLeft: "auto",
   };
 }
 
@@ -152,7 +196,6 @@ function xpBarStyle() {
     height: "6px",
     background: "rgba(255,255,255,0.1)",
     borderRadius: 10,
-    marginTop: "8px",
     overflow: "hidden",
   };
 }
@@ -168,16 +211,31 @@ function xpFillStyle() {
 
 function xpTextStyle() {
   return {
-    display: "flex",
-    justifyContent: "space-between",
     fontSize: "0.7rem",
     color: "#888",
+    textAlign: "center",
     marginTop: "4px",
   };
 }
 
-function xpProgressStyle() {
+function badgesStyle() {
   return {
-    color: "gold",
+    display: "flex",
+    gap: "8px",
+    marginTop: "8px",
+    flexWrap: "wrap",
+  };
+}
+
+function badgeButtonStyle() {
+  return {
+    background: "rgba(255,255,255,0.05)",
+    padding: "2px 10px",
+    borderRadius: 12,
+    fontSize: "0.7rem",
+    color: "#aaa",
+    border: "1px solid rgba(255,255,255,0.05)",
+    cursor: "pointer",
+    transition: "all 0.3s ease",
   };
 }

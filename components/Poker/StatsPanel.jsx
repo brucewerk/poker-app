@@ -1,50 +1,78 @@
 // components/Poker/StatsPanel.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
-export default function StatsPanel({ username, onShowAchievements }) {
+// components/Poker/StatsPanel.jsx - Adicione a prop refreshInterval
+export default function StatsPanel({
+  username,
+  onShowAchievements,
+  refreshInterval = 10000,
+}) {
+  // ...
   const [stats, setStats] = useState(null);
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(false);
   const [error, setError] = useState(false);
+  const [lastAchievement, setLastAchievement] = useState(null);
+  const intervalRef = useRef(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     if (username) {
       fetchStats();
-    } else {
-      setLoading(false);
-      setError(true);
+      intervalRef.current = setInterval(() => {
+        if (username && mountedRef.current) fetchStats(true);
+      }, refreshInterval); // 🔥 USAR A PROP
     }
-  }, [username]);
 
-  const fetchStats = async () => {
+    return () => {
+      mountedRef.current = false;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [username, refreshInterval]);
+
+  const fetchStats = async (silent = false) => {
+    if (!username || !mountedRef.current) return;
+
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(false);
 
-      // 🔥 Enviar username como query parameter
-      const url = `/api/get-stats?username=${encodeURIComponent(username)}`;
-      const res = await fetch(url);
+      const url = `/api/get-stats?username=${encodeURIComponent(username)}&t=${Date.now()}`;
+      const res = await fetch(url, { cache: "no-store" });
       const data = await res.json();
 
-      if (data.success) {
+      if (data.success && mountedRef.current) {
+        const newAchievements = data.newAchievements || [];
+
+        // 🔥 VERIFICAR NOVAS CONQUISTAS
+        if (newAchievements.length > 0 && !silent) {
+          setLastAchievement(newAchievements[0]);
+
+          // 🔥 DISPARAR EVENTO PARA ABRIR MODAL
+          window.dispatchEvent(
+            new CustomEvent("new-achievements", {
+              detail: { achievements: newAchievements },
+            }),
+          );
+        }
+
         setStats(data.stats || {});
         setAchievements(data.achievements || []);
-      } else {
-        setError(true);
-        console.error("Erro ao carregar estatísticas:", data.error);
       }
     } catch (error) {
-      setError(true);
-      console.error("Erro ao carregar estatísticas:", error);
+      if (!silent) {
+        setError(true);
+        console.error("Erro ao carregar estatísticas:", error);
+      }
     } finally {
-      setLoading(false);
+      if (!silent && mountedRef.current) setLoading(false);
     }
   };
 
-  // Se não tem usuário ou erro, mostra mensagem amigável
   if (!username || error) {
     return (
       <div style={panelStyle()}>
@@ -60,12 +88,11 @@ export default function StatsPanel({ username, onShowAchievements }) {
     return (
       <div style={panelStyle()}>
         <h3 style={titleStyle()}>📊 ESTATÍSTICAS</h3>
-        <p style={textStyle()}>Carregando estatísticas...</p>
+        <p style={textStyle()}>Carregando...</p>
       </div>
     );
   }
 
-  // Se não tem dados, mostra mensagem
   if (!stats || stats.handsPlayed === 0) {
     return (
       <div style={panelStyle()}>
@@ -95,6 +122,12 @@ export default function StatsPanel({ username, onShowAchievements }) {
           {showDetails ? "▲" : "▼"}
         </button>
       </div>
+
+      {lastAchievement && (
+        <div style={achievementNotificationStyle()}>
+          🏅 Nova conquista: {lastAchievement.name}!
+        </div>
+      )}
 
       <div style={statsGridStyle()}>
         <div style={statItemStyle()}>
@@ -325,5 +358,19 @@ function badgeStyle() {
     borderRadius: 12,
     fontSize: "0.8rem",
     border: "1px solid rgba(255,215,0,0.2)",
+  };
+}
+
+function achievementNotificationStyle() {
+  return {
+    background: "rgba(255,215,0,0.15)",
+    border: "1px solid gold",
+    borderRadius: 10,
+    padding: "6px 10px",
+    marginBottom: "8px",
+    color: "gold",
+    fontSize: "0.8rem",
+    textAlign: "center",
+    animation: "fadeIn 0.3s ease-out",
   };
 }

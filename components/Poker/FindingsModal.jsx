@@ -2,19 +2,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FINDINGS } from "@/lib/findings";
 
 export default function FindingsModal({ onClose, newFindings = [] }) {
   const [findings, setFindings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [displayNewFindings, setDisplayNewFindings] = useState(newFindings);
+
+  useEffect(() => {
+    if (newFindings && newFindings.length > 0) {
+      setDisplayNewFindings(newFindings);
+    }
+  }, [newFindings]);
 
   useEffect(() => {
     fetchFindings();
+    const interval = setInterval(fetchFindings, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchFindings = async () => {
     try {
-      const res = await fetch("/api/get-level");
+      const res = await fetch("/api/get-level", { cache: "no-store" });
       const data = await res.json();
       if (data.success) {
         setFindings(data.findings || []);
@@ -26,14 +34,67 @@ export default function FindingsModal({ onClose, newFindings = [] }) {
     }
   };
 
-  const allFindings = Object.values(FINDINGS);
+  // 🔥 LISTA ATUALIZADA DE ACHADOS (SEM FLUSH E SEQUENCIA)
+  const allFindings = [
+    {
+      id: "first_hand",
+      name: "🎴 Primeira Mão",
+      description: "Jogue sua primeira mão",
+      icon: "🎴",
+    },
+    {
+      id: "ten_hands",
+      name: "🎯 10 Mãos",
+      description: "Jogue 10 mãos",
+      icon: "🎯",
+    },
+    {
+      id: "first_win",
+      name: "🏆 Primeira Vitória",
+      description: "Ganhe sua primeira mão",
+      icon: "🏆",
+    },
+    {
+      id: "five_wins",
+      name: "⭐ 5 Vitórias",
+      description: "Ganhe 5 mãos",
+      icon: "⭐",
+    },
+    {
+      id: "twenty_hands_finding",
+      name: "🎯 20 Mãos",
+      description: "Jogue 20 mãos",
+      icon: "🎯",
+    },
+    {
+      id: "fifty_hands_finding",
+      name: "🎯 50 Mãos",
+      description: "Jogue 50 mãos",
+      icon: "🎯",
+    },
+    {
+      id: "all_in_win_finding",
+      name: "⚡ All-in Vitorioso",
+      description: "Ganhe com All-in",
+      icon: "⚡",
+    },
+    {
+      id: "ten_wins",
+      name: "🏆 10 Vitórias",
+      description: "Ganhe 10 mãos",
+      icon: "🏆",
+    },
+  ];
+
   const unlockedIds = findings.map((f) => f.id);
+  const totalCount = allFindings.length;
+  const unlockedCount = unlockedIds.length;
 
   if (loading) {
     return (
       <div style={overlayStyle()}>
         <div style={modalStyle()}>
-          <h2 style={titleStyle()}>🏅 ACHADOS</h2>
+          <h2 style={titleStyle()}>🔍 ACHADOS</h2>
           <p style={{ textAlign: "center", color: "#aaa" }}>Carregando...</p>
         </div>
       </div>
@@ -47,22 +108,20 @@ export default function FindingsModal({ onClose, newFindings = [] }) {
           ✕
         </button>
 
-        <h2 style={titleStyle()}>🏅 ACHADOS</h2>
-        <p style={subtitleStyle()}>
-          Descubra todos os achados escondidos no jogo!
-        </p>
+        <h2 style={titleStyle()}>🔍 ACHADOS</h2>
 
-        {newFindings.length > 0 && (
+        {displayNewFindings.length > 0 && (
           <div style={newFindingsStyle()}>
-            <h3>🎉 Novos Achados!</h3>
+            <h3 style={{ color: "#4caf50", margin: "0 0 10px" }}>
+              🎉 Novos Achados!
+            </h3>
             <div style={newFindingsListStyle()}>
-              {newFindings.map((f, i) => (
+              {displayNewFindings.map((f, i) => (
                 <div key={i} style={newFindingItemStyle()}>
-                  <span style={findingIconStyle()}>{f.icon || "🏅"}</span>
+                  <span style={findingIconStyle()}>{f.icon || "🔍"}</span>
                   <div>
                     <div style={findingNameStyle(true)}>{f.name}</div>
                     <div style={findingDescStyle()}>{f.description}</div>
-                    <div style={findingXpStyle()}>+{f.xp} XP</div>
                   </div>
                 </div>
               ))}
@@ -72,13 +131,13 @@ export default function FindingsModal({ onClose, newFindings = [] }) {
 
         <div style={progressStyle()}>
           <span style={{ color: "#ddd" }}>
-            Progresso: {unlockedIds.length}/{allFindings.length}
+            Progresso: {unlockedCount}/{totalCount}
           </span>
           <div style={progressBarStyle()}>
             <div
               style={{
                 ...progressFillStyle(),
-                width: `${(unlockedIds.length / allFindings.length) * 100}%`,
+                width: `${(unlockedCount / totalCount) * 100}%`,
               }}
             />
           </div>
@@ -98,9 +157,6 @@ export default function FindingsModal({ onClose, newFindings = [] }) {
                     {unlocked && " ✅"}
                   </div>
                   <div style={findingDescStyle()}>{f.description}</div>
-                  <div style={findingXpStyle()}>
-                    {unlocked ? `+${f.xp} XP (desbloqueado)` : `+${f.xp} XP`}
-                  </div>
                 </div>
               </div>
             );
@@ -124,7 +180,7 @@ function overlayStyle() {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 1002,
+    zIndex: 1000,
     padding: 20,
   };
 }
@@ -134,12 +190,12 @@ function modalStyle() {
     background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
     padding: "30px 35px",
     borderRadius: 30,
-    maxWidth: 550,
+    maxWidth: 600,
     width: "100%",
     maxHeight: "80vh",
     overflowY: "auto",
     color: "white",
-    border: "2px solid gold",
+    border: "2px solid #4caf50",
     position: "relative",
   };
 }
@@ -154,24 +210,16 @@ function closeButtonStyle() {
     color: "white",
     fontSize: "1.5rem",
     cursor: "pointer",
+    padding: "5px",
   };
 }
 
 function titleStyle() {
   return {
     textAlign: "center",
-    color: "gold",
-    margin: "0 0 5px",
+    color: "#4caf50",
+    margin: "0 0 20px",
     fontSize: "1.8rem",
-  };
-}
-
-function subtitleStyle() {
-  return {
-    textAlign: "center",
-    color: "#aaa",
-    marginBottom: "20px",
-    fontSize: "0.9rem",
   };
 }
 
@@ -198,7 +246,7 @@ function progressBarStyle() {
 function progressFillStyle() {
   return {
     height: "100%",
-    background: "linear-gradient(90deg, #4caf50, gold)",
+    background: "linear-gradient(90deg, #4caf50, #8bc34a)",
     borderRadius: 10,
     transition: "width 0.5s ease",
   };
@@ -220,7 +268,7 @@ function findingItemStyle(unlocked) {
     gap: "12px",
     padding: "10px 15px",
     borderRadius: 10,
-    background: unlocked ? "rgba(76,175,80,0.1)" : "rgba(255,255,255,0.03)",
+    background: unlocked ? "rgba(76,175,80,0.08)" : "rgba(255,255,255,0.03)",
     border: unlocked
       ? "1px solid rgba(76,175,80,0.3)"
       : "1px solid rgba(255,255,255,0.05)",
@@ -258,21 +306,13 @@ function findingDescStyle() {
   };
 }
 
-function findingXpStyle() {
-  return {
-    fontSize: "0.7rem",
-    color: "gold",
-    marginTop: "2px",
-  };
-}
-
 function newFindingsStyle() {
   return {
-    background: "rgba(255,215,0,0.12)",
+    background: "rgba(76,175,80,0.12)",
     padding: "15px",
     borderRadius: 15,
     marginBottom: "20px",
-    border: "2px solid gold",
+    border: "2px solid #4caf50",
     animation: "pulse 2s ease-in-out infinite",
   };
 }
@@ -299,15 +339,15 @@ function newFindingItemStyle() {
 
 function buttonStyle() {
   return {
-    background: "radial-gradient(#f7d97c,#d6a12e)",
+    background: "radial-gradient(#4caf50,#2e7d32)",
     border: "none",
     fontWeight: "bold",
     fontSize: "1rem",
     padding: "12px 30px",
     borderRadius: 60,
     cursor: "pointer",
-    boxShadow: "0 4px 0 #7a4c1a",
-    color: "#2e241f",
+    boxShadow: "0 4px 0 #1b5e20",
+    color: "white",
     width: "100%",
   };
 }

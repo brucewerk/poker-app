@@ -1,8 +1,6 @@
 // components/Poker/StatusPanel.jsx
 "use client";
 
-import { useState, useEffect } from "react";
-
 export default function StatusPanel({
   stage,
   pot,
@@ -14,193 +12,181 @@ export default function StatusPanel({
   stageNames,
   gameStatus,
   winnerMsg,
-  isTurbo = false,
+  isTurbo,
 }) {
-  const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    if (winnerMsg && stage === "showdown") {
-      const duration = isTurbo ? 2 : 5;
-      setCountdown(duration);
-      const interval = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(interval);
-    } else {
-      setCountdown(0);
-    }
-  }, [winnerMsg, stage, isTurbo]);
-
   return (
-    <div
-      style={{
-        background: "#1a2a1ecc",
-        backdropFilter: "blur(4px)",
-        borderRadius: 20,
-        padding: 15,
-        color: "white",
-        border: `1px solid ${isTurbo ? "rgba(255,152,0,0.4)" : "rgba(255,215,0,0.2)"}`,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 10,
-        }}
-      >
-        <h3
-          style={{
-            color: "gold",
-            margin: 0,
-            fontSize: "1rem",
-          }}
-        >
-          📋 STATUS DA PARTIDA
-        </h3>
-        {isTurbo && (
-          <span
-            style={{
-              background: "rgba(255,152,0,0.2)",
-              color: "#ff9800",
-              fontSize: "0.6rem",
-              padding: "2px 8px",
-              borderRadius: 10,
-              fontWeight: "bold",
-              border: "1px solid rgba(255,152,0,0.3)",
-            }}
-          >
-            🚀 TURBO
-          </span>
-        )}
-      </div>
+    <div style={panelStyle()}>
+      <h3 style={titleStyle()}>📊 STATUS</h3>
 
-      <div style={statusCardStyle()}>
-        <p style={statusPStyle()}>
-          <span style={{ color: "gold", fontWeight: "bold" }}>🎯 Fase:</span>{" "}
-          {stageNames[stage] || stage}
-          {stage === "showdown" && winnerMsg && (
-            <span
-              style={{
-                display: "block",
-                color: "#ffd700",
-                fontSize: "0.8rem",
-                marginTop: "4px",
-                fontWeight: "bold",
-              }}
-            >
-              {winnerMsg}
-            </span>
-          )}
-        </p>
-        <p style={statusPStyle()}>
-          <span style={{ color: "gold", fontWeight: "bold" }}>💰 Pote:</span>{" "}
-          {pot}
-        </p>
-        <p style={statusPStyle()}>
-          <span style={{ color: "gold", fontWeight: "bold" }}>
-            🎴 Aposta atual:
-          </span>{" "}
-          {currentBet}
-        </p>
-      </div>
-
-      <div style={statusCardStyle()}>
-        <p style={statusPStyle()}>
-          <span style={{ color: "gold", fontWeight: "bold" }}>
-            👤 Você apostou:
-          </span>{" "}
-          {playerBet}
-        </p>
-        <p style={statusPStyle()}>
-          <span style={{ color: "gold", fontWeight: "bold" }}>
-            🤖 CPU apostou:
-          </span>{" "}
-          {cpuBet}
-        </p>
-      </div>
-
-      <div style={statusCardStyle()}>
-        <p style={statusPStyle()}>
-          <span style={{ color: "gold", fontWeight: "bold" }}>
-            📈 Próximo raise:
-          </span>{" "}
-          +{nextRaise} fichas
-        </p>
-        <p style={statusPStyle()}>
-          <span style={{ color: "gold", fontWeight: "bold" }}>⚡ All-in:</span>{" "}
-          Apostar tudo
-        </p>
-      </div>
-
-      {countdown > 0 && (
-        <div
-          style={{
-            background: isTurbo
-              ? "rgba(255,152,0,0.15)"
-              : "rgba(255,215,0,0.15)",
-            borderRadius: 15,
-            padding: "10px",
-            marginTop: "10px",
-            textAlign: "center",
-            border: `1px solid ${isTurbo ? "#ff9800" : "gold"}`,
-          }}
-        >
-          <span
-            style={{
-              fontSize: "0.9rem",
-              color: isTurbo ? "#ff9800" : "#ffd700",
-            }}
-          >
-            ⏳ Próxima mão em {countdown}s...
-          </span>
-        </div>
-      )}
-
-      {notification.visible && (
+      {notification?.visible && (
         <div
           style={{
             background: notification.isError
-              ? "linear-gradient(135deg,#ff4444,#cc0000)"
-              : "linear-gradient(135deg,#ffd700,#ff8c00)",
-            borderRadius: 20,
-            padding: 10,
-            marginTop: 15,
-            textAlign: "center",
-            color: "#2e241f",
-            fontWeight: "bold",
+              ? "rgba(244,67,54,0.15)"
+              : "rgba(76,175,80,0.15)",
+            border: notification.isError
+              ? "1px solid #f44336"
+              : "1px solid #4caf50",
+            borderRadius: 10,
+            padding: "6px 10px",
+            marginBottom: "8px",
+            color: notification.isError ? "#f44336" : "#4caf50",
             fontSize: "0.8rem",
+            textAlign: "center",
           }}
         >
           {notification.msg}
+        </div>
+      )}
+
+      <div style={statusGridStyle()}>
+        <div style={statusItemStyle()}>
+          <span style={statusLabelStyle()}>🎯 Fase</span>
+          <span style={statusValueStyle()}>
+            {stageNames?.[stage] || stage || "Aguardando"}
+          </span>
+        </div>
+
+        <div style={statusItemStyle()}>
+          <span style={statusLabelStyle()}>💰 Pote</span>
+          <span style={statusValueStyle()}>${pot || 0}</span>
+        </div>
+
+        <div style={statusItemStyle()}>
+          <span style={statusLabelStyle()}>📊 Aposta</span>
+          <span style={statusValueStyle()}>${currentBet || 0}</span>
+        </div>
+
+        <div style={statusItemStyle()}>
+          <span style={statusLabelStyle()}>🚀 Modo</span>
+          <span style={statusValueStyle(isTurbo ? "#ff9800" : "#4caf50")}>
+            {isTurbo ? "Turbo" : "Normal"}
+          </span>
+        </div>
+      </div>
+
+      <div style={betsStyle()}>
+        <span style={betStyle()}>👤 Você: ${playerBet || 0}</span>
+        <span style={betStyle()}>🤖 CPU: ${cpuBet || 0}</span>
+        {nextRaise > 0 && (
+          <span style={nextRaiseStyle()}>Próximo aumento: ${nextRaise}</span>
+        )}
+      </div>
+
+      {gameStatus && !winnerMsg && (
+        <div style={gameStatusStyle()}>{gameStatus}</div>
+      )}
+
+      {winnerMsg && (
+        <div
+          style={{
+            ...gameStatusStyle(),
+            background: "rgba(255,215,0,0.15)",
+            border: "1px solid gold",
+            color: "gold",
+            fontWeight: "bold",
+          }}
+        >
+          {winnerMsg}
         </div>
       )}
     </div>
   );
 }
 
-function statusCardStyle() {
+// ====================== ESTILOS ======================
+function panelStyle() {
   return {
-    background: "rgba(0,0,0,0.3)",
-    borderRadius: 15,
-    padding: 10,
-    marginBottom: 10,
+    background: "#1a2a1ecc",
+    backdropFilter: "blur(4px)",
+    borderRadius: 20,
+    padding: 15,
+    marginTop: 10,
+    color: "white",
+    border: "1px solid rgba(255,215,0,0.2)",
   };
 }
 
-function statusPStyle() {
+function titleStyle() {
   return {
-    margin: "4px 0",
-    fontSize: "0.85rem",
+    color: "gold",
+    margin: "0 0 10px",
+    fontSize: "1rem",
+  };
+}
+
+function statusGridStyle() {
+  return {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+  };
+}
+
+function statusItemStyle() {
+  return {
+    background: "rgba(255,255,255,0.05)",
+    padding: "6px 8px",
+    borderRadius: 10,
+    textAlign: "center",
+  };
+}
+
+function statusLabelStyle() {
+  return {
+    display: "block",
+    fontSize: "0.65rem",
+    color: "#aaa",
+    marginBottom: "2px",
+  };
+}
+
+function statusValueStyle(color = "#fff") {
+  return {
+    display: "block",
+    fontSize: "0.9rem",
+    fontWeight: "bold",
+    color: color,
+  };
+}
+
+function betsStyle() {
+  return {
+    display: "flex",
+    justifyContent: "space-between",
+    marginTop: "8px",
+    fontSize: "0.75rem",
+    color: "#aaa",
+    flexWrap: "wrap",
+    gap: "4px",
+  };
+}
+
+function betStyle() {
+  return {
+    background: "rgba(255,255,255,0.05)",
+    padding: "2px 10px",
+    borderRadius: 10,
+  };
+}
+
+function nextRaiseStyle() {
+  return {
+    background: "rgba(255,215,0,0.1)",
+    padding: "2px 10px",
+    borderRadius: 10,
+    color: "gold",
+  };
+}
+
+function gameStatusStyle() {
+  return {
+    marginTop: "8px",
+    padding: "6px 10px",
+    background: "rgba(0,0,0,0.3)",
+    borderRadius: 10,
+    fontSize: "0.8rem",
+    textAlign: "center",
     color: "#ffefb9",
-    wordBreak: "break-word",
   };
 }

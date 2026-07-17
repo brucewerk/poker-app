@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getCardDisplayName, getCardColor } from "@/lib/poker/deck.js";
 
 export default function Card({
   card,
@@ -9,95 +10,141 @@ export default function Card({
   delay = 0,
   isRevealing = false,
 }) {
-  const [isVisible, setIsVisible] = useState(!isRevealing);
   const [isFlipped, setIsFlipped] = useState(faceDown);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (delay > 0) {
+      const timer = setTimeout(() => setIsVisible(true), delay);
+      return () => clearTimeout(timer);
+    }
+    setIsVisible(true);
+  }, [delay]);
 
   useEffect(() => {
     if (isRevealing && faceDown) {
-      setIsAnimating(true);
-      const timer = setTimeout(() => {
-        setIsFlipped(false);
-        setIsVisible(true);
-        setTimeout(() => setIsAnimating(false), 400);
-      }, delay);
-
+      const timer = setTimeout(() => setIsFlipped(false), 300);
       return () => clearTimeout(timer);
     }
-  }, [isRevealing, faceDown, delay]);
+    setIsFlipped(faceDown);
+  }, [faceDown, isRevealing]);
 
-  // ✅ Estilo base com animação suave
-  const baseStyle = {
-    width: 70,
-    height: 100,
-    borderRadius: 10,
-    display: "inline-flex",
+  if (!isVisible) {
+    return <div style={cardPlaceholderStyle()} />;
+  }
+
+  const isRed = card && (card.suit === "♥" || card.suit === "♦");
+  const displayName = card ? getCardDisplayName(card) : "???";
+
+  return (
+    <div style={cardContainerStyle(isFlipped)}>
+      {isFlipped ? (
+        <div style={cardBackStyle()} />
+      ) : (
+        <div style={cardFrontStyle(isRed)}>
+          <div style={cardContentStyle()}>
+            <span style={cardRankStyle(isRed)}>{card?.rank || "?"}</span>
+            <span style={cardSuitStyle(isRed)}>{card?.suit || "?"}</span>
+            <span style={cardDisplayNameStyle()}>{displayName}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ====================== ESTILOS ======================
+function cardContainerStyle(isFlipped) {
+  return {
+    display: "inline-block",
+    width: 60,
+    height: 85,
+    margin: "0 3px",
+    perspective: "600px",
+    transition: "transform 0.3s ease",
+  };
+}
+
+function cardBackStyle() {
+  return {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+    background:
+      "repeating-linear-gradient(45deg, #2b5797, #2b5797 12px, #1d3f6e 12px, #1d3f6e 24px)",
+    border: "2px solid #1a3a6e",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+    position: "relative",
+  };
+}
+
+function cardFrontStyle(isRed) {
+  return {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+    background: "#fff",
+    border: "2px solid #ccc",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+    color: isRed ? "#cc0000" : "#000",
+    fontSize: "0.8rem",
+    fontWeight: "bold",
+    padding: "4px",
+  };
+}
+
+function cardContentStyle() {
+  return {
+    display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    margin: "0 3px",
-    flexShrink: 0,
-    transition:
-      "transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease",
-    backfaceVisibility: "hidden",
-    WebkitBackfaceVisibility: "hidden",
-    transform: "translateZ(0)",
-    willChange: "transform, opacity",
+    width: "100%",
+    height: "100%",
   };
+}
 
-  if (faceDown && isFlipped) {
-    return (
-      <div
-        style={{
-          ...baseStyle,
-          background:
-            "repeating-linear-gradient(45deg,#2b5797,#2b5797 15px,#1d3f6e 15px,#1d3f6e 30px)",
-          boxShadow: "-2px 2px 8px rgba(0,0,0,0.5)",
-          transform: isVisible
-            ? "rotateY(0deg) scale(1)"
-            : "rotateY(180deg) scale(0.8)",
-          opacity: isVisible ? 1 : 0,
-          animation: isAnimating ? "cardReveal 0.5s ease-out forwards" : "none",
-        }}
-      >
-        <span
-          style={{
-            fontSize: "1.8rem",
-            color: "#ffd966",
-            fontWeight: "bold",
-          }}
-        >
-          ?
-        </span>
-      </div>
-    );
-  }
+function cardRankStyle(isRed) {
+  return {
+    fontSize: "1.2rem",
+    fontWeight: "bold",
+    color: isRed ? "#cc0000" : "#000",
+    lineHeight: 1,
+  };
+}
 
-  let rank = card.rank;
-  if (rank === 11) rank = "J";
-  if (rank === 12) rank = "Q";
-  if (rank === 13) rank = "K";
-  if (rank === 14) rank = "A";
+function cardSuitStyle(isRed) {
+  return {
+    fontSize: "1.5rem",
+    color: isRed ? "#cc0000" : "#000",
+    lineHeight: 1,
+  };
+}
 
-  const isRed = card.suit === "♥" || card.suit === "♦";
+function cardDisplayNameStyle() {
+  return {
+    fontSize: "0.45rem",
+    color: "#666",
+    marginTop: "2px",
+    textAlign: "center",
+    fontWeight: "normal",
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  };
+}
 
-  return (
-    <div
-      style={{
-        ...baseStyle,
-        background: "linear-gradient(145deg,#fff,#f8f4e8)",
-        boxShadow: "-2px 2px 8px rgba(0,0,0,0.5)",
-        color: isRed ? "#c33" : "#1f2a2f",
-        fontWeight: "bold",
-        transform: isVisible
-          ? "rotateY(0deg) scale(1)"
-          : "rotateY(180deg) scale(0.8)",
-        opacity: isVisible ? 1 : 0,
-        animation: isAnimating ? "cardReveal 0.5s ease-out forwards" : "none",
-      }}
-    >
-      <div style={{ fontSize: "1.4rem", fontWeight: 800 }}>{rank}</div>
-      <div style={{ fontSize: "2rem", lineHeight: 1 }}>{card.suit}</div>
-    </div>
-  );
+function cardPlaceholderStyle() {
+  return {
+    display: "inline-block",
+    width: 60,
+    height: 85,
+    margin: "0 3px",
+    opacity: 0,
+  };
 }

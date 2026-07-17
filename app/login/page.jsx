@@ -26,11 +26,11 @@ export default function LoginPage() {
         callbackUrl: "/",
       });
 
-      console.log("Resultado do login:", result);
+      console.log("📡 Resultado do login:", result);
 
       if (result?.error) {
+        console.error("❌ Erro no login:", result.error);
         setError("Usuário ou senha inválidos");
-        console.error("Erro no login:", result.error);
         setLoading(false);
         return;
       }
@@ -44,7 +44,7 @@ export default function LoginPage() {
         setLoading(false);
       }
     } catch (error) {
-      console.error("Erro ao fazer login:", error);
+      console.error("❌ Erro ao fazer login:", error);
       setError("Erro de conexão. Verifique o servidor.");
       setLoading(false);
     }

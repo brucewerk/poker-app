@@ -1,31 +1,29 @@
 // components/Poker/MissionsPanel.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
-export default function MissionsPanel({ username }) {
+export default function MissionsPanel({ username, onChipsUpdated }) {
   const [missions, setMissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMissions, setShowMissions] = useState(false);
   const [claiming, setClaiming] = useState(null);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const intervalRef = useRef(null);
+  const [notification, setNotification] = useState(null);
+  const [claimedIds, setClaimedIds] = useState(new Set());
 
-  useEffect(() => {
-    if (username) {
-      fetchMissions();
-    } else {
-      setLoading(false);
-    }
-  }, [username]);
-
-  const fetchMissions = async () => {
+  // 🔥 CARREGAR MISSÕES
+  const fetchMissions = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await fetch(
         `/api/missions?username=${encodeURIComponent(username)}`,
       );
       const data = await res.json();
+
       if (data.success) {
-        // 🔥 Garantir que todas as missões tenham campos válidos
         const validMissions = (data.missions || []).map((m) => ({
           id: m.id || `mission_${Math.random().toString(36).substr(2, 9)}`,
           name: m.name || "Missão",
@@ -39,106 +37,152 @@ export default function MissionsPanel({ username }) {
           xpReward: m.xpReward || 50,
           chipsReward: m.chipsReward || 100,
         }));
+
         setMissions(validMissions);
+        setCompletedCount(data.completedCount || 0);
+        setTotalCount(data.totalCount || validMissions.length);
+
+        // 🔥 ATUALIZAR SET DE IDs REIVINDICADOS
+        const claimed = new Set(
+          validMissions.filter((m) => m.claimed === true).map((m) => m.id),
+        );
+        setClaimedIds(claimed);
+
+        // 🔥 VERIFICAR NOVAS MISSÕES COMPLETADAS
+        if (!silent) {
+          const newCompleted = validMissions.filter(
+            (m) => m.completed && !m.claimed,
+          );
+          if (newCompleted.length > 0) {
+            const names = newCompleted.map((m) => m.name).join(", ");
+            setNotification(`🎉 Missões completadas: ${names}!`);
+            setTimeout(() => setNotification(null), 5000);
+          }
+        }
       } else {
-        // ✅ Se a API não existir, cria missões padrão
-        console.log("ℹ️ API de missões não disponível, usando dados padrão");
-        setMissions([
-          {
-            id: "mission_1",
-            name: "Jogar 5 mãos",
-            description: "Complete 5 mãos de poker",
-            icon: "🎯",
-            completed: false,
-            claimed: false,
-            progress: 0,
-            required: 5,
-            current: 0,
-            xpReward: 50,
-            chipsReward: 100,
-          },
-          {
-            id: "mission_2",
-            name: "Ganhar 3 mãos",
-            description: "Vença 3 mãos contra a CPU",
-            icon: "🏆",
-            completed: false,
-            claimed: false,
-            progress: 0,
-            required: 3,
-            current: 0,
-            xpReward: 100,
-            chipsReward: 200,
-          },
-          {
-            id: "mission_3",
-            name: "Ganhar 500 fichas",
-            description: "Acumule 500 fichas em vitórias",
-            icon: "💰",
-            completed: false,
-            claimed: false,
-            progress: 0,
-            required: 500,
-            current: 0,
-            xpReward: 150,
-            chipsReward: 300,
-          },
-        ]);
+        setMissions([]);
       }
     } catch (error) {
-      // ✅ Em caso de erro, mostra missões padrão
-      console.log("ℹ️ Erro ao carregar missões, usando dados padrão");
-      setMissions([
-        {
-          id: "mission_1",
-          name: "Jogar 5 mãos",
-          description: "Complete 5 mãos de poker",
-          icon: "🎯",
-          completed: false,
-          claimed: false,
-          progress: 0,
-          required: 5,
-          current: 0,
-          xpReward: 50,
-          chipsReward: 100,
-        },
-        {
-          id: "mission_2",
-          name: "Ganhar 3 mãos",
-          description: "Vença 3 mãos contra a CPU",
-          icon: "🏆",
-          completed: false,
-          claimed: false,
-          progress: 0,
-          required: 3,
-          current: 0,
-          xpReward: 100,
-          chipsReward: 200,
-        },
-      ]);
+      if (!silent) console.log("ℹ️ Erro ao carregar missões:", error);
+      setMissions([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
+  // 🔥 INICIALIZAR
+  useEffect(() => {
+    if (username) {
+      fetchMissions();
+      startAutoRefresh();
+    } else {
+      setLoading(false);
+    }
+
+    const handleChipsUpdate = (event) => {
+      if (event.detail?.chips !== undefined && onChipsUpdated) {
+        onChipsUpdated(event.detail.chips);
+      }
+    };
+    window.addEventListener("chips-updated", handleChipsUpdate);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      window.removeEventListener("chips-updated", handleChipsUpdate);
+    };
+  }, [username]);
+
+  const startAutoRefresh = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      if (username) fetchMissions(true);
+    }, 10000);
+  };
+
+  // 🔥 REIVINDICAR RECOMPENSA
   const claimReward = async (missionId) => {
+    // 🔥 VERIFICAR SE JÁ FOI REIVINDICADA
+    if (claimedIds.has(missionId)) {
+      setNotification("⚠️ Esta missão já foi reivindicada!");
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+
+    if (claiming) return;
     setClaiming(missionId);
+
     try {
       const res = await fetch("/api/missions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ missionId }),
       });
-      const data = await res.json();
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        setNotification("❌ Erro ao processar recompensa.");
+        setTimeout(() => setNotification(null), 3000);
+        setClaiming(null);
+        return;
+      }
+
       if (data.success) {
-        await fetchMissions();
-        alert(`🎉 ${data.message}`);
+        // 🔥 ATUALIZAR ESTADO LOCAL IMEDIATAMENTE
+        setClaimedIds((prev) => new Set([...prev, missionId]));
+
+        // 🔥 ATUALIZAR MISSÃO LOCALMENTE
+        setMissions((prev) =>
+          prev.map((m) =>
+            m.id === missionId ? { ...m, claimed: true, completed: true } : m,
+          ),
+        );
+
+        // 🔥 ATUALIZAR FICHAS
+        if (data.chips !== undefined && onChipsUpdated) {
+          onChipsUpdated(data.chips);
+        }
+
+        window.dispatchEvent(
+          new CustomEvent("chips-updated", {
+            detail: { chips: data.chips },
+          }),
+        );
+
+        setNotification(`🎉 ${data.message}`);
+        setTimeout(() => setNotification(null), 5000);
+
+        if (data.leveledUp) {
+          setTimeout(() => {
+            setNotification(`🎊 Subiu para Nível ${data.level}!`);
+            setTimeout(() => setNotification(null), 5000);
+          }, 1000);
+        }
+
+        // 🔥 FORÇAR RECARREGAMENTO PARA SINCRONIZAR
+        setTimeout(() => fetchMissions(true), 100);
       } else {
-        alert(`❌ ${data.error || "Erro ao reivindicar recompensa"}`);
+        // 🔥 SE O SERVIDOR DISSE QUE JÁ FOI REIVINDICADA
+        if (data.error?.includes("já foi reivindicada")) {
+          setClaimedIds((prev) => new Set([...prev, missionId]));
+          setMissions((prev) =>
+            prev.map((m) => (m.id === missionId ? { ...m, claimed: true } : m)),
+          );
+          setNotification("⚠️ Esta missão já foi reivindicada!");
+          setTimeout(() => setNotification(null), 3000);
+        } else {
+          setNotification(`❌ ${data.error || "Erro ao reivindicar"}`);
+          setTimeout(() => setNotification(null), 3000);
+        }
       }
     } catch (error) {
-      console.error("Erro ao reivindicar recompensa:", error);
-      alert("❌ Erro ao reivindicar recompensa. Tente novamente.");
+      console.error("❌ Erro:", error);
+      setNotification("❌ Erro de conexão. Tente novamente.");
+      setTimeout(() => setNotification(null), 3000);
     } finally {
       setClaiming(null);
     }
@@ -157,23 +201,24 @@ export default function MissionsPanel({ username }) {
     return (
       <div style={panelStyle()}>
         <h3 style={titleStyle()}>🎯 MISSÕES DIÁRIAS</h3>
-        <p style={emptyStyle()}>Nenhuma missão disponível hoje.</p>
+        <p style={emptyStyle()}>Nenhuma missão disponível.</p>
       </div>
     );
   }
 
-  const completedCount = missions.filter((m) => m.completed).length;
-  const totalCount = missions.length;
+  const completed = missions.filter((m) => m.completed).length;
 
   return (
     <div style={panelStyle()}>
+      {notification && <div style={notificationStyle()}>{notification}</div>}
+
       <div style={headerStyle()}>
         <h3 style={titleStyle()}>🎯 MISSÕES DIÁRIAS</h3>
         <button
           onClick={() => setShowMissions(!showMissions)}
           style={toggleButtonStyle()}
         >
-          {showMissions ? "▲" : "▼"} ({completedCount}/{totalCount})
+          {showMissions ? "▲" : "▼"} ({completed}/{missions.length})
         </button>
       </div>
 
@@ -181,10 +226,10 @@ export default function MissionsPanel({ username }) {
         <div style={missionsListStyle()}>
           {missions.map((mission, index) => {
             const isCompleted = mission.completed || false;
+            // 🔥 VERIFICAR SE FOI REIVINDICADA (PELO ESTADO LOCAL OU PELO BANCO)
+            const isClaimed = mission.claimed || claimedIds.has(mission.id);
             const progress = mission.progress || 0;
             const progressPercent = Math.round(progress * 100);
-
-            // 🔥 Valores seguros para exibição
             const current = mission.current || 0;
             const required = mission.required || 5;
             const xpReward = mission.xpReward || 50;
@@ -197,15 +242,21 @@ export default function MissionsPanel({ username }) {
               >
                 <div style={missionHeaderStyle()}>
                   <span style={missionIconStyle()}>
-                    {isCompleted ? "✅" : mission.icon || "📋"}
+                    {isClaimed
+                      ? "✅"
+                      : isCompleted
+                        ? "🎯"
+                        : mission.icon || "📋"}
                   </span>
                   <span style={missionNameStyle(isCompleted)}>
                     {mission.name || "Missão"}
                   </span>
-                  <span style={missionStatusStyle(isCompleted)}>
-                    {isCompleted
-                      ? "Concluída"
-                      : `${Math.min(current, required)}/${required}`}
+                  <span style={missionStatusStyle(isCompleted, isClaimed)}>
+                    {isClaimed
+                      ? "✅ Reivindicada"
+                      : isCompleted
+                        ? "🎉 Completada!"
+                        : `${Math.min(current, required)}/${required}`}
                   </span>
                 </div>
 
@@ -233,16 +284,19 @@ export default function MissionsPanel({ username }) {
                       💰 +{chipsReward}
                     </span>
                   )}
-                  {isCompleted && !mission.claimed && (
+
+                  {/* 🔥 BOTÃO SÓ APARECE SE COMPLETADA E NÃO REIVINDICADA */}
+                  {isCompleted && !isClaimed && (
                     <button
                       onClick={() => claimReward(mission.id)}
                       disabled={claiming === mission.id}
-                      style={claimButtonStyle()}
+                      style={claimButtonStyle(claiming === mission.id)}
                     >
                       {claiming === mission.id ? "⏳" : "🎁 Reivindicar"}
                     </button>
                   )}
-                  {isCompleted && mission.claimed && (
+
+                  {isClaimed && (
                     <span style={claimedStyle()}>✅ Recompensa recebida</span>
                   )}
                 </div>
@@ -265,6 +319,21 @@ function panelStyle() {
     marginTop: 10,
     color: "white",
     border: "1px solid rgba(255,215,0,0.2)",
+    position: "relative",
+  };
+}
+
+function notificationStyle() {
+  return {
+    background: "rgba(255,215,0,0.15)",
+    border: "1px solid gold",
+    borderRadius: 10,
+    padding: "8px 12px",
+    marginBottom: "10px",
+    color: "gold",
+    fontSize: "0.85rem",
+    textAlign: "center",
+    animation: "fadeIn 0.3s ease-out",
   };
 }
 
@@ -349,7 +418,14 @@ function missionNameStyle(isCompleted) {
   };
 }
 
-function missionStatusStyle(isCompleted) {
+function missionStatusStyle(isCompleted, isClaimed) {
+  if (isClaimed) {
+    return {
+      fontSize: "0.75rem",
+      color: "#4caf50",
+      fontWeight: "bold",
+    };
+  }
   return {
     fontSize: "0.75rem",
     color: isCompleted ? "#4caf50" : "#888",
@@ -411,18 +487,20 @@ function rewardBadgeStyle(type) {
   };
 }
 
-function claimButtonStyle() {
+function claimButtonStyle(isLoading) {
   return {
-    background: "radial-gradient(#f7d97c,#d6a12e)",
+    background: isLoading ? "#666" : "radial-gradient(#f7d97c,#d6a12e)",
     border: "none",
     fontWeight: "bold",
     fontSize: "0.7rem",
     padding: "4px 12px",
     borderRadius: 15,
-    cursor: "pointer",
-    boxShadow: "0 2px 0 #7a4c1a",
-    color: "#2e241f",
+    cursor: isLoading ? "not-allowed" : "pointer",
+    boxShadow: isLoading ? "none" : "0 2px 0 #7a4c1a",
+    color: isLoading ? "#888" : "#2e241f",
     marginLeft: "auto",
+    opacity: isLoading ? 0.5 : 1,
+    transition: "all 0.3s ease",
   };
 }
 
@@ -431,5 +509,6 @@ function claimedStyle() {
     fontSize: "0.7rem",
     color: "#4caf50",
     marginLeft: "auto",
+    fontWeight: "bold",
   };
 }
