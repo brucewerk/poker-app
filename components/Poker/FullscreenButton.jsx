@@ -12,16 +12,21 @@ export default function FullscreenButton() {
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () =>
+    return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
   }, []);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.warn("Erro ao entrar em tela cheia:", err);
+      });
     } else {
       if (document.exitFullscreen) {
-        document.exitFullscreen();
+        document.exitFullscreen().catch((err) => {
+          console.warn("Erro ao sair da tela cheia:", err);
+        });
       }
     }
   };
@@ -29,37 +34,30 @@ export default function FullscreenButton() {
   return (
     <button
       onClick={toggleFullscreen}
-      style={{
-        position: "fixed",
-        bottom: 80,
-        left: 20,
-        zIndex: 100,
-        background: "rgba(0,0,0,0.6)",
-        color: "white",
-        border: "2px solid rgba(255,215,0,0.3)",
-        borderRadius: "50%",
-        width: 50,
-        height: 50,
-        fontSize: "1.5rem",
-        cursor: "pointer",
-        backdropFilter: "blur(4px)",
-        transition: "all 0.3s ease",
-        boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-      onMouseEnter={(e) => {
-        e.target.style.transform = "scale(1.1)";
-        e.target.style.background = "rgba(255,215,0,0.3)";
-      }}
-      onMouseLeave={(e) => {
-        e.target.style.transform = "scale(1)";
-        e.target.style.background = "rgba(0,0,0,0.6)";
-      }}
+      style={buttonStyle()}
       title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
     >
-      {isFullscreen ? "⛶" : "⛶"}
+      ⛶
     </button>
   );
+}
+
+// ====================== ESTILOS ======================
+function buttonStyle() {
+  return {
+    width: 44,
+    height: 44,
+    background: "rgba(0,0,0,0.6)",
+    border: "1px solid rgba(255,255,255,0.2)",
+    borderRadius: "50%",
+    color: "white",
+    fontSize: "1.2rem",
+    cursor: "pointer",
+    backdropFilter: "blur(4px)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    transition: "all 0.3s ease",
+    position: "relative",
+  };
 }

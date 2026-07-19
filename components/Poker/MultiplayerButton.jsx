@@ -1,41 +1,50 @@
 // components/Poker/MultiplayerButton.jsx
 "use client";
 
-export default function MultiplayerButton({ onClick }) {
+export default function MultiplayerButton({ onClick, isActive = false }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        position: "fixed",
-        bottom: 80,
-        left: 80,
-        zIndex: 100,
-        background: "rgba(0,0,0,0.6)",
-        color: "white",
-        border: "2px solid rgba(255,215,0,0.3)",
-        borderRadius: "50%",
-        width: 50,
-        height: 50,
-        fontSize: "1.3rem",
-        cursor: "pointer",
-        backdropFilter: "blur(4px)",
-        transition: "all 0.3s ease",
-        boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-      onMouseEnter={(e) => {
-        e.target.style.transform = "scale(1.1)";
-        e.target.style.background = "rgba(255,215,0,0.3)";
-      }}
-      onMouseLeave={(e) => {
-        e.target.style.transform = "scale(1)";
-        e.target.style.background = "rgba(0,0,0,0.6)";
-      }}
+      style={buttonStyle(isActive)}
       title="Modo 2 Jogadores"
     >
       👥
+      {isActive && <span style={activeDotStyle("#4caf50")} />}
     </button>
   );
+}
+
+// ====================== ESTILOS ======================
+function buttonStyle(isActive) {
+  return {
+    width: 44,
+    height: 44,
+    background: isActive ? "rgba(76,175,80,0.2)" : "rgba(0,0,0,0.6)",
+    border: isActive
+      ? "1px solid rgba(76,175,80,0.4)"
+      : "1px solid rgba(255,255,255,0.2)",
+    borderRadius: "50%",
+    color: "white",
+    fontSize: "1.2rem",
+    cursor: "pointer",
+    backdropFilter: "blur(4px)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    transition: "all 0.3s ease",
+    position: "relative",
+  };
+}
+
+function activeDotStyle(color) {
+  return {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    background: color || "#4caf50",
+    borderRadius: "50%",
+    border: "2px solid #0a2f1f",
+  };
 }

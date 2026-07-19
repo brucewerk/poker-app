@@ -1,4 +1,4 @@
-// app/page.jsx - COMPLETO COM SOM CORRIGIDO
+// app/page.jsx - COMPLETO COM TOOLBARBUTTONS
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -28,6 +28,7 @@ import TurboButton from "@/components/Poker/TurboButton.jsx";
 import MultiplayerButton from "@/components/Poker/MultiplayerButton.jsx";
 import MultiplayerModal from "@/components/Poker/MultiplayerModal.jsx";
 import PlayerSelector from "@/components/Poker/PlayerSelector.jsx";
+import ToolbarButtons from "@/components/Poker/ToolbarButtons.jsx";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -379,17 +380,11 @@ export default function PokerGame() {
     }
   }, []);
 
-  // ====================== NOTIFICAÇÃO (CORRIGIDO - SOM GARANTIDO) ======================
+  // ====================== NOTIFICAÇÃO ======================
   const showNotification = useCallback((msg, isError = false) => {
     setNotification({ msg, isError, visible: true });
 
-    // 🔥 TOCAR SOM - VERSÃO GARANTIDA
     try {
-      // Inicializar áudio se necessário
-      if (!soundManager.isInitialized) {
-        soundManager.initAudioContext();
-      }
-
       if (!isError && msg.includes("VENCEU")) {
         soundManager.playSound("win");
       } else if (isError && msg.includes("perdeu")) {
@@ -403,9 +398,7 @@ export default function PokerGame() {
       } else if (msg.includes("CHECK")) {
         soundManager.playSound("check");
       }
-    } catch (e) {
-      // Ignorar erros de áudio
-    }
+    } catch (e) {}
 
     setTimeout(() => setNotification((n) => ({ ...n, visible: false })), 2000);
   }, []);
@@ -674,7 +667,6 @@ export default function PokerGame() {
         const cScoreNum = cScore?.raw || cScore?.score || 0;
 
         if (pScoreNum > cScoreNum) {
-          // 🏆 JOGADOR VENCEU
           finalState.playerMoney += finalState.pot;
           const won = finalState.pot;
           finalState.winnerMsg = `🏆 ${playerName} venceu com ${pName}!`;
@@ -714,7 +706,6 @@ export default function PokerGame() {
             communityCards: state.community || [],
           };
         } else if (cScoreNum > pScoreNum) {
-          // 💔 CPU VENCEU
           finalState.cpuMoney += finalState.pot;
           const lost = finalState.pot;
           finalState.winnerMsg = `🤖 CPU venceu com ${cName}!`;
@@ -760,7 +751,6 @@ export default function PokerGame() {
             communityCards: state.community || [],
           };
         } else {
-          // 🤝 EMPATE
           const split = Math.floor(finalState.pot / 2);
           finalState.playerMoney += split;
           finalState.cpuMoney += finalState.pot - split;
@@ -819,7 +809,6 @@ export default function PokerGame() {
           modalOpenTimeoutRef.current = null;
         }
 
-        // 🔥 MOSTRAR MODAL PARA TODOS OS RESULTADOS
         if (modalData) {
           console.log("🔍 [SHOWDOWN] Abrindo modal de resultado");
           setResultModalOpen(false);
@@ -967,7 +956,7 @@ export default function PokerGame() {
     return state;
   }
 
-  // ====================== INICIAR MÃO (CORRIGIDO - SOM) ======================
+  // ====================== INICIAR MÃO ======================
   function startNewHand(user, initialMoney) {
     if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
     if (startNewHandTimeoutRef.current) {
@@ -1003,7 +992,6 @@ export default function PokerGame() {
 
       const deck = createDeck();
 
-      // 🔥 TOCAR SONS - COM TRATAMENTO DE ERRO
       try {
         soundManager.playSound("shuffle");
         setTimeout(() => {
@@ -1853,11 +1841,14 @@ export default function PokerGame() {
         </div>
       )}
 
-      <SoundToggle />
-      <FullscreenButton />
-      <TurboButton onToggle={handleTurboToggle} isTurbo={isTurbo} />
-      <MultiplayerButton onClick={() => setShowMultiplayerModal(true)} />
-      <OnlineButton onClick={() => setShowOnline(true)} />
+      <ToolbarButtons
+        isTurbo={isTurbo}
+        onTurboToggle={handleTurboToggle}
+        onMultiplayerClick={() => setShowMultiplayerModal(true)}
+        isMultiplayerActive={multiplayerModeActive}
+        onOnlineClick={() => setShowOnline(true)}
+        isOnlineActive={!!onlineGame}
+      />
 
       {showMultiplayerModal && (
         <MultiplayerModal
