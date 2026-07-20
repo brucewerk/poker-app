@@ -8,33 +8,28 @@ export const proxy = withAuth(
     const isAuth = !!token;
     const path = req.nextUrl.pathname;
 
-    // 🔥 Páginas públicas (não exigem autenticação)
+    // 🔥 PÁGINAS PÚBLICAS - SEMPRE PERMITIR ACESSO
     const isPublicPage =
       path.startsWith("/login") ||
       path.startsWith("/register") ||
-      path.startsWith("/api/auth") ||
-      path.startsWith("/_next") ||
-      path.startsWith("/favicon.ico");
+      path.startsWith("/api/auth");
 
-    // 🔥 Se for página pública, permite acesso SEM redirecionar
     if (isPublicPage) {
       return NextResponse.next();
     }
 
-    // 🔥 Se NÃO estiver autenticado e tentar acessar página privada
+    // 🔥 Se NÃO estiver autenticado, redireciona para login
     if (!isAuth && !isPublicPage) {
       const loginUrl = new URL("/login", req.url);
       return NextResponse.redirect(loginUrl);
     }
 
-    // 🔥 Se estiver autenticado, permite acesso
     return NextResponse.next();
   },
   {
     callbacks: {
       authorized: ({ req, token }) => {
         const path = req?.nextUrl?.pathname || "";
-        // 🔥 Permite acesso público a essas rotas sem verificar token
         if (
           path.startsWith("/login") ||
           path.startsWith("/register") ||
@@ -42,7 +37,6 @@ export const proxy = withAuth(
         ) {
           return true;
         }
-        // 🔥 Para outras rotas, exige autenticação
         return !!token;
       },
     },
@@ -50,8 +44,5 @@ export const proxy = withAuth(
 );
 
 export const config = {
-  matcher: [
-    // 🔥 Aplica a todas as rotas EXCETO arquivos estáticos e API
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

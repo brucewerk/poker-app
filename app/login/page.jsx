@@ -12,13 +12,13 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 🔥 Monitora a sessão e redireciona quando autenticado
+  // Redireciona se já estiver autenticado
   useEffect(() => {
-    if (status === "authenticated" && session) {
-      console.log("✅ Sessão ativa, redirecionando...");
+    if (status === "authenticated") {
+      console.log("✅ Já autenticado, redirecionando...");
       window.location.href = "/";
     }
-  }, [status, session]);
+  }, [status]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,6 +36,7 @@ export default function LoginPage() {
       console.log("📡 Resultado do login:", result);
 
       if (result?.error) {
+        console.error("❌ Erro no login:", result.error);
         setError("Usuário ou senha inválidos");
         setLoading(false);
         return;
@@ -43,7 +44,7 @@ export default function LoginPage() {
 
       if (result?.ok) {
         console.log("✅ Login bem-sucedido!");
-        // 🔥 Força redirecionamento imediato
+        // 🔥 Força redirecionamento
         window.location.href = "/";
       } else {
         setError("Erro ao fazer login. Tente novamente.");
@@ -71,15 +72,15 @@ export default function LoginPage() {
       <div
         style={{
           background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
-          padding: "40px",
+          padding: "40px 30px",
           borderRadius: 30,
-          maxWidth: 400,
+          maxWidth: 420,
           width: "100%",
           border: "2px solid gold",
           boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: 30 }}>
+        <div style={{ textAlign: "center", marginBottom: 25 }}>
           <div style={{ fontSize: "4rem" }}>♠️</div>
           <h1 style={{ color: "gold", margin: "10px 0 5px", fontSize: "2rem" }}>
             Poker App
@@ -99,7 +100,7 @@ export default function LoginPage() {
               color: "#f44336",
               marginBottom: 20,
               textAlign: "center",
-              fontSize: "0.9rem",
+              fontSize: "0.85rem",
             }}
           >
             ❌ {error}
@@ -111,13 +112,13 @@ export default function LoginPage() {
             <label
               style={{
                 color: "#ffefb9",
-                fontSize: "0.9rem",
+                fontSize: "0.85rem",
                 fontWeight: "bold",
                 display: "block",
                 marginBottom: 5,
               }}
             >
-              Usuário
+              👤 Usuário
             </label>
             <input
               type="text"
@@ -125,7 +126,7 @@ export default function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               style={{
                 width: "100%",
-                padding: "12px 15px",
+                padding: "14px 15px",
                 borderRadius: 15,
                 border: "1px solid rgba(255,215,0,0.3)",
                 background: "rgba(0,0,0,0.3)",
@@ -136,6 +137,7 @@ export default function LoginPage() {
               placeholder="Digite seu usuário"
               required
               disabled={loading}
+              autoComplete="username"
             />
           </div>
 
@@ -143,13 +145,13 @@ export default function LoginPage() {
             <label
               style={{
                 color: "#ffefb9",
-                fontSize: "0.9rem",
+                fontSize: "0.85rem",
                 fontWeight: "bold",
                 display: "block",
                 marginBottom: 5,
               }}
             >
-              Senha
+              🔒 Senha
             </label>
             <input
               type="password"
@@ -157,7 +159,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               style={{
                 width: "100%",
-                padding: "12px 15px",
+                padding: "14px 15px",
                 borderRadius: 15,
                 border: "1px solid rgba(255,215,0,0.3)",
                 background: "rgba(0,0,0,0.3)",
@@ -168,6 +170,7 @@ export default function LoginPage() {
               placeholder="Digite sua senha"
               required
               disabled={loading}
+              autoComplete="current-password"
             />
           </div>
 
@@ -181,7 +184,7 @@ export default function LoginPage() {
               border: "none",
               fontWeight: "bold",
               fontSize: "1rem",
-              padding: "14px 30px",
+              padding: "15px 30px",
               borderRadius: 60,
               cursor: loading ? "not-allowed" : "pointer",
               boxShadow: loading ? "none" : "0 4px 0 #7a4c1a",
@@ -206,6 +209,28 @@ export default function LoginPage() {
           >
             Não tem conta? <span style={{ color: "gold" }}>Cadastre-se</span>
           </Link>
+        </div>
+
+        {/* 🔥 MENSAGEM PARA IPAD */}
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 20,
+            padding: 10,
+            background: "rgba(255,152,0,0.1)",
+            borderRadius: 10,
+            border: "1px solid rgba(255,152,0,0.2)",
+          }}
+        >
+          <p style={{ color: "#ff9800", fontSize: "0.7rem", margin: 0 }}>
+            📱 Problemas no iPad/iPhone?
+            <br />
+            <span style={{ fontSize: "0.6rem", color: "#888" }}>
+              Acesse Configurações &gt; Safari &gt;
+              <br />
+              Desative "Impedir rastreamento entre sites"
+            </span>
+          </p>
         </div>
       </div>
     </div>
