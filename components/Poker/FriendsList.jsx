@@ -66,10 +66,21 @@ export default function FriendsList({ username }) {
       return;
     }
 
-    // 🔥 VERIFICAR SE É O PRÓPRIO USUÁRIO
     if (friendName.toLowerCase() === username?.toLowerCase()) {
       setError("❌ Você não pode adicionar a si mesmo como amigo!");
       setTimeout(() => setError(""), 3000);
+      return;
+    }
+
+    // Verificação case-insensitive
+    const alreadyFriend = friends.some(
+      (f) => f.username.toLowerCase() === friendName.toLowerCase(),
+    );
+
+    if (alreadyFriend) {
+      setError(`ℹ️ "${friendName}" já está na sua lista de amigos!`);
+      setTimeout(() => setError(""), 3000);
+      setNewFriend("");
       return;
     }
 
@@ -78,56 +89,51 @@ export default function FriendsList({ username }) {
     setRefreshing(true);
 
     try {
-      // 🔥 GARANTIR QUE O NOME ESTÁ SENDO ENVIADO CORRETAMENTE
       const payload = {
         friendUsername: friendName,
         action: "add",
       };
-      console.log("📤 Enviando:", payload);
+      console.log("📤 Enviando POST /api/friends:", payload);
 
       const res = await fetch("/api/friends", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include", // 🔥 ESSENCIAL para enviar o cookie
+        credentials: "include",
         body: JSON.stringify(payload),
       });
 
-      // 🔥 Tentar ler a resposta mesmo se for erro
-      let data;
-      try {
-        data = await res.json();
-      } catch (e) {
-        console.error("❌ Erro ao ler resposta:", e);
-        setError("Erro ao processar resposta do servidor");
+      const data = await res.json();
+      console.log("📡 POST /api/friends - Resposta:", data);
+
+      // 🔥 CASO 1: Amigo já existe (status 200 com alreadyFriend)
+      if (data.alreadyFriend) {
+        setError(`ℹ️ "${friendName}" já está na sua lista de amigos!`);
+        setTimeout(() => setError(""), 3000);
+        setNewFriend("");
+        setRefreshing(false);
+        return;
+      }
+
+      // 🔥 CASO 2: Amigo não encontrado (status 200 com notFound)
+      if (data.notFound) {
+        setError(
+          `❌ Usuário "${friendName}" não encontrado. Verifique o nome.`,
+        );
         setTimeout(() => setError(""), 3000);
         setRefreshing(false);
         return;
       }
 
-      console.log("📡 POST /api/friends - Resposta:", data);
-
-      if (res.status === 401) {
-        setError("❌ Você precisa estar logado para adicionar amigos");
-        setTimeout(() => setError(""), 3000);
-        return;
-      }
-
-      if (res.status === 404) {
-        setError(
-          `❌ Usuário "${friendName}" não encontrado. Verifique o nome.`,
-        );
-        setTimeout(() => setError(""), 3000);
-        return;
-      }
-
+      // 🔥 CASO 3: Sucesso
       if (data.success) {
         setNewFriend("");
         setSuccess(`✅ ${friendName} adicionado como amigo!`);
         await fetchFriends();
         setTimeout(() => setSuccess(""), 3000);
       } else {
+        // Fallback para outros erros
         setError(data.error || "Erro ao adicionar amigo");
         setTimeout(() => setError(""), 3000);
       }
@@ -161,6 +167,9 @@ export default function FriendsList({ username }) {
         setSuccess(`✅ ${friendUsername} removido com sucesso!`);
         await fetchFriends();
         setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(data.error || "Erro ao remover amigo");
+        setTimeout(() => setError(""), 3000);
       }
     } catch (error) {
       console.error("Erro ao remover amigo:", error);
@@ -199,7 +208,7 @@ export default function FriendsList({ username }) {
               onChange={(e) => setNewFriend(e.target.value)}
               placeholder="Digite o nome do amigo"
               style={inputStyle()}
-              onKeyPress={(e) => e.key === "Enter" && addFriend()}
+              onKeyDown={(e) => e.key === "Enter" && addFriend()}
               disabled={refreshing}
             />
             <button
@@ -211,7 +220,12 @@ export default function FriendsList({ username }) {
             </button>
           </div>
 
-          {error && <div style={errorStyle()}>❌ {error}</div>}
+          {error && (
+            <div style={errorStyle()}>
+              {error.includes("ℹ️") ? "ℹ️" : "❌"}{" "}
+              {error.replace("ℹ️", "").trim()}
+            </div>
+          )}
           {success && <div style={successStyle()}>{success}</div>}
 
           {friends.length === 0 ? (
@@ -332,11 +346,11 @@ function addButtonStyle() {
 
 function errorStyle() {
   return {
-    color: "#f44336",
+    color: "#ff9800",
     fontSize: "0.8rem",
     textAlign: "center",
     padding: "5px",
-    background: "rgba(244,67,54,0.1)",
+    background: "rgba(255,152,0,0.1)",
     borderRadius: 10,
   };
 }

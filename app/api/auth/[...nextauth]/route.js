@@ -76,7 +76,6 @@ export const authOptions = {
       }
       return session;
     },
-    // 🔧 Callback redirect para evitar loops
     async redirect({ url, baseUrl }) {
       if (url.startsWith(baseUrl)) return url;
       else if (url.startsWith("/")) return new URL(url, baseUrl).toString();
@@ -88,50 +87,18 @@ export const authOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 dias
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: false,
+  debug: process.env.NODE_ENV !== "production",
   pages: {
     signIn: "/login",
   },
-  // 🔧 CONFIGURAÇÃO EXPLÍCITA DE COOKIES PARA COMPATIBILIDADE COM SAFARI/IPAD
+  // 🔥 CONFIGURAÇÃO CRÍTICA DE COOKIES
   useSecureCookies: process.env.NODE_ENV === "production",
   cookies: {
     sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-    callbackUrl: {
-      name: `next-auth.callback-url`,
-      options: {
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-    csrfToken: {
-      name: `next-auth.csrf-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-    pkceCodeVerifier: {
-      name: `next-auth.pkce.code_verifier`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-    state: {
-      name: `next-auth.state`,
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
       options: {
         httpOnly: true,
         sameSite: "lax",

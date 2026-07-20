@@ -1,19 +1,17 @@
 // app/api/friends/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
+
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 // ====================== GET - Buscar amigos ======================
 export async function GET(request) {
   try {
-    // 🔥 USAR AUTHOPTIONS EXPLICITAMENTE
     const session = await getServerSession(authOptions);
-    console.log("🔍 GET /api/friends - Session:", session?.user?.username);
 
     if (!session) {
-      console.log("❌ GET /api/friends - Não autorizado (sem sessão)");
       return NextResponse.json(
         { success: false, error: "Não autorizado" },
         { status: 401 },
@@ -22,8 +20,6 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const username = searchParams.get("username") || session.user.username;
-
-    console.log(`🔍 GET /api/friends - Buscando amigos para: ${username}`);
 
     if (!username) {
       return NextResponse.json(
@@ -36,7 +32,6 @@ export async function GET(request) {
 
     const user = await User.findOne({ username });
     if (!user) {
-      console.log(`❌ GET /api/friends - Usuário ${username} não encontrado`);
       return NextResponse.json({
         success: true,
         friends: [],
@@ -79,8 +74,6 @@ export async function GET(request) {
       })
       .filter(Boolean);
 
-    console.log(`✅ GET /api/friends - ${friends.length} amigos retornados`);
-
     return NextResponse.json({
       success: true,
       friends: friends,
@@ -97,12 +90,9 @@ export async function GET(request) {
 // ====================== POST - Adicionar/Remover amigo ======================
 export async function POST(request) {
   try {
-    // 🔥 USAR AUTHOPTIONS EXPLICITAMENTE
     const session = await getServerSession(authOptions);
-    console.log("🔍 POST /api/friends - Session:", session?.user?.username);
 
     if (!session || !session.user) {
-      console.log("❌ POST /api/friends - Não autorizado (sem sessão)");
       return NextResponse.json(
         { success: false, error: "Não autorizado. Faça login novamente." },
         { status: 401 },
@@ -111,7 +101,6 @@ export async function POST(request) {
 
     const username = session.user.username;
     if (!username) {
-      console.log("❌ POST /api/friends - Username não encontrado na sessão");
       return NextResponse.json(
         { success: false, error: "Usuário não identificado." },
         { status: 401 },
@@ -122,7 +111,6 @@ export async function POST(request) {
     try {
       body = await request.json();
     } catch (e) {
-      console.error("❌ Erro ao ler body:", e);
       return NextResponse.json(
         { success: false, error: "Body inválido" },
         { status: 400 },
@@ -130,12 +118,6 @@ export async function POST(request) {
     }
 
     const { friendUsername, action } = body;
-
-    console.log(`🔍 POST /api/friends - Dados recebidos:`, {
-      username,
-      friendUsername,
-      action,
-    });
 
     if (!friendUsername) {
       return NextResponse.json(
@@ -152,7 +134,6 @@ export async function POST(request) {
     }
 
     if (username.toLowerCase() === friendUsername.toLowerCase()) {
-      console.log(`⚠️ ${username} tentou adicionar a si mesmo`);
       return NextResponse.json(
         { success: false, error: "Não é possível adicionar a si mesmo" },
         { status: 400 },
@@ -170,7 +151,6 @@ export async function POST(request) {
 
     const user = await User.findOne({ username });
     if (!user) {
-      console.log(`❌ POST /api/friends - Usuário ${username} não encontrado`);
       return NextResponse.json(
         { success: false, error: "Usuário não encontrado" },
         { status: 404 },
@@ -181,27 +161,19 @@ export async function POST(request) {
       user.friends = [];
     }
 
+    // 🔥 ADICIONAR AMIGO - TODAS AS RESPOSTAS COM STATUS 200
     if (action === "add") {
       const friend = await User.findOne({
         username: { $regex: new RegExp(`^${friendUsername}$`, "i") },
       });
 
-      console.log(
-        `🔍 Buscando amigo: ${friendUsername} -> ${friend?.username || "NÃO ENCONTRADO"}`,
-      );
-
+      // 🔥 CASO 1: Amigo não encontrado → status 200 com flag
       if (!friend) {
-        const allUsers = await User.find({}, { username: 1 });
-        const userList = allUsers.map((u) => u.username).join(", ");
-        console.log(`📊 Usuários disponíveis: ${userList}`);
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Usuário "${friendUsername}" não encontrado.`,
-          },
-          { status: 404 },
-        );
+        return NextResponse.json({
+          success: false,
+          notFound: true,
+          message: `Usuário "${friendUsername}" não encontrado.`,
+        });
       }
 
       const alreadyFriend = user.friends.some(
@@ -210,14 +182,21 @@ export async function POST(request) {
           f.username.toLowerCase() === friend.username.toLowerCase(),
       );
 
+      // 🔥 CASO 2: Amigo já existe → status 200 com flag
       if (alreadyFriend) {
-        console.log(`⚠️ ${friend.username} já é amigo de ${username}`);
-        return NextResponse.json(
-          { success: false, error: `${friend.username} já é seu amigo` },
-          { status: 400 },
-        );
+        return NextResponse.json({
+          success: false,
+          alreadyFriend: true,
+          message: `${friend.username} já é seu amigo`,
+          friend: {
+            username: friend.username,
+            level: friend.level || 1,
+            chips: friend.chips || 0,
+          },
+        });
       }
 
+      // 🔥 CASO 3: Sucesso → status 200
       user.friends.push({
         username: friend.username,
         level: friend.level || 1,
@@ -227,8 +206,7 @@ export async function POST(request) {
 
       await user.save();
 
-      console.log(`✅ ${username} adicionou ${friend.username}`);
-
+      // Retorna a lista atualizada
       const friendUsernames = user.friends
         .map((f) => f.username)
         .filter(Boolean);
@@ -246,18 +224,21 @@ export async function POST(request) {
         };
       });
 
-      const updatedFriends = user.friends.map((f) => {
-        const friendData = friendsMap[f.username];
-        if (friendData) {
-          return friendData;
-        }
-        return {
-          username: f.username || "Desconhecido",
-          level: f.level || 1,
-          chips: f.chips || 0,
-          isOnline: f.isOnline || false,
-        };
-      });
+      const updatedFriends = user.friends
+        .map((f) => {
+          if (!f.username) return null;
+          const friendData = friendsMap[f.username];
+          if (friendData) {
+            return friendData;
+          }
+          return {
+            username: f.username,
+            level: f.level || 1,
+            chips: f.chips || 0,
+            isOnline: f.isOnline || false,
+          };
+        })
+        .filter(Boolean);
 
       return NextResponse.json({
         success: true,
@@ -266,11 +247,14 @@ export async function POST(request) {
       });
     }
 
+    // 🔥 REMOVER AMIGO
     if (action === "remove") {
-      user.friends = user.friends.filter((f) => f.username !== friendUsername);
+      user.friends = user.friends.filter(
+        (f) =>
+          f.username &&
+          f.username.toLowerCase() !== friendUsername.toLowerCase(),
+      );
       await user.save();
-
-      console.log(`✅ ${username} removeu ${friendUsername}`);
 
       return NextResponse.json({
         success: true,

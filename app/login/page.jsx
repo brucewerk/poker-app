@@ -3,23 +3,22 @@
 
 import { useState, useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function LoginPage() {
-  const router = useRouter();
   const { data: session, status } = useSession();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Se já estiver autenticado, redireciona para home
+  // 🔥 Monitora a sessão e redireciona quando autenticado
   useEffect(() => {
-    if (status === "authenticated") {
-      router.push("/");
+    if (status === "authenticated" && session) {
+      console.log("✅ Sessão ativa, redirecionando...");
+      window.location.href = "/";
     }
-  }, [status, router]);
+  }, [status, session]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,7 +36,6 @@ export default function LoginPage() {
       console.log("📡 Resultado do login:", result);
 
       if (result?.error) {
-        console.error("❌ Erro no login:", result.error);
         setError("Usuário ou senha inválidos");
         setLoading(false);
         return;
@@ -45,8 +43,7 @@ export default function LoginPage() {
 
       if (result?.ok) {
         console.log("✅ Login bem-sucedido!");
-        // 🔥 Força redirecionamento com window.location para garantir
-        // em casos onde o router.push pode falhar (Safari/iPad)
+        // 🔥 Força redirecionamento imediato
         window.location.href = "/";
       } else {
         setError("Erro ao fazer login. Tente novamente.");
