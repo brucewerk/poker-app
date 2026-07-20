@@ -1,54 +1,36 @@
 // proxy.js
+import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 
-export default async function proxy(req) {
-  const { pathname } = req.nextUrl;
+// Usa withAuth para garantir que o token esteja disponível
+export const proxy = withAuth(
+  function middleware(req) {
+    const token = req.nextauth.token;
+    const isAuth = !!token;
+    const isAuthPage =
+      req.nextUrl.pathname.startsWith("/login") ||
+      req.nextUrl.pathname.startsWith("/register");
 
-  // Rotas públicas (não precisam de autenticação)
-  const publicRoutes = ["/login", "/register"];
-  const isPublicRoute = publicRoutes.some((route) =>
-    pathname.startsWith(route),
-  );
+    // Se estiver na página de autenticação e já estiver logado, redireciona para home
+    if (isAuthPage && isAuth) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
 
-  // Rotas da API (não precisam de autenticação via proxy)
-  const isApiRoute = pathname.startsWith("/api");
+    // Se não estiver logado e tentar acessar página protegida, redireciona para login
+    if (!isAuth && !isAuthPage) {
+      const loginUrl = new URL("/login", req.url);
+      return NextResponse.redirect(loginUrl);
+    }
 
-  // Rotas de arquivos estáticos
-  const isStaticRoute = /\.(png|svg|ico|jpg|jpeg|webp)$/.test(pathname);
-
-  // Se for rota pública, API ou estática, permite acesso
-  if (isPublicRoute || isApiRoute || isStaticRoute) {
     return NextResponse.next();
-  }
+  },
+  {
+    callbacks: {
+      authorized: ({ token }) => true,
+    },
+  },
+);
 
-  // Verificar autenticação
-  const token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
-
-  // Se não estiver autenticado, redireciona para login
-  if (!token) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // Se estiver autenticado, permite acesso
-  return NextResponse.next();
-}
-
-// Configurar em quais rotas o proxy será executado
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * 1. /api (API routes)
-     * 2. /_next (Next.js internals)
-     * 3. /_vercel (Vercel internals)
-     * 4. /favicon.ico, /robots.txt, /sitemap.xml (SEO)
-     */
-    "/((?!api|_next|_vercel|favicon.ico|robots.txt|sitemap.xml|.*\\.png$|.*\\.svg$).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login|register).*)"],
 };

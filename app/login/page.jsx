@@ -1,17 +1,25 @@
 // app/login/page.jsx
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Se já estiver autenticado, redireciona para home
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/");
+    }
+  }, [status, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,8 +45,9 @@ export default function LoginPage() {
 
       if (result?.ok) {
         console.log("✅ Login bem-sucedido!");
-        router.push("/");
-        router.refresh();
+        // 🔥 Força redirecionamento com window.location para garantir
+        // em casos onde o router.push pode falhar (Safari/iPad)
+        window.location.href = "/";
       } else {
         setError("Erro ao fazer login. Tente novamente.");
         setLoading(false);
