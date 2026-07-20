@@ -45,13 +45,16 @@ export default function FriendsList({ username }) {
           isOnline: friend.isOnline || false,
         }));
         setFriends(validFriends);
-        console.log(`✅ ${validFriends.length} amigos carregados`);
+        // ✅ USANDO console.info EM VEZ DE console.log
+        console.info(`✅ ${validFriends.length} amigos carregados`);
       } else {
-        console.log("ℹ️ Erro ao carregar amigos:", data.error);
+        // ✅ ERRO DE NEGÓCIO - USAR console.info
+        console.info(`ℹ️ ${data.error || "Erro ao carregar amigos"}`);
         setFriends([]);
       }
     } catch (error) {
-      console.log("ℹ️ Erro ao carregar amigos:", error);
+      // ✅ ERRO DE REDE - USAR console.debug
+      console.debug("🔍 Erro de rede ao carregar amigos:", error);
       setFriends([]);
     } finally {
       setLoading(false);
@@ -72,18 +75,6 @@ export default function FriendsList({ username }) {
       return;
     }
 
-    // Verificação case-insensitive
-    const alreadyFriend = friends.some(
-      (f) => f.username.toLowerCase() === friendName.toLowerCase(),
-    );
-
-    if (alreadyFriend) {
-      setError(`ℹ️ "${friendName}" já está na sua lista de amigos!`);
-      setTimeout(() => setError(""), 3000);
-      setNewFriend("");
-      return;
-    }
-
     setError("");
     setSuccess("");
     setRefreshing(true);
@@ -93,7 +84,9 @@ export default function FriendsList({ username }) {
         friendUsername: friendName,
         action: "add",
       };
-      console.log("📤 Enviando POST /api/friends:", payload);
+
+      // ✅ LOG DE ENVIO - USAR console.info
+      console.info(`📤 Enviando solicitação para: ${friendName}`);
 
       const res = await fetch("/api/friends", {
         method: "POST",
@@ -104,42 +97,45 @@ export default function FriendsList({ username }) {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      console.log("📡 POST /api/friends - Resposta:", data);
-
-      // 🔥 CASO 1: Amigo já existe (status 200 com alreadyFriend)
-      if (data.alreadyFriend) {
-        setError(`ℹ️ "${friendName}" já está na sua lista de amigos!`);
-        setTimeout(() => setError(""), 3000);
-        setNewFriend("");
-        setRefreshing(false);
-        return;
-      }
-
-      // 🔥 CASO 2: Amigo não encontrado (status 200 com notFound)
-      if (data.notFound) {
-        setError(
-          `❌ Usuário "${friendName}" não encontrado. Verifique o nome.`,
-        );
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        console.debug("🔍 Erro ao processar resposta:", e);
+        setError("Erro ao processar resposta do servidor");
         setTimeout(() => setError(""), 3000);
         setRefreshing(false);
         return;
       }
 
-      // 🔥 CASO 3: Sucesso
+      // ✅ LOG DA RESPOSTA - USAR console.info (NUNCA console.error)
+      console.info(
+        `📡 Resposta: ${data.success ? "✅" : "ℹ️"} ${data.message || data.error || "Sem mensagem"}`,
+      );
+
+      if (res.status === 401) {
+        setError("❌ Você precisa estar logado para adicionar amigos");
+        setTimeout(() => setError(""), 3000);
+        return;
+      }
+
+      // ✅ TRATAR TODOS OS ERROS DE NEGÓCIO COMO INFORMAÇÃO
       if (data.success) {
         setNewFriend("");
         setSuccess(`✅ ${friendName} adicionado como amigo!`);
         await fetchFriends();
         setTimeout(() => setSuccess(""), 3000);
       } else {
-        // Fallback para outros erros
-        setError(data.error || "Erro ao adicionar amigo");
+        // ✅ USAR A MENSAGEM DO SERVIDOR SEM console.error
+        const errorMsg = data.error || "Erro ao adicionar amigo";
+        setError(`❌ ${errorMsg}`);
+        console.info(`ℹ️ ${errorMsg}`); // 👈 NUNCA console.error
         setTimeout(() => setError(""), 3000);
       }
     } catch (error) {
-      console.error("❌ Erro ao adicionar amigo:", error);
-      setError("Erro de conexão");
+      // ✅ ERRO DE REDE - USAR console.debug
+      console.debug("🔍 Erro de rede ao adicionar amigo:", error);
+      setError("❌ Erro de conexão com o servidor");
       setTimeout(() => setError(""), 3000);
     } finally {
       setRefreshing(false);
@@ -168,12 +164,15 @@ export default function FriendsList({ username }) {
         await fetchFriends();
         setTimeout(() => setSuccess(""), 3000);
       } else {
-        setError(data.error || "Erro ao remover amigo");
+        // ✅ ERRO DE NEGÓCIO - USAR console.info
+        console.info(`ℹ️ ${data.error || "Erro ao remover amigo"}`);
+        setError(`❌ ${data.error || "Erro ao remover amigo"}`);
         setTimeout(() => setError(""), 3000);
       }
     } catch (error) {
-      console.error("Erro ao remover amigo:", error);
-      setError("Erro ao remover amigo");
+      // ✅ ERRO DE REDE - USAR console.debug
+      console.debug("🔍 Erro de rede ao remover amigo:", error);
+      setError("❌ Erro de conexão com o servidor");
       setTimeout(() => setError(""), 3000);
     }
   };
@@ -208,7 +207,7 @@ export default function FriendsList({ username }) {
               onChange={(e) => setNewFriend(e.target.value)}
               placeholder="Digite o nome do amigo"
               style={inputStyle()}
-              onKeyDown={(e) => e.key === "Enter" && addFriend()}
+              onKeyPress={(e) => e.key === "Enter" && addFriend()}
               disabled={refreshing}
             />
             <button
@@ -220,12 +219,7 @@ export default function FriendsList({ username }) {
             </button>
           </div>
 
-          {error && (
-            <div style={errorStyle()}>
-              {error.includes("ℹ️") ? "ℹ️" : "❌"}{" "}
-              {error.replace("ℹ️", "").trim()}
-            </div>
-          )}
+          {error && <div style={errorStyle()}>{error}</div>}
           {success && <div style={successStyle()}>{success}</div>}
 
           {friends.length === 0 ? (
@@ -346,11 +340,11 @@ function addButtonStyle() {
 
 function errorStyle() {
   return {
-    color: "#ff9800",
+    color: "#f44336",
     fontSize: "0.8rem",
     textAlign: "center",
     padding: "5px",
-    background: "rgba(255,152,0,0.1)",
+    background: "rgba(244,67,54,0.1)",
     borderRadius: 10,
   };
 }

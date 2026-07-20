@@ -76,36 +76,15 @@ export const authOptions = {
       }
       return session;
     },
-    async redirect({ url, baseUrl }) {
-      if (url.startsWith(baseUrl)) return url;
-      else if (url.startsWith("/")) return new URL(url, baseUrl).toString();
-      return baseUrl;
-    },
   },
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 dias
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV !== "production",
+  debug: false,
   pages: {
     signIn: "/login",
-  },
-  // 🔥 CONFIGURAÇÃO CRÍTICA DE COOKIES
-  useSecureCookies: process.env.NODE_ENV === "production",
-  cookies: {
-    sessionToken: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Secure-next-auth.session-token"
-          : "next-auth.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
   },
 };
 

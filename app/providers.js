@@ -8,8 +8,7 @@ export default function Providers({ children }) {
     <SessionProvider
       refetchInterval={5 * 60}
       refetchOnWindowFocus={true}
-      // 🔥 Força o caminho base para garantir que as requisições sejam feitas corretamente
-      basePath="/api/auth"
+      // 🔥 BASE PATH PARA GARANTIR QUE AS REQUISIÇÕES ESTEJAM CORRETAS
     >
       {children}
     </SessionProvider>

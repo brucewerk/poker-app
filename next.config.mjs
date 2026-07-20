@@ -1,16 +1,11 @@
 // next.config.mjs
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-    ],
-  },
+  /* config options here */
+  // Se precisar de configurações adicionais para o proxy
+  // experimental: {
+  //   proxy: true,
+  // },
 };
 
 export default nextConfig;

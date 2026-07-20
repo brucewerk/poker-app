@@ -1,10 +1,9 @@
 // app/api/friends/route.js
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
-
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 // ====================== GET - Buscar amigos ======================
 export async function GET(request) {
@@ -39,7 +38,6 @@ export async function GET(request) {
     }
 
     const friendList = user.friends || [];
-
     const friendUsernames = friendList.map((f) => f.username).filter(Boolean);
     const friendUsers = await User.find({
       username: { $in: friendUsernames },
@@ -122,28 +120,28 @@ export async function POST(request) {
     if (!friendUsername) {
       return NextResponse.json(
         { success: false, error: "Nome do amigo não fornecido" },
-        { status: 400 },
+        { status: 200 }, // 👈 Mudado para 200
       );
     }
 
     if (!action) {
       return NextResponse.json(
         { success: false, error: "Ação não fornecida" },
-        { status: 400 },
+        { status: 200 }, // 👈 Mudado para 200
       );
     }
 
     if (username.toLowerCase() === friendUsername.toLowerCase()) {
       return NextResponse.json(
         { success: false, error: "Não é possível adicionar a si mesmo" },
-        { status: 400 },
+        { status: 200 }, // 👈 Mudado para 200
       );
     }
 
     if (!["add", "remove"].includes(action)) {
       return NextResponse.json(
         { success: false, error: "Ação inválida. Use 'add' ou 'remove'" },
-        { status: 400 },
+        { status: 200 }, // 👈 Mudado para 200
       );
     }
 
@@ -153,7 +151,7 @@ export async function POST(request) {
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Usuário não encontrado" },
-        { status: 404 },
+        { status: 200 }, // 👈 Mudado para 200
       );
     }
 
@@ -161,19 +159,19 @@ export async function POST(request) {
       user.friends = [];
     }
 
-    // 🔥 ADICIONAR AMIGO - TODAS AS RESPOSTAS COM STATUS 200
     if (action === "add") {
       const friend = await User.findOne({
         username: { $regex: new RegExp(`^${friendUsername}$`, "i") },
       });
 
-      // 🔥 CASO 1: Amigo não encontrado → status 200 com flag
       if (!friend) {
-        return NextResponse.json({
-          success: false,
-          notFound: true,
-          message: `Usuário "${friendUsername}" não encontrado.`,
-        });
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Usuário "${friendUsername}" não encontrado.`,
+          },
+          { status: 200 }, // 👈 Mudado para 200
+        );
       }
 
       const alreadyFriend = user.friends.some(
@@ -182,21 +180,13 @@ export async function POST(request) {
           f.username.toLowerCase() === friend.username.toLowerCase(),
       );
 
-      // 🔥 CASO 2: Amigo já existe → status 200 com flag
       if (alreadyFriend) {
-        return NextResponse.json({
-          success: false,
-          alreadyFriend: true,
-          message: `${friend.username} já é seu amigo`,
-          friend: {
-            username: friend.username,
-            level: friend.level || 1,
-            chips: friend.chips || 0,
-          },
-        });
+        return NextResponse.json(
+          { success: false, error: `${friend.username} já é seu amigo` },
+          { status: 200 }, // 👈 Mudado para 200
+        );
       }
 
-      // 🔥 CASO 3: Sucesso → status 200
       user.friends.push({
         username: friend.username,
         level: friend.level || 1,
@@ -206,7 +196,6 @@ export async function POST(request) {
 
       await user.save();
 
-      // Retorna a lista atualizada
       const friendUsernames = user.friends
         .map((f) => f.username)
         .filter(Boolean);
@@ -224,21 +213,18 @@ export async function POST(request) {
         };
       });
 
-      const updatedFriends = user.friends
-        .map((f) => {
-          if (!f.username) return null;
-          const friendData = friendsMap[f.username];
-          if (friendData) {
-            return friendData;
-          }
-          return {
-            username: f.username,
-            level: f.level || 1,
-            chips: f.chips || 0,
-            isOnline: f.isOnline || false,
-          };
-        })
-        .filter(Boolean);
+      const updatedFriends = user.friends.map((f) => {
+        const friendData = friendsMap[f.username];
+        if (friendData) {
+          return friendData;
+        }
+        return {
+          username: f.username || "Desconhecido",
+          level: f.level || 1,
+          chips: f.chips || 0,
+          isOnline: f.isOnline || false,
+        };
+      });
 
       return NextResponse.json({
         success: true,
@@ -247,13 +233,8 @@ export async function POST(request) {
       });
     }
 
-    // 🔥 REMOVER AMIGO
     if (action === "remove") {
-      user.friends = user.friends.filter(
-        (f) =>
-          f.username &&
-          f.username.toLowerCase() !== friendUsername.toLowerCase(),
-      );
+      user.friends = user.friends.filter((f) => f.username !== friendUsername);
       await user.save();
 
       return NextResponse.json({
@@ -265,7 +246,7 @@ export async function POST(request) {
 
     return NextResponse.json(
       { success: false, error: "Ação inválida" },
-      { status: 400 },
+      { status: 200 }, // 👈 Mudado para 200
     );
   } catch (error) {
     console.error("❌ POST /api/friends - Erro:", error);
