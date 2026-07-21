@@ -1,29 +1,85 @@
-/* app/globals.css */
+/* app/globals.css - COMPLETO COM TEMA ESCURO/CLARO */
 @import "tailwindcss";
 
+/* ====================== VARIÁVEIS DE TEMA ====================== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* 🔥 TEMA ESCURO (PADRÃO) */
+  --bg-primary: #0a2f1f;
+  --bg-secondary: #1a3a2a;
+  --bg-card: #1a2a1ecc;
+  --bg-table: #1a3a1a;
+  --bg-felt: #1a6a3a;
+  --bg-modal: #1a3a2a;
+  --bg-header: #2c2e2bdd;
+  --bg-input: rgba(0,0,0,0.3);
+  --bg-button: #1e1b14cc;
+  --bg-panel: #1a2a1ecc;
+  
+  --text-primary: #ffffff;
+  --text-secondary: #ffefb9;
+  --text-muted: #aaaaaa;
+  --text-dark: #1a2a1f;
+  
+  --border-gold: rgba(255,215,0,0.2);
+  --border-light: rgba(255,255,255,0.05);
+  --border-input: rgba(255,215,0,0.3);
+  
+  --shadow-dark: rgba(0,0,0,0.5);
+  --shadow-light: rgba(0,0,0,0.3);
+  
+  --gold: #ffd700;
+  --gold-dim: rgba(255,215,0,0.15);
+  --green: #4caf50;
+  --red: #f44336;
+  --orange: #ff9800;
+  --blue: #2196f3;
+  
+  --card-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --modal-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  --table-shadow: 0 30px 40px rgba(0,0,0,0.5);
+  
+  --transition-theme: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* 🔥 TEMA CLARO */
+[data-theme="light"] {
+  --bg-primary: #f0f7f4;
+  --bg-secondary: #e0ebe6;
+  --bg-card: #e8f0ec;
+  --bg-table: #d0e0d8;
+  --bg-felt: #2a8a5a;
+  --bg-modal: #e8f0ec;
+  --bg-header: #d5e0da;
+  --bg-input: rgba(255,255,255,0.6);
+  --bg-button: #c8d8d0;
+  --bg-panel: #e8f0ec;
+  
+  --text-primary: #1a2a1f;
+  --text-secondary: #2a3a2f;
+  --text-muted: #555555;
+  --text-dark: #1a2a1f;
+  
+  --border-gold: rgba(255,215,0,0.4);
+  --border-light: rgba(0,0,0,0.08);
+  --border-input: rgba(0,0,0,0.2);
+  
+  --shadow-dark: rgba(0,0,0,0.15);
+  --shadow-light: rgba(0,0,0,0.08);
+  
+  --gold: #d4a800;
+  --gold-dim: rgba(212,168,0,0.15);
+  
+  --card-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  --modal-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  --table-shadow: 0 30px 40px rgba(0,0,0,0.15);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ====================== APLICAÇÃO DAS VARIÁVEIS ====================== */
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-family: Arial, Helvetica, sans-serif;
+  transition: var(--transition-theme);
 }
 
 /* ====================== ANIMAÇÕES ====================== */
@@ -130,8 +186,6 @@ body {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-
-/* app/globals.css - Adicione no final do arquivo */
 
 /* ====================== ANIMAÇÕES GLOBAIS ====================== */
 

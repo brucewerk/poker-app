@@ -1,4 +1,4 @@
-// app/page.jsx - COMPLETO COM SISTEMA DE TORNEIOS
+// app/page.jsx - COMPLETO COM TEMA ESCURO/CLARO
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -36,6 +36,7 @@ import PlayerSelector from "@/components/Poker/PlayerSelector.jsx";
 import ToolbarButtons from "@/components/Poker/ToolbarButtons.jsx";
 import GameTable from "@/components/Poker/GameTable.jsx";
 import TournamentLobby from "@/components/Poker/TournamentLobby.jsx";
+import ThemeToggle from "@/components/Poker/ThemeToggle.jsx";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -2084,12 +2085,13 @@ export default function PokerGame() {
       <div
         style={{
           minHeight: "100vh",
-          background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
+          background: "var(--bg-primary)",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          color: "white",
+          color: "var(--text-primary)",
           fontSize: "1.5rem",
+          transition: "var(--transition-theme)",
         }}
       >
         <div style={{ textAlign: "center" }}>
@@ -2111,12 +2113,13 @@ export default function PokerGame() {
       <div
         style={{
           minHeight: "100vh",
-          background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
+          background: "var(--bg-primary)",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          color: "white",
+          color: "var(--text-primary)",
           fontSize: "1.5rem",
+          transition: "var(--transition-theme)",
         }}
       >
         <div style={{ textAlign: "center" }}>
@@ -2138,7 +2141,7 @@ export default function PokerGame() {
       style={{
         margin: 0,
         minHeight: "100vh",
-        background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
+        background: "var(--bg-primary)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -2146,6 +2149,7 @@ export default function PokerGame() {
         padding: 15,
         userSelect: "none",
         position: "relative",
+        transition: "var(--transition-theme)",
       }}
     >
       {currentUser && (
@@ -2155,8 +2159,12 @@ export default function PokerGame() {
             top: 10,
             right: 10,
             zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
+          <ThemeToggle />
           <motion.button
             onClick={() => signOut()}
             style={{
@@ -2264,13 +2272,15 @@ export default function PokerGame() {
 
       <motion.div
         style={{
-          background: "radial-gradient(circle at 30% 20%,#1c6e3c,#0a4122)",
+          background:
+            "radial-gradient(circle at 30% 20%, var(--bg-felt), var(--bg-primary))",
           borderRadius: 50,
           boxShadow:
-            "0 30px 40px rgba(0,0,0,0.5),inset 0 2px 5px rgba(255,255,255,0.2)",
+            "var(--table-shadow), inset 0 2px 5px rgba(255,255,255,0.2)",
           padding: 20,
           maxWidth: 1600,
           width: "100%",
+          transition: "var(--transition-theme)",
         }}
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -2288,13 +2298,14 @@ export default function PokerGame() {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              background: "#2c2e2bdd",
+              background: "var(--bg-header)",
               backdropFilter: "blur(8px)",
               borderRadius: 50,
               padding: "8px 20px",
               marginBottom: 20,
               flexWrap: "wrap",
               gap: 10,
+              transition: "var(--transition-theme)",
             }}
           >
             {[
@@ -2309,13 +2320,14 @@ export default function PokerGame() {
               <motion.div
                 key={`header-${i}-${icon}`}
                 style={{
-                  background: "#1e1b14cc",
+                  background: "var(--bg-button)",
                   padding: "5px 15px",
                   borderRadius: 40,
-                  color: "white",
+                  color: "var(--text-primary)",
                   fontWeight: "bold",
                   fontSize: "0.9rem",
                   whiteSpace: "nowrap",
+                  transition: "var(--transition-theme)",
                 }}
                 whileHover={{ scale: 1.03 }}
                 transition={{ type: "spring", stiffness: 300 }}
@@ -2374,7 +2386,7 @@ export default function PokerGame() {
                 multiplayerPlayers={multiplayerPlayers}
                 currentPlayerIndex={currentPlayerIndex}
                 onSwitchPlayer={handleSwitchPlayer}
-                currentUser={currentUser} // 🔥 NOVO
+                currentUser={currentUser}
               />
 
               <ActionButtons
@@ -2414,8 +2426,9 @@ export default function PokerGame() {
                   textAlign: "center",
                   marginTop: 12,
                   fontSize: "0.7rem",
-                  color: "#c9a96e",
+                  color: "var(--text-muted)",
                   textShadow: "1px 1px 0 #2a1f0e",
+                  transition: "var(--transition-theme)",
                 }}
               >
                 Desenvolvido por BruCe - 2026
