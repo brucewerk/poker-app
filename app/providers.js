@@ -2,15 +2,12 @@
 "use client";
 
 import { SessionProvider } from "next-auth/react";
+import { ThemeProvider } from "./theme/ThemeContext";
 
-export default function Providers({ children }) {
+export default function Providers({ children, session }) {
   return (
-    <SessionProvider
-      refetchInterval={5 * 60}
-      refetchOnWindowFocus={true}
-      // 🔥 BASE PATH PARA GARANTIR QUE AS REQUISIÇÕES ESTEJAM CORRETAS
-    >
-      {children}
+    <SessionProvider session={session}>
+      <ThemeProvider>{children}</ThemeProvider>
     </SessionProvider>
   );
 }
