@@ -1,8 +1,10 @@
-// components/Poker/OnlineGame.jsx
+// components/Poker/OnlineGame.jsx - COM CHAT INTEGRADO
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { motion, AnimatePresence } from "framer-motion";
+import Chat from "./Chat.jsx";
 
 function getRankDisplay(rank) {
   if (rank === 11) return "J";
@@ -36,8 +38,8 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   const [isSummaryClosing, setIsSummaryClosing] = useState(false);
   const [closedCount, setClosedCount] = useState(0);
   const [totalPlayers, setTotalPlayers] = useState(0);
+  const [showChat, setShowChat] = useState(true);
 
-  // 🔥 REFS
   const resultLockedRef = useRef(false);
   const resultClosedRef = useRef(false);
   const isClosingRef = useRef(false);
@@ -76,11 +78,8 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       setIsMyTurn(data.playerId === socket.id);
     };
 
-    // 🔥 QUANDO O RESULTADO CHEGA
     const onRoundEnded = (data) => {
       console.log("📡 ROUND-ENDED recebido!");
-
-      // 🔒 TRAVAR O MODAL
       resultLockedRef.current = true;
       resultClosedRef.current = false;
       isClosingRef.current = false;
@@ -89,7 +88,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       setShowResult(true);
       setIsSummaryClosing(false);
 
-      // 🔥 Atualizar contadores
       const playersWithStatus = data.players || [];
       setTotalPlayers(playersWithStatus.length);
       const closed = playersWithStatus.filter((p) => p.hasClosedSummary).length;
@@ -100,14 +98,12 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       );
     };
 
-    // 🔥 PROGRESSO - atualiza quem já fechou
     const onSummaryProgress = (data) => {
       console.log("📡 summary-progress:", data);
       if (data.roomId === roomId) {
         setClosedCount(data.closedCount || 0);
         setTotalPlayers(data.totalPlayers || 0);
 
-        // Atualizar resultado data com os novos status
         setResultData((prev) => {
           if (!prev) return prev;
           return {
@@ -118,7 +114,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
-    // 🔥 QUANDO TODOS FECHARAM OU TIMER
     const onSummaryClosed = (data) => {
       console.log("📡 summary-closed:", data);
       if (data.roomId === roomId) {
@@ -134,7 +129,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
-    // Limpar listeners antigos
     socket.off("room-update");
     socket.off("game-started");
     socket.off("game-update");
@@ -145,7 +139,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     socket.off("summary-progress");
     socket.off("error");
 
-    // Registrar novos listeners
     socket.on("room-update", onRoomUpdate);
     socket.on("game-started", onGameStarted);
     socket.on("game-update", onGameUpdate);
@@ -166,7 +159,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     };
   }, [socket, update, roomId]);
 
-  // 🔥 FECHAR RESUMO - APENAS PARA QUEM CLICOU
   const handleCloseSummary = () => {
     if (isClosingRef.current) return;
     if (resultClosedRef.current) return;
@@ -210,8 +202,18 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     const isAllClosed = closed >= total && total > 0;
 
     return (
-      <div style={resultOverlayStyle()}>
-        <div style={resultModalStyle()}>
+      <motion.div
+        style={resultOverlayStyle()}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.div
+          style={resultModalStyle()}
+          initial={{ scale: 0.9, y: 20 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 400, damping: 28 }}
+        >
           <h2 style={resultTitleStyle()}>🏆 RESULTADO DA PARTIDA</h2>
 
           <div style={resultPotStyle()}>💰 Pote: {resultData.pot} fichas</div>
@@ -232,7 +234,13 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
 
           <div style={resultPlayersStyle()}>
             {resultData.results.map((r, i) => (
-              <div key={i} style={resultPlayerItemStyle(r.isWinner)}>
+              <motion.div
+                key={i}
+                style={resultPlayerItemStyle(r.isWinner)}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+              >
                 <span style={resultPlayerNameStyle(r.isWinner)}>
                   {r.name} {r.isWinner && "👑"}
                 </span>
@@ -240,7 +248,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
                 {r.isWinner && (
                   <span style={resultWinnerBadgeStyle()}>🏆 VENCEDOR</span>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
 
@@ -248,7 +256,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             🎉 {resultData.winner.name} venceu {resultData.pot} fichas!
           </div>
 
-          {/* 🔥 INDICADOR DE PROGRESSO */}
           <div style={resultStatusStyle()}>
             <span style={{ color: "#888", fontSize: "0.85rem" }}>
               👥 {closed}/{total} jogadores já fecharam
@@ -258,32 +265,35 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             </span>
           </div>
 
-          {/* 🔥 BARRA DE PROGRESSO */}
           <div style={progressBarContainerStyle()}>
-            <div
+            <motion.div
               style={{
                 ...progressBarFillStyle(),
                 width: `${total > 0 ? (closed / total) * 100 : 0}%`,
               }}
+              initial={{ width: 0 }}
+              animate={{ width: `${total > 0 ? (closed / total) * 100 : 0}%` }}
+              transition={{ duration: 0.5 }}
             />
           </div>
 
-          {/* 🔥 BOTÃO DE FECHAR */}
           <div style={resultButtonsStyle()}>
-            <button
+            <motion.button
               onClick={handleCloseSummary}
               disabled={isSummaryClosing || isAllClosed}
               style={{
                 ...resultButtonStyle(),
                 opacity: isSummaryClosing || isAllClosed ? 0.6 : 1,
               }}
+              whileHover={{ scale: isSummaryClosing || isAllClosed ? 1 : 1.02 }}
+              whileTap={{ scale: isSummaryClosing || isAllClosed ? 1 : 0.98 }}
             >
               {isAllClosed
                 ? "✅ Todos fecharam!"
                 : isSummaryClosing
                   ? "⏳ Fechando..."
                   : "✕ FECHAR RESUMO"}
-            </button>
+            </motion.button>
           </div>
 
           <p style={resultHintStyle()}>
@@ -294,20 +304,11 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
                 : `💡 Clique no botão para fechar. Aguarde os outros (${closed}/${total})`}
           </p>
 
-          <div
-            style={{
-              textAlign: "center",
-              fontSize: "0.7rem",
-              color: "#4caf50",
-              marginTop: "10px",
-              paddingTop: "10px",
-              borderTop: "1px solid rgba(76,175,80,0.3)",
-            }}
-          >
+          <div style={resultLockedStyle()}>
             🔒 Resumo travado - Aguardando sua ação
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     );
   }
 
@@ -325,23 +326,37 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
         <div style={playersListStyle()}>
           <h3>👥 Jogadores:</h3>
           {players.map((player, index) => (
-            <div key={index} style={playerItemStyle(player.isReady)}>
+            <motion.div
+              key={index}
+              style={playerItemStyle(player.isReady)}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
               <span>{player.name}</span>
               <span>{player.id === socket?.id ? " 👈 (você)" : ""}</span>
               <span>{player.isReady ? "✅ Pronto" : "⏳ Aguardando..."}</span>
-            </div>
+            </motion.div>
           ))}
         </div>
 
-        <button onClick={toggleReady} style={readyButtonStyle()}>
+        <motion.button
+          onClick={toggleReady}
+          style={readyButtonStyle()}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
           {isReady ? "⏳ Aguardando..." : "✅ Pronto para jogar"}
-        </button>
+        </motion.button>
 
         <p style={infoStyle()}>
           {players.length >= 2
             ? "🎮 Todos prontos? O jogo vai começar!"
             : "👥 Aguardando mais jogadores..."}
         </p>
+
+        {/* Chat no lobby */}
+        <Chat socket={socket} roomId={roomId} playerName={playerName} />
       </div>
     );
   }
@@ -377,9 +392,10 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             const isCurrent = player.id === socket?.id;
             const isTurn = gameState.currentPlayerIndex === index;
             return (
-              <div
+              <motion.div
                 key={index}
                 style={playerGameStyle(isCurrent, player.isFolded)}
+                whileHover={{ scale: isCurrent ? 1.02 : 1 }}
               >
                 <div style={playerNameStyle()}>
                   {player.name} {isCurrent && "👈"}
@@ -399,16 +415,20 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
                 {player.bet > 0 && (
                   <div style={playerBetStyle()}>Aposta: {player.bet}</div>
                 )}
-              </div>
+              </motion.div>
             );
           })}
         </div>
 
         <div style={turnIndicatorStyle()}>
           {isCurrentPlayerMe && !currentPlayer?.isFolded ? (
-            <span style={{ color: "#4caf50", fontWeight: "bold" }}>
+            <motion.span
+              style={{ color: "#4caf50", fontWeight: "bold" }}
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            >
               🎯 É SUA VEZ!
-            </span>
+            </motion.span>
           ) : (
             <span style={{ color: "#ff9800" }}>
               ⏳ Aguardando {currentPlayer?.name || "jogador"}...
@@ -421,43 +441,56 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
         !currentPlayer?.isFolded &&
         !currentPlayer?.isAllIn && (
           <div style={actionsStyle()}>
-            <button
+            <motion.button
               onClick={() => handleAction("fold")}
               style={actionButtonStyle("#f44336")}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               ❌ FOLD
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               onClick={() => handleAction("check")}
               style={actionButtonStyle("#4caf50")}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               ✅ CHECK
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               onClick={() => handleAction("call")}
               style={actionButtonStyle("#ff9800")}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               💰 CALL ({gameState.currentBet - currentPlayer.bet})
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               onClick={() => handleAction("raise", gameState.currentBet + 50)}
               style={actionButtonStyle("#2196f3")}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               📈 RAISE
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               onClick={() => handleAction("all-in")}
               style={actionButtonStyle("#9c27b0")}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               ⚡ ALL-IN
-            </button>
+            </motion.button>
           </div>
         )}
+
+      {/* Chat durante o jogo */}
+      <Chat socket={socket} roomId={roomId} playerName={playerName} />
     </div>
   );
 }
 
-// ====================== ESTILOS ======================
+// ====================== ESTILOS (MANTIDOS E ATUALIZADOS) ======================
 function resultOverlayStyle() {
   return {
     position: "fixed",
@@ -468,6 +501,7 @@ function resultOverlayStyle() {
     alignItems: "center",
     zIndex: 2000,
     padding: 20,
+    backdropFilter: "blur(8px)",
   };
 }
 
@@ -482,6 +516,7 @@ function resultModalStyle() {
     border: "3px solid gold",
     maxHeight: "80vh",
     overflowY: "auto",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
   };
 }
 
@@ -491,6 +526,7 @@ function resultTitleStyle() {
     color: "gold",
     margin: "0 0 15px",
     fontSize: "1.8rem",
+    fontWeight: "800",
   };
 }
 
@@ -569,7 +605,6 @@ function resultWinnerStyle() {
   };
 }
 
-// 🔥 NOVOS ESTILOS PARA PROGRESSO
 function resultStatusStyle() {
   return {
     display: "flex",
@@ -638,12 +673,22 @@ function resultHintStyle() {
   };
 }
 
-// ====================== ESTILOS EXISTENTES ======================
+function resultLockedStyle() {
+  return {
+    textAlign: "center",
+    fontSize: "0.7rem",
+    color: "#4caf50",
+    marginTop: "10px",
+    paddingTop: "10px",
+    borderTop: "1px solid rgba(76,175,80,0.3)",
+  };
+}
+
 function lobbyStyle() {
   return {
     background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
     borderRadius: 30,
-    padding: 20,
+    padding: "20px",
     minHeight: "400px",
     color: "white",
     position: "fixed",
@@ -658,7 +703,7 @@ function gameStyle() {
   return {
     background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
     borderRadius: 30,
-    padding: 20,
+    padding: "20px",
     minHeight: "500px",
     color: "white",
     position: "fixed",
@@ -675,6 +720,8 @@ function headerStyle() {
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "20px",
+    flexWrap: "wrap",
+    gap: "10px",
   };
 }
 
@@ -682,6 +729,7 @@ function titleStyle() {
   return {
     color: "gold",
     margin: 0,
+    fontSize: "1.5rem",
   };
 }
 
@@ -693,6 +741,7 @@ function leaveButtonStyle() {
     padding: "8px 16px",
     color: "white",
     cursor: "pointer",
+    transition: "all 0.3s ease",
   };
 }
 
@@ -741,7 +790,7 @@ function tableStyle() {
   return {
     background: "rgba(0,20,0,0.3)",
     borderRadius: 30,
-    padding: 20,
+    padding: "20px",
     minHeight: "300px",
   };
 }
@@ -844,6 +893,7 @@ function actionButtonStyle(color) {
     color: "white",
     fontWeight: "bold",
     cursor: "pointer",
+    transition: "all 0.3s ease",
   };
 }
 

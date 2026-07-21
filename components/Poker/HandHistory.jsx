@@ -65,7 +65,6 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
         setHistory([]);
         setTotal(0);
         alert("✅ Histórico limpo com sucesso!");
-        // 🔥 RECARREGAR APÓS LIMPAR
         setTimeout(() => fetchHistory(), 500);
       }
     } catch (error) {
@@ -76,13 +75,11 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
     }
   };
 
-  // 🔥 INICIALIZAR
   useEffect(() => {
     mountedRef.current = true;
 
     if (username) {
       fetchHistory();
-      // 🔥 POLLING A CADA 10 SEGUNDOS
       intervalRef.current = setInterval(() => {
         if (isResultModalOpen) {
           console.log("🔍 [HISTORY] Pausado - Modal aberto");
@@ -149,7 +146,10 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
             const resultIcon = isWin ? "🏆" : isTie ? "🤝" : "💔";
 
             return (
-              <div key={index} style={historyItemStyle(isWin, isTie)}>
+              <div
+                key={`hand-${index}-${hand.timestamp}-${hand.result}`}
+                style={historyItemStyle(isWin, isTie)}
+              >
                 <div style={historyHeaderStyle()}>
                   <span style={historyResultStyle(resultColor)}>
                     {resultIcon} {hand.result?.toUpperCase() || "—"}

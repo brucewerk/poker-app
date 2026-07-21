@@ -18,7 +18,7 @@ export default function PlayerSelector({
     >
       {players.map((player, index) => (
         <button
-          key={index}
+          key={`player-${index}-${player.name}`} // 🔥 CHAVE ÚNICA
           onClick={() => onSelectPlayer(index)}
           style={{
             padding: "10px 25px",

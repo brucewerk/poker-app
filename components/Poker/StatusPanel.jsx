@@ -1,6 +1,8 @@
 // components/Poker/StatusPanel.jsx
 "use client";
 
+import { motion, AnimatePresence } from "framer-motion";
+
 export default function StatusPanel({
   stage,
   pot,
@@ -14,83 +16,143 @@ export default function StatusPanel({
   winnerMsg,
   isTurbo,
 }) {
+  // 🔥 CORREÇÃO: Dados do status com keys únicas
+  const statusItems = [
+    {
+      id: "stage",
+      label: "🎯 Fase",
+      value: stageNames?.[stage] || stage || "Aguardando",
+    },
+    { id: "pot", label: "💰 Pote", value: `$${pot || 0}` },
+    { id: "bet", label: "📊 Aposta", value: `$${currentBet || 0}` },
+    {
+      id: "mode",
+      label: "🚀 Modo",
+      value: isTurbo ? "Turbo" : "Normal",
+      color: isTurbo ? "#ff9800" : "#4caf50",
+    },
+  ];
+
   return (
-    <div style={panelStyle()}>
+    <motion.div
+      style={panelStyle()}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
       <h3 style={titleStyle()}>📊 STATUS</h3>
 
-      {notification?.visible && (
-        <div
-          style={{
-            background: notification.isError
-              ? "rgba(244,67,54,0.15)"
-              : "rgba(76,175,80,0.15)",
-            border: notification.isError
-              ? "1px solid #f44336"
-              : "1px solid #4caf50",
-            borderRadius: 10,
-            padding: "6px 10px",
-            marginBottom: "8px",
-            color: notification.isError ? "#f44336" : "#4caf50",
-            fontSize: "0.8rem",
-            textAlign: "center",
-          }}
-        >
-          {notification.msg}
-        </div>
-      )}
+      <AnimatePresence>
+        {notification?.visible && (
+          <motion.div
+            key="notification"
+            initial={{ opacity: 0, scale: 0.9, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -10 }}
+            style={{
+              background: notification.isError
+                ? "rgba(244,67,54,0.15)"
+                : "rgba(76,175,80,0.15)",
+              border: notification.isError
+                ? "1px solid #f44336"
+                : "1px solid #4caf50",
+              borderRadius: 10,
+              padding: "6px 10px",
+              marginBottom: "8px",
+              color: notification.isError ? "#f44336" : "#4caf50",
+              fontSize: "0.8rem",
+              textAlign: "center",
+            }}
+          >
+            {notification.msg}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div style={statusGridStyle()}>
-        <div style={statusItemStyle()}>
-          <span style={statusLabelStyle()}>🎯 Fase</span>
-          <span style={statusValueStyle()}>
-            {stageNames?.[stage] || stage || "Aguardando"}
-          </span>
-        </div>
-
-        <div style={statusItemStyle()}>
-          <span style={statusLabelStyle()}>💰 Pote</span>
-          <span style={statusValueStyle()}>${pot || 0}</span>
-        </div>
-
-        <div style={statusItemStyle()}>
-          <span style={statusLabelStyle()}>📊 Aposta</span>
-          <span style={statusValueStyle()}>${currentBet || 0}</span>
-        </div>
-
-        <div style={statusItemStyle()}>
-          <span style={statusLabelStyle()}>🚀 Modo</span>
-          <span style={statusValueStyle(isTurbo ? "#ff9800" : "#4caf50")}>
-            {isTurbo ? "Turbo" : "Normal"}
-          </span>
-        </div>
+        {statusItems.map((item) => (
+          <motion.div
+            key={item.id} // 🔥 CHAVE ÚNICA!
+            style={statusItemStyle()}
+            whileHover={{ scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            <span style={statusLabelStyle()}>{item.label}</span>
+            <motion.span
+              key={`${item.id}-${item.value}`}
+              style={statusValueStyle(item.color)}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              {item.value}
+            </motion.span>
+          </motion.div>
+        ))}
       </div>
 
       <div style={betsStyle()}>
-        <span style={betStyle()}>👤 Você: ${playerBet || 0}</span>
-        <span style={betStyle()}>🤖 CPU: ${cpuBet || 0}</span>
+        <motion.span
+          key={`playerBet-${playerBet}`}
+          style={betStyle()}
+          initial={{ scale: 0.8 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          👤 Você: ${playerBet || 0}
+        </motion.span>
+        <motion.span
+          key={`cpuBet-${cpuBet}`}
+          style={betStyle()}
+          initial={{ scale: 0.8 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          🤖 CPU: ${cpuBet || 0}
+        </motion.span>
         {nextRaise > 0 && (
-          <span style={nextRaiseStyle()}>Próximo aumento: ${nextRaise}</span>
+          <span key="nextRaise" style={nextRaiseStyle()}>
+            Próximo aumento: ${nextRaise}
+          </span>
         )}
       </div>
 
-      {gameStatus && !winnerMsg && (
-        <div style={gameStatusStyle()}>{gameStatus}</div>
-      )}
+      <AnimatePresence>
+        {gameStatus && !winnerMsg && (
+          <motion.div
+            key="gameStatus"
+            style={gameStatusStyle()}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+          >
+            {gameStatus}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {winnerMsg && (
-        <div
-          style={{
-            ...gameStatusStyle(),
-            background: "rgba(255,215,0,0.15)",
-            border: "1px solid gold",
-            color: "gold",
-            fontWeight: "bold",
-          }}
-        >
-          {winnerMsg}
-        </div>
-      )}
-    </div>
+      <AnimatePresence>
+        {winnerMsg && (
+          <motion.div
+            key="winnerMsg"
+            style={{
+              ...gameStatusStyle(),
+              background: "rgba(255,215,0,0.15)",
+              border: "1px solid gold",
+              color: "gold",
+              fontWeight: "bold",
+            }}
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -20 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            {winnerMsg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -129,6 +191,7 @@ function statusItemStyle() {
     padding: "6px 8px",
     borderRadius: 10,
     textAlign: "center",
+    cursor: "default",
   };
 }
 
@@ -167,6 +230,7 @@ function betStyle() {
     background: "rgba(255,255,255,0.05)",
     padding: "2px 10px",
     borderRadius: 10,
+    display: "inline-block",
   };
 }
 

@@ -10,14 +10,16 @@
     "socket": "node socket-server.js"
   },
   "dependencies": {
+    "@auth/mongodb-adapter": "^3.0.0",
     "bcryptjs": "^2.4.3",
+    "framer-motion": "^12.42.2",
+    "mongodb": "^6.12.0",
     "mongoose": "^8.9.5",
     "next": "16.2.9",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
     "next-auth": "^4.24.10",
-    "@auth/mongodb-adapter": "^3.0.0",
-    "mongodb": "^6.12.0",
+    "react": "19.2.4",
+    "react-confetti": "^6.4.0",
+    "react-dom": "19.2.4",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5"
   },
@@ -25,7 +27,7 @@
     "@tailwindcss/postcss": "^4.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
-    "tailwindcss": "^4.0.0",
-    "postcss": "^8.5.0"
+    "postcss": "^8.5.0",
+    "tailwindcss": "^4.0.0"
   }
 }

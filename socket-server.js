@@ -183,6 +183,7 @@ function sanitizeGameState(gameState) {
           isActive: p.isActive,
           hasActed: p.hasActed,
           hasClosedSummary: p.hasClosedSummary || false,
+          position: p.position || 0, // NOVO: posição na mesa
         }))
       : [],
     pot: gameState.pot,
@@ -193,6 +194,9 @@ function sanitizeGameState(gameState) {
     lastRaiser: gameState.lastRaiser,
     roundStartIndex: gameState.roundStartIndex,
     bettingRoundComplete: gameState.bettingRoundComplete,
+    smallBlind: gameState.smallBlind || 25, // NOVO
+    bigBlind: gameState.bigBlind || 50, // NOVO
+    chatMessages: gameState.chatMessages || [], // NOVO
   };
 }
 
@@ -207,6 +211,7 @@ async function broadcastRoomList() {
       updatedPlayers.push({
         name: player.name,
         chips: currentChips,
+        isReady: player.isReady || false,
       });
       player.chips = currentChips;
     }
@@ -215,8 +220,9 @@ async function broadcastRoomList() {
       roomId: roomId,
       players: updatedPlayers,
       playerCount: room.players.length,
-      maxPlayers: 4,
+      maxPlayers: room.maxPlayers || 6, // NOVO: suporte a 6 jogadores
       isGameActive: !!room.gameState,
+      hasAvailableSlot: room.players.length < (room.maxPlayers || 6),
     });
   }
 
@@ -227,12 +233,14 @@ async function broadcastRoomList() {
 io.on("connection", (socket) => {
   console.log(`🟢 Conectado: ${socket.id}`);
 
+  // ====================== LISTAR SALAS ======================
   socket.on("list-rooms", async () => {
     await broadcastRoomList();
   });
 
+  // ====================== CRIAR SALA ======================
   socket.on("create-room", async (data) => {
-    const { playerName } = data;
+    const { playerName, maxPlayers = 6 } = data; // NOVO: maxPlayers
     const roomId = generateRoomId();
 
     const userChips = await getChipsFromDatabase(playerName);
@@ -245,11 +253,14 @@ io.on("connection", (socket) => {
           chips: userChips,
           isReady: false,
           hasClosedSummary: false,
+          position: 0,
         },
       ],
       gameState: null,
       isSummaryVisible: false,
       summaryTimer: null,
+      maxPlayers: Math.min(Math.max(maxPlayers, 2), 6), // NOVO: 2-6 jogadores
+      chatMessages: [], // NOVO: histórico do chat
     });
 
     socket.join(roomId);
@@ -259,10 +270,11 @@ io.on("connection", (socket) => {
     await broadcastRoomList();
 
     console.log(
-      `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas)`,
+      `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas) | Máx: ${maxPlayers} jogadores`,
     );
   });
 
+  // ====================== ENTRAR NA SALA ======================
   socket.on("join-room", async (data) => {
     const { roomId, playerName } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -280,8 +292,10 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (room.players.length >= 4) {
-      socket.emit("error", { message: "Sala lotada!" });
+    if (room.players.length >= (room.maxPlayers || 6)) {
+      socket.emit("error", {
+        message: `Sala lotada (máx ${room.maxPlayers})!`,
+      });
       return;
     }
 
@@ -293,8 +307,17 @@ io.on("connection", (socket) => {
       chips: userChips,
       isReady: false,
       hasClosedSummary: false,
+      position: room.players.length,
     });
     socket.join(normalizedRoomId);
+
+    // NOVO: Notificar que alguém entrou
+    io.to(normalizedRoomId).emit("chat-message", {
+      player: "Sistema",
+      message: `🎉 ${playerName} entrou na sala!`,
+      timestamp: Date.now(),
+      isSystem: true,
+    });
 
     io.to(normalizedRoomId).emit("room-update", room);
     await broadcastRoomList();
@@ -304,6 +327,7 @@ io.on("connection", (socket) => {
     );
   });
 
+  // ====================== PRONTO PARA JOGAR ======================
   socket.on("player-ready", (data) => {
     const { roomId } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -315,13 +339,29 @@ io.on("connection", (socket) => {
       player.isReady = !player.isReady;
       io.to(normalizedRoomId).emit("room-update", room);
 
+      // NOVO: Notificar status de prontidão
+      io.to(normalizedRoomId).emit("chat-message", {
+        player: "Sistema",
+        message: `${player.name} ${player.isReady ? "✅ está pronto!" : "⏸️ não está mais pronto"}`,
+        timestamp: Date.now(),
+        isSystem: true,
+      });
+
       const allReady = room.players.every((p) => p.isReady);
       if (allReady && room.players.length >= 2) {
+        // NOVO: Contagem regressiva antes de iniciar
+        io.to(normalizedRoomId).emit("chat-message", {
+          player: "Sistema",
+          message: "🚀 Todos prontos! Iniciando partida...",
+          timestamp: Date.now(),
+          isSystem: true,
+        });
         startGame(normalizedRoomId);
       }
     }
   });
 
+  // ====================== INICIAR JOGO ======================
   function startGame(roomId) {
     const room = rooms.get(roomId);
     if (!room) return;
@@ -329,11 +369,15 @@ io.on("connection", (socket) => {
     const deck = createDeck();
     const numPlayers = room.players.length;
 
+    // NOVO: Configurar blinds baseado no número de jogadores
+    const smallBlind = 25;
+    const bigBlind = 50;
+
     const gameState = {
       phase: "preflop",
       deck: deck,
       communityCards: [],
-      players: room.players.map((p) => ({
+      players: room.players.map((p, index) => ({
         id: p.id,
         name: p.name,
         cards: [],
@@ -344,6 +388,7 @@ io.on("connection", (socket) => {
         isActive: true,
         hasActed: false,
         hasClosedSummary: false,
+        position: index,
       })),
       pot: 0,
       currentBet: 0,
@@ -353,23 +398,27 @@ io.on("connection", (socket) => {
       lastRaiser: -1,
       roundStartIndex: 0,
       bettingRoundComplete: false,
+      smallBlind: smallBlind,
+      bigBlind: bigBlind,
+      chatMessages: room.chatMessages || [],
     };
 
+    // Distribuir cartas
     gameState.players.forEach((p) => {
       p.cards = [deck.pop(), deck.pop()];
     });
 
-    const sb = 25;
-    const bb = 50;
+    // NOVO: Sistema de blinds rotativo
     const sbIdx = 1 % numPlayers;
     const bbIdx = 2 % numPlayers;
 
     gameState.dealerIndex = 0;
 
+    // Small Blind
     const sbPlayer = gameState.players[sbIdx];
-    if (sbPlayer.chips >= sb) {
-      sbPlayer.chips -= sb;
-      sbPlayer.bet = sb;
+    if (sbPlayer.chips >= smallBlind) {
+      sbPlayer.chips -= smallBlind;
+      sbPlayer.bet = smallBlind;
     } else {
       sbPlayer.bet = sbPlayer.chips;
       sbPlayer.chips = 0;
@@ -377,10 +426,11 @@ io.on("connection", (socket) => {
     }
     gameState.pot += sbPlayer.bet;
 
+    // Big Blind
     const bbPlayer = gameState.players[bbIdx];
-    if (bbPlayer.chips >= bb) {
-      bbPlayer.chips -= bb;
-      bbPlayer.bet = bb;
+    if (bbPlayer.chips >= bigBlind) {
+      bbPlayer.chips -= bigBlind;
+      bbPlayer.bet = bigBlind;
     } else {
       bbPlayer.bet = bbPlayer.chips;
       bbPlayer.chips = 0;
@@ -388,18 +438,27 @@ io.on("connection", (socket) => {
     }
     gameState.pot += bbPlayer.bet;
 
-    gameState.currentBet = bb;
+    gameState.currentBet = bigBlind;
     gameState.lastRaiser = bbIdx;
     gameState.currentPlayerIndex = (bbIdx + 1) % numPlayers;
     gameState.roundStartIndex = gameState.currentPlayerIndex;
 
     room.gameState = gameState;
 
+    // NOVO: Notificar início
+    io.to(roomId).emit("chat-message", {
+      player: "Sistema",
+      message: `🃏 Partida iniciada! Small Blind: ${smallBlind}, Big Blind: ${bigBlind}`,
+      timestamp: Date.now(),
+      isSystem: true,
+    });
+
     const safeGameState = sanitizeGameState(gameState);
     io.to(roomId).emit("game-started", safeGameState);
     console.log(`🎮 Jogo iniciado na sala ${roomId}`);
   }
 
+  // ====================== AÇÕES DO JOGADOR ======================
   socket.on("player-action", (data) => {
     const { roomId, action, amount } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -425,10 +484,14 @@ io.on("connection", (socket) => {
     player.hasActed = true;
     gameState.actionCount++;
 
+    // NOVO: Registrar ação para o chat
+    let actionMessage = "";
+
     switch (action) {
       case "fold":
         player.isFolded = true;
         player.isActive = false;
+        actionMessage = `🙅 ${player.name} desistiu`;
         console.log(`👤 ${player.name} FOLD`);
         break;
 
@@ -441,6 +504,7 @@ io.on("connection", (socket) => {
           gameState.actionCount--;
           return;
         }
+        actionMessage = `✅ ${player.name} deu CHECK`;
         console.log(`👤 ${player.name} CHECK`);
         break;
 
@@ -452,11 +516,13 @@ io.on("connection", (socket) => {
           player.chips = 0;
           gameState.pot += allInCall;
           player.isAllIn = true;
+          actionMessage = `💰 ${player.name} pagou ALL-IN ${allInCall}`;
           console.log(`👤 ${player.name} ALL-IN CALL ${allInCall}`);
         } else {
           player.chips -= callAmount;
           player.bet += callAmount;
           gameState.pot += callAmount;
+          actionMessage = `💰 ${player.name} pagou ${callAmount}`;
           console.log(`👤 ${player.name} CALL ${callAmount}`);
         }
         break;
@@ -486,6 +552,7 @@ io.on("connection", (socket) => {
             p.hasActed = false;
           }
         });
+        actionMessage = `📈 ${player.name} aumentou para ${amount}`;
         console.log(`👤 ${player.name} RAISE para ${amount}`);
         break;
 
@@ -510,13 +577,58 @@ io.on("connection", (socket) => {
             }
           });
         }
+        actionMessage = `⚡ ${player.name} ALL-IN ${allInAmount}`;
         console.log(`👤 ${player.name} ALL-IN ${allInAmount}`);
         break;
+    }
+
+    // NOVO: Enviar ação para o chat
+    if (actionMessage) {
+      io.to(normalizedRoomId).emit("chat-message", {
+        player: "Ação",
+        message: actionMessage,
+        timestamp: Date.now(),
+        isSystem: true,
+      });
     }
 
     advanceGame(normalizedRoomId);
   });
 
+  // ====================== CHAT EM TEMPO REAL ======================
+  socket.on("send-chat-message", (data) => {
+    const { roomId, message } = data;
+    const normalizedRoomId = roomId.toUpperCase();
+    const room = rooms.get(normalizedRoomId);
+    if (!room) return;
+
+    const player = room.players.find((p) => p.id === socket.id);
+    if (!player) return;
+
+    // NOVO: Limitar mensagens para evitar spam
+    if (message.length > 500) {
+      socket.emit("error", { message: "Mensagem muito longa!" });
+      return;
+    }
+
+    const chatMessage = {
+      player: player.name,
+      message: message.trim(),
+      timestamp: Date.now(),
+      isSystem: false,
+    };
+
+    // Manter histórico do chat (últimas 100 mensagens)
+    if (!room.chatMessages) room.chatMessages = [];
+    room.chatMessages.push(chatMessage);
+    if (room.chatMessages.length > 100) {
+      room.chatMessages = room.chatMessages.slice(-100);
+    }
+
+    io.to(normalizedRoomId).emit("chat-message", chatMessage);
+  });
+
+  // ====================== AVANÇAR JOGO ======================
   function advanceGame(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -594,6 +706,7 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("player-turn", { playerId: players[nextIndex].id });
   }
 
+  // ====================== AVANÇAR FASE ======================
   function advancePhase(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -612,28 +725,43 @@ io.on("connection", (socket) => {
     gameState.actionCount = 0;
     gameState.bettingRoundComplete = false;
 
+    // NOVO: Anunciar fase no chat
+    let phaseMessage = "";
+
     switch (gameState.phase) {
       case "preflop":
         gameState.phase = "flop";
         for (let i = 0; i < 3 && gameState.deck.length > 0; i++) {
           gameState.communityCards.push(gameState.deck.pop());
         }
+        phaseMessage = "🎴 FLOP - Três cartas comunitárias!";
         break;
       case "flop":
         gameState.phase = "turn";
         if (gameState.deck.length > 0) {
           gameState.communityCards.push(gameState.deck.pop());
         }
+        phaseMessage = "🔄 TURN - Quarta carta!";
         break;
       case "turn":
         gameState.phase = "river";
         if (gameState.deck.length > 0) {
           gameState.communityCards.push(gameState.deck.pop());
         }
+        phaseMessage = "🌊 RIVER - Última carta!";
         break;
       case "river":
         endRound(roomId);
         return;
+    }
+
+    if (phaseMessage) {
+      io.to(roomId).emit("chat-message", {
+        player: "Sistema",
+        message: phaseMessage,
+        timestamp: Date.now(),
+        isSystem: true,
+      });
     }
 
     const startIndex = (gameState.dealerIndex + 1) % players.length;
@@ -663,7 +791,7 @@ io.on("connection", (socket) => {
     );
   }
 
-  // ====================== FECHAR RESUMO (APENAS PARA QUEM CLICOU) ======================
+  // ====================== FECHAR RESUMO ======================
   socket.on("close-summary", async (data) => {
     const { roomId } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -680,10 +808,8 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // 🔥 Marcar que este jogador já fechou
     player.hasClosedSummary = true;
 
-    // Atualizar no gameState também
     if (room.gameState) {
       const gamePlayer = room.gameState.players.find((p) => p.id === socket.id);
       if (gamePlayer) {
@@ -698,13 +824,22 @@ io.on("connection", (socket) => {
       `📊 ${player.name} fechou o resumo (${closedCount}/${totalPlayers})`,
     );
 
-    // 🔥 EMITIR APENAS PARA QUEM CLICOU
     socket.emit("summary-closed", {
       roomId: normalizedRoomId,
       playerId: socket.id,
     });
 
-    // 🔥 Verificar se TODOS os jogadores já fecharam
+    // NOVO: Notificar progresso
+    io.to(normalizedRoomId).emit("summary-progress", {
+      roomId: normalizedRoomId,
+      closedCount: closedCount,
+      totalPlayers: totalPlayers,
+      players: room.players.map((p) => ({
+        name: p.name,
+        hasClosed: p.hasClosedSummary,
+      })),
+    });
+
     const allClosed = room.players.every((p) => p.hasClosedSummary === true);
 
     if (allClosed) {
@@ -712,13 +847,11 @@ io.on("connection", (socket) => {
         `✅ Todos os jogadores fecharam! Resetando sala ${normalizedRoomId}`,
       );
 
-      // Limpar timer se existir
       if (room.summaryTimer) {
         clearTimeout(room.summaryTimer);
         room.summaryTimer = null;
       }
 
-      // Resetar o jogo para todos
       if (room.gameState) {
         for (const p of room.gameState.players) {
           await saveChipsToDatabase(p.name, p.chips);
@@ -740,6 +873,12 @@ io.on("connection", (socket) => {
 
         io.to(normalizedRoomId).emit("room-update", room);
         io.to(normalizedRoomId).emit("game-reset");
+        io.to(normalizedRoomId).emit("chat-message", {
+          player: "Sistema",
+          message: "🔄 Jogo resetado! Preparem-se para a próxima rodada!",
+          timestamp: Date.now(),
+          isSystem: true,
+        });
 
         await broadcastRoomList();
 
@@ -747,21 +886,10 @@ io.on("connection", (socket) => {
           `🔄 Jogo resetado na sala ${normalizedRoomId} (todos fecharam)`,
         );
       }
-    } else {
-      // 🔥 Notificar todos sobre o progresso (quem já fechou)
-      io.to(normalizedRoomId).emit("summary-progress", {
-        roomId: normalizedRoomId,
-        closedCount: closedCount,
-        totalPlayers: totalPlayers,
-        players: room.players.map((p) => ({
-          name: p.name,
-          hasClosed: p.hasClosedSummary,
-        })),
-      });
     }
   });
 
-  // ====================== ENCERRAR RODADA (COM TIMER DE 25s) ======================
+  // ====================== ENCERRAR RODADA ======================
   async function endRound(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -815,7 +943,6 @@ io.on("connection", (socket) => {
 
       room.isSummaryVisible = true;
 
-      // 🔥 Resetar estado de fechamento dos jogadores
       room.players.forEach((p) => {
         p.hasClosedSummary = false;
       });
@@ -823,7 +950,14 @@ io.on("connection", (socket) => {
         p.hasClosedSummary = false;
       });
 
-      // 🔥 Emitir resultado
+      // NOVO: Anunciar vencedor no chat
+      io.to(roomId).emit("chat-message", {
+        player: "Sistema",
+        message: `🏆 ${winner.name} venceu ${gameState.pot} fichas com ${results.find((r) => r.isWinner)?.hand || "boa mão"}!`,
+        timestamp: Date.now(),
+        isSystem: true,
+      });
+
       const roundEndData = {
         winner: {
           name: winner.name,
@@ -842,27 +976,23 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("round-ended", roundEndData);
 
       console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
-      console.log(`📊 Resumo enviado. Aguardando cliques individuais...`);
 
-      // 🔥 TIMER DE 25 SEGUNDOS (FALLBACK)
+      // Timer de 25 segundos (fallback)
       if (room.summaryTimer) {
         clearTimeout(room.summaryTimer);
       }
 
       room.summaryTimer = setTimeout(async () => {
-        // Verificar se o resumo ainda está visível
         if (room.isSummaryVisible) {
           console.log(
             `⏰ Timer de 25s - Fechando resumo da sala ${roomId} (fallback)`,
           );
 
-          // Forçar fechamento para todos
           io.to(roomId).emit("summary-closed", {
             roomId: roomId,
             forced: true,
           });
 
-          // Resetar o jogo
           if (room.gameState) {
             for (const p of room.gameState.players) {
               await saveChipsToDatabase(p.name, p.chips);
@@ -891,7 +1021,7 @@ io.on("connection", (socket) => {
           }
         }
         room.summaryTimer = null;
-      }, 25000); // 🔥 25 SEGUNDOS
+      }, 25000);
     }
   }
 
@@ -902,13 +1032,20 @@ io.on("connection", (socket) => {
     const room = rooms.get(normalizedRoomId);
     if (!room) return;
 
-    for (const player of room.players) {
-      if (player.id === socket.id) {
-        await saveChipsToDatabase(player.name, player.chips);
-        console.log(
-          `💾 Fichas de ${player.name} salvas ao sair: ${player.chips}`,
-        );
-      }
+    const player = room.players.find((p) => p.id === socket.id);
+    if (player) {
+      await saveChipsToDatabase(player.name, player.chips);
+      console.log(
+        `💾 Fichas de ${player.name} salvas ao sair: ${player.chips}`,
+      );
+
+      // NOVO: Notificar saída
+      io.to(normalizedRoomId).emit("chat-message", {
+        player: "Sistema",
+        message: `👋 ${player.name} saiu da sala`,
+        timestamp: Date.now(),
+        isSystem: true,
+      });
     }
 
     room.players = room.players.filter((p) => p.id !== socket.id);
@@ -928,11 +1065,20 @@ io.on("connection", (socket) => {
     await broadcastRoomList();
   });
 
+  // ====================== DESCONEXÃO ======================
   socket.on("disconnect", () => {
     console.log(`🔴 Desconectado: ${socket.id}`);
     rooms.forEach((room, roomId) => {
       const idx = room.players.findIndex((p) => p.id === socket.id);
       if (idx !== -1) {
+        const player = room.players[idx];
+        io.to(roomId).emit("chat-message", {
+          player: "Sistema",
+          message: `👋 ${player.name} desconectou`,
+          timestamp: Date.now(),
+          isSystem: true,
+        });
+
         room.players.splice(idx, 1);
         if (room.players.length === 0) {
           if (room.summaryTimer) {
@@ -957,10 +1103,13 @@ console.log(`📋 Texas Hold'em Online pronto!\n`);
 console.log(`💡 Fluxo correto:`);
 console.log(`  1. Preflop -> 2. Flop -> 3. Turn -> 4. River -> 5. Showdown\n`);
 console.log(`💡 Para testar:`);
-console.log(`  - Abra duas janelas (Edge e Chrome)`);
+console.log(`  - Abra várias janelas para simular múltiplos jogadores`);
 console.log(`  - Entre na mesma sala`);
-console.log(`  - Ambos cliquem em "Pronto para jogar"\n`);
+console.log(`  - Todos cliquem em "Pronto para jogar"\n`);
 console.log(`🆕 NOVIDADES:`);
+console.log(`   ✅ Suporte a 2-6 jogadores`);
+console.log(`   ✅ Sistema de blinds rotativo`);
+console.log(`   ✅ Chat em tempo real`);
 console.log(`   ✅ Cada jogador fecha o resumo individualmente`);
 console.log(`   ✅ Timer de 25 segundos como fallback`);
 console.log(`   ✅ Indicador de progresso (quem já fechou)`);

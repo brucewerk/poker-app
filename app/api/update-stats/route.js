@@ -1,4 +1,4 @@
-// app/api/update-stats/route.js
+// app/api/update-stats/route.js - COMPLETO COM MÉTRICAS AVANÇADAS
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -48,18 +48,31 @@ export async function POST(request) {
         bestHand: "",
         allInWins: 0,
         currentStreak: 0,
+        handsLost: 0,
+        handsTied: 0,
+        // 🔥 NOVAS MÉTRICAS PARA ESTATÍSTICAS AVANÇADAS
+        totalChips: 0,
+        lastHandTimestamp: null,
+        handsByPosition: {
+          early: 0,
+          middle: 0,
+          late: 0,
+        },
+        winsByPosition: {
+          early: 0,
+          middle: 0,
+          late: 0,
+        },
+        handsByType: {},
+        streakHistory: [],
       };
     }
 
-    // 🔥 GARANTIR QUE FINDINGS E ACHIEVEMENTS EXISTEM
-    if (!user.findings) {
-      user.findings = [];
-    }
-    if (!user.achievements) {
-      user.achievements = [];
-    }
+    if (!user.findings) user.findings = [];
+    if (!user.achievements) user.achievements = [];
+    if (!user.handHistory) user.handHistory = [];
 
-    // 🔥 NORMALIZAR O NOME DA MÃO (MAPEAMENTO COMPLETO)
+    // 🔥 NORMALIZAR O NOME DA MÃO
     let normalizedHandName = handName;
     if (handName) {
       const handMapping = {
@@ -84,19 +97,21 @@ export async function POST(request) {
 
     // 🔥 ATUALIZAR STATS
     user.stats.handsPlayed = (user.stats.handsPlayed || 0) + 1;
+    user.stats.lastHandTimestamp = new Date().toISOString();
 
-    // 🔥 CALCULAR GANHO DE XP
     let xpGain = 0;
+    let chipsChange = 0;
 
     if (result === "win") {
       user.stats.handsWon = (user.stats.handsWon || 0) + 1;
       user.stats.totalChipsWon = (user.stats.totalChipsWon || 0) + (chips || 0);
+      chipsChange = chips || 0;
 
       if (chips > (user.stats.biggestWin || 0)) {
         user.stats.biggestWin = chips;
       }
 
-      // 🔥 MELHOR MÃO (USANDO O NOME NORMALIZADO)
+      // 🔥 MELHOR MÃO
       if (normalizedHandName) {
         const handOrder = [
           "Carta Alta",
@@ -114,8 +129,14 @@ export async function POST(request) {
         const newIndex = handOrder.indexOf(normalizedHandName);
         if (newIndex > currentIndex) {
           user.stats.bestHand = normalizedHandName;
-          console.log(`🏆 ${username} melhor mão: ${normalizedHandName}`);
         }
+
+        // 🔥 REGISTRAR DISTRIBUIÇÃO DE MÃOS
+        if (!user.stats.handsByType) {
+          user.stats.handsByType = {};
+        }
+        user.stats.handsByType[normalizedHandName] =
+          (user.stats.handsByType[normalizedHandName] || 0) + 1;
       }
 
       // 🔥 STREAK
@@ -124,7 +145,6 @@ export async function POST(request) {
         user.stats.bestStreak = user.stats.currentStreak;
       }
 
-      // 🔥 ALL-IN WINS
       if (wasAllIn) {
         user.stats.allInWins = (user.stats.allInWins || 0) + 1;
       }
@@ -133,26 +153,38 @@ export async function POST(request) {
       xpGain = 10 + Math.floor(chips / 10);
       if (wasAllIn) xpGain += 20;
       if (chips >= 500) xpGain += 15;
+      if (normalizedHandName === "Royal Flush") xpGain += 100;
+      if (normalizedHandName === "Straight Flush") xpGain += 50;
     } else if (result === "loss") {
+      user.stats.handsLost = (user.stats.handsLost || 0) + 1;
       user.stats.currentStreak = 0;
+      chipsChange = -(chips || 0);
       xpGain = 5;
     } else if (result === "tie") {
+      user.stats.handsTied = (user.stats.handsTied || 0) + 1;
       xpGain = 5;
     }
 
+    // 🔥 ATUALIZAR TOTAL DE FICHAS
+    user.stats.totalChips = (user.stats.totalChips || 0) + chipsChange;
+
     // 🔥 ADICIONAR XP
     user.xp = (user.xp || 0) + xpGain;
+    user.totalXpEarned = (user.totalXpEarned || 0) + xpGain;
 
     // 🔥 VERIFICAR SUBIDA DE NÍVEL
-    const levelUpInfo = checkLevelUp(user.level || 1, user.xp || 0);
+    const xpPerLevel = 100;
+    const newLevel = Math.floor(user.xp / xpPerLevel) + 1;
     let leveledUp = false;
-    let newLevel = user.level || 1;
+    let oldLevel = user.level || 1;
 
-    if (levelUpInfo.leveledUp) {
-      user.level = levelUpInfo.newLevel;
-      newLevel = levelUpInfo.newLevel;
+    if (newLevel > oldLevel) {
+      user.level = newLevel;
       leveledUp = true;
-      console.log(`🎉 ${username} subiu para Nível ${newLevel}!`);
+
+      // 🔥 BÔNUS DE FICHAS POR SUBIR DE NÍVEL
+      const levelBonus = newLevel * 100;
+      user.chips = (user.chips || 0) + levelBonus;
     }
 
     // 🔥 VERIFICAR CONQUISTAS
@@ -167,7 +199,10 @@ export async function POST(request) {
           if (!user.achievements.find((a) => a === ach.id)) {
             user.achievements.push(ach.id);
             unlockedAchievements.push(ach);
-            console.log(`🏅 ${username} desbloqueou: ${ach.name}`);
+            // 🔥 BÔNUS XP POR CONQUISTA
+            if (ach.xpBonus) {
+              user.xp = (user.xp || 0) + ach.xpBonus;
+            }
           }
         });
       }
@@ -175,18 +210,17 @@ export async function POST(request) {
       console.warn("Erro ao verificar conquistas:", e);
     }
 
-    // 🔥 VERIFICAR ACHADOS (FINDINGS)
+    // 🔥 VERIFICAR ACHADOS
     let unlockedFindings = [];
     try {
       const { checkFindings } = await import("@/lib/findings");
-      const newFindings = await checkFindings(username, user.stats);
+      const newFindings = checkFindings(user.stats, user.findings || []);
       if (newFindings && newFindings.length > 0) {
         newFindings.forEach((finding) => {
           if (!user.findings.find((f) => f.id === finding.id)) {
             user.findings.push(finding);
             user.xp = (user.xp || 0) + (finding.xp || 0);
             unlockedFindings.push(finding);
-            console.log(`🔍 ${username} descobriu: ${finding.name}`);
           }
         });
       }
@@ -194,14 +228,49 @@ export async function POST(request) {
       // Módulo findings não existe
     }
 
+    // 🔥 SALVAR HISTÓRICO DA MÃO (para gráficos e estatísticas)
+    if (result === "win" || result === "loss" || result === "tie") {
+      const handEntry = {
+        result: result,
+        playerHand: normalizedHandName || "Carta Alta",
+        cpuHand: "CPU", // Será substituído pelo histórico real
+        pot: chips || 0,
+        chipsWon: result === "win" ? chips : 0,
+        chipsLost: result === "loss" ? chips : 0,
+        wasAllIn: wasAllIn || false,
+        timestamp: new Date().toISOString(),
+        // 🔥 NOVOS CAMPOS PARA ESTATÍSTICAS AVANÇADAS
+        handType: normalizedHandName || "Carta Alta",
+        chipsChange: chipsChange,
+      };
+
+      // Adicionar ao histórico (limitado a 100 entradas)
+      user.handHistory.unshift(handEntry);
+      if (user.handHistory.length > 100) {
+        user.handHistory = user.handHistory.slice(0, 100);
+      }
+    }
+
+    // 🔥 SALVAR STREAK HISTORY (para gráfico de streaks)
+    if (!user.stats.streakHistory) {
+      user.stats.streakHistory = [];
+    }
+    if (user.stats.currentStreak > 0 && user.stats.currentStreak % 5 === 0) {
+      user.stats.streakHistory.push({
+        streak: user.stats.currentStreak,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    if (user.stats.streakHistory.length > 20) {
+      user.stats.streakHistory = user.stats.streakHistory.slice(-20);
+    }
+
     await user.save();
 
     // 🔥 CALCULAR INFORMAÇÕES DO NÍVEL ATUAL
     const currentLevelInfo = calculateLevel(user.xp || 0);
 
-    console.log(`📊 ${username}: ${user.xp} XP (Nível ${user.level})`);
-
-    // 🔥 DISPARAR EVENTO DE ATUALIZAÇÃO DE NÍVEL
+    // 🔥 RESPONSE COM TODOS OS DADOS
     const response = {
       success: true,
       stats: user.stats,
@@ -215,6 +284,9 @@ export async function POST(request) {
       xpGain: xpGain,
       newAchievements: unlockedAchievements,
       newFindings: unlockedFindings,
+      // 🔥 DADOS ADICIONAIS
+      chips: user.chips || 0,
+      totalChipsWon: user.stats.totalChipsWon || 0,
     };
 
     return NextResponse.json(response);

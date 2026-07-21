@@ -45,15 +45,12 @@ export default function FriendsList({ username }) {
           isOnline: friend.isOnline || false,
         }));
         setFriends(validFriends);
-        // ✅ USANDO console.info EM VEZ DE console.log
         console.info(`✅ ${validFriends.length} amigos carregados`);
       } else {
-        // ✅ ERRO DE NEGÓCIO - USAR console.info
         console.info(`ℹ️ ${data.error || "Erro ao carregar amigos"}`);
         setFriends([]);
       }
     } catch (error) {
-      // ✅ ERRO DE REDE - USAR console.debug
       console.debug("🔍 Erro de rede ao carregar amigos:", error);
       setFriends([]);
     } finally {
@@ -85,7 +82,6 @@ export default function FriendsList({ username }) {
         action: "add",
       };
 
-      // ✅ LOG DE ENVIO - USAR console.info
       console.info(`📤 Enviando solicitação para: ${friendName}`);
 
       const res = await fetch("/api/friends", {
@@ -108,7 +104,6 @@ export default function FriendsList({ username }) {
         return;
       }
 
-      // ✅ LOG DA RESPOSTA - USAR console.info (NUNCA console.error)
       console.info(
         `📡 Resposta: ${data.success ? "✅" : "ℹ️"} ${data.message || data.error || "Sem mensagem"}`,
       );
@@ -119,21 +114,18 @@ export default function FriendsList({ username }) {
         return;
       }
 
-      // ✅ TRATAR TODOS OS ERROS DE NEGÓCIO COMO INFORMAÇÃO
       if (data.success) {
         setNewFriend("");
         setSuccess(`✅ ${friendName} adicionado como amigo!`);
         await fetchFriends();
         setTimeout(() => setSuccess(""), 3000);
       } else {
-        // ✅ USAR A MENSAGEM DO SERVIDOR SEM console.error
         const errorMsg = data.error || "Erro ao adicionar amigo";
         setError(`❌ ${errorMsg}`);
-        console.info(`ℹ️ ${errorMsg}`); // 👈 NUNCA console.error
+        console.info(`ℹ️ ${errorMsg}`);
         setTimeout(() => setError(""), 3000);
       }
     } catch (error) {
-      // ✅ ERRO DE REDE - USAR console.debug
       console.debug("🔍 Erro de rede ao adicionar amigo:", error);
       setError("❌ Erro de conexão com o servidor");
       setTimeout(() => setError(""), 3000);
@@ -164,13 +156,11 @@ export default function FriendsList({ username }) {
         await fetchFriends();
         setTimeout(() => setSuccess(""), 3000);
       } else {
-        // ✅ ERRO DE NEGÓCIO - USAR console.info
         console.info(`ℹ️ ${data.error || "Erro ao remover amigo"}`);
         setError(`❌ ${data.error || "Erro ao remover amigo"}`);
         setTimeout(() => setError(""), 3000);
       }
     } catch (error) {
-      // ✅ ERRO DE REDE - USAR console.debug
       console.debug("🔍 Erro de rede ao remover amigo:", error);
       setError("❌ Erro de conexão com o servidor");
       setTimeout(() => setError(""), 3000);
@@ -231,7 +221,10 @@ export default function FriendsList({ username }) {
           ) : (
             <div style={friendsListStyle()}>
               {friends.map((friend, index) => (
-                <div key={index} style={friendItemStyle()}>
+                <div
+                  key={`friend-${index}-${friend.username}`}
+                  style={friendItemStyle()}
+                >
                   <div style={friendInfoStyle()}>
                     <span style={friendNameStyle()}>
                       {friend.username || "Desconhecido"}

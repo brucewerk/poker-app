@@ -1,12 +1,105 @@
-// components/Poker/FindingsModal.jsx
+// components/Poker/FindingsModal.jsx - CORRIGIDO
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-export default function FindingsModal({ onClose, newFindings = [] }) {
+export default function FindingsModal({ onClose, newFindings = [], username }) {
   const [findings, setFindings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [displayNewFindings, setDisplayNewFindings] = useState(newFindings);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // 🔥 TODOS OS ACHADOS DISPONÍVEIS
+  const ALL_FINDINGS = useMemo(
+    () => [
+      {
+        id: "first_hand",
+        name: "🎴 Primeira Mão",
+        description: "Jogue sua primeira mão",
+        icon: "🎴",
+        xp: 10,
+      },
+      {
+        id: "first_win_finding",
+        name: "🏆 Primeira Vitória",
+        description: "Ganhe sua primeira mão",
+        icon: "🏆",
+        xp: 15,
+      },
+      {
+        id: "ten_hands_finding",
+        name: "🎯 10 Mãos",
+        description: "Jogue 10 mãos",
+        icon: "🎯",
+        xp: 20,
+      },
+      {
+        id: "twenty_hands_finding",
+        name: "🎯 20 Mãos",
+        description: "Jogue 20 mãos",
+        icon: "🎯",
+        xp: 30,
+      },
+      {
+        id: "fifty_hands_finding",
+        name: "🎯 50 Mãos",
+        description: "Jogue 50 mãos",
+        icon: "🎯",
+        xp: 40,
+      },
+      {
+        id: "hundred_hands_finding",
+        name: "🎯 100 Mãos",
+        description: "Jogue 100 mãos",
+        icon: "🎯",
+        xp: 50,
+      },
+      {
+        id: "five_wins_finding",
+        name: "⭐ 5 Vitórias",
+        description: "Ganhe 5 mãos",
+        icon: "⭐",
+        xp: 25,
+      },
+      {
+        id: "ten_wins_finding",
+        name: "🏆 10 Vitórias",
+        description: "Ganhe 10 mãos",
+        icon: "🏆",
+        xp: 35,
+      },
+      {
+        id: "twenty_wins_finding",
+        name: "🏆 20 Vitórias",
+        description: "Ganhe 20 mãos",
+        icon: "🏆",
+        xp: 50,
+      },
+      {
+        id: "all_in_win_finding",
+        name: "⚡ All-in Vitorioso",
+        description: "Ganhe com All-in",
+        icon: "⚡",
+        xp: 40,
+      },
+      {
+        id: "big_win_finding",
+        name: "💰 Grande Vitória",
+        description: "Ganhe mais de 300 fichas",
+        icon: "💰",
+        xp: 35,
+      },
+      {
+        id: "mega_win_finding",
+        name: "💎 Mega Vitória",
+        description: "Ganhe mais de 1000 fichas",
+        icon: "💎",
+        xp: 60,
+      },
+    ],
+    [],
+  );
 
   useEffect(() => {
     if (newFindings && newFindings.length > 0) {
@@ -16,15 +109,17 @@ export default function FindingsModal({ onClose, newFindings = [] }) {
 
   useEffect(() => {
     fetchFindings();
-    const interval = setInterval(fetchFindings, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [username]);
 
   const fetchFindings = async () => {
     try {
-      const res = await fetch("/api/get-level", { cache: "no-store" });
+      const url = username
+        ? `/api/get-level?username=${encodeURIComponent(username)}&t=${Date.now()}`
+        : "/api/get-level";
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
+        // 🔥 CORREÇÃO: Usar os findings retornados pela API
         setFindings(data.findings || []);
       }
     } catch (error) {
@@ -34,61 +129,25 @@ export default function FindingsModal({ onClose, newFindings = [] }) {
     }
   };
 
-  // 🔥 LISTA ATUALIZADA DE ACHADOS (SEM FLUSH E SEQUENCIA)
-  const allFindings = [
-    {
-      id: "first_hand",
-      name: "🎴 Primeira Mão",
-      description: "Jogue sua primeira mão",
-      icon: "🎴",
-    },
-    {
-      id: "ten_hands",
-      name: "🎯 10 Mãos",
-      description: "Jogue 10 mãos",
-      icon: "🎯",
-    },
-    {
-      id: "first_win",
-      name: "🏆 Primeira Vitória",
-      description: "Ganhe sua primeira mão",
-      icon: "🏆",
-    },
-    {
-      id: "five_wins",
-      name: "⭐ 5 Vitórias",
-      description: "Ganhe 5 mãos",
-      icon: "⭐",
-    },
-    {
-      id: "twenty_hands_finding",
-      name: "🎯 20 Mãos",
-      description: "Jogue 20 mãos",
-      icon: "🎯",
-    },
-    {
-      id: "fifty_hands_finding",
-      name: "🎯 50 Mãos",
-      description: "Jogue 50 mãos",
-      icon: "🎯",
-    },
-    {
-      id: "all_in_win_finding",
-      name: "⚡ All-in Vitorioso",
-      description: "Ganhe com All-in",
-      icon: "⚡",
-    },
-    {
-      id: "ten_wins",
-      name: "🏆 10 Vitórias",
-      description: "Ganhe 10 mãos",
-      icon: "🏆",
-    },
-  ];
+  // 🔥 CORREÇÃO: Filtrar achados desbloqueados
+  const unlockedFindings = useMemo(() => {
+    return findings.filter((f) => f && f.id);
+  }, [findings]);
 
-  const unlockedIds = findings.map((f) => f.id);
-  const totalCount = allFindings.length;
-  const unlockedCount = unlockedIds.length;
+  // 🔥 CORREÇÃO: Contar apenas os desbloqueados
+  const unlockedCount = unlockedFindings.length;
+  const totalCount = ALL_FINDINGS.length;
+
+  // Filtrar por busca
+  const filteredFindings = useMemo(() => {
+    if (!searchTerm) return ALL_FINDINGS;
+    const term = searchTerm.toLowerCase();
+    return ALL_FINDINGS.filter(
+      (f) =>
+        f.name.toLowerCase().includes(term) ||
+        f.description.toLowerCase().includes(term),
+    );
+  }, [ALL_FINDINGS, searchTerm]);
 
   if (loading) {
     return (
@@ -101,37 +160,34 @@ export default function FindingsModal({ onClose, newFindings = [] }) {
     );
   }
 
+  // 🔥 IDs dos achados desbloqueados
+  const unlockedIds = new Set(unlockedFindings.map((f) => f.id));
+
   return (
-    <div style={overlayStyle()}>
-      <div style={modalStyle()}>
+    <motion.div
+      style={overlayStyle()}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        style={modalStyle()}
+        initial={{ scale: 0.9, y: 20, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 28 }}
+      >
         <button onClick={onClose} style={closeButtonStyle()}>
           ✕
         </button>
 
         <h2 style={titleStyle()}>🔍 ACHADOS</h2>
 
-        {displayNewFindings.length > 0 && (
-          <div style={newFindingsStyle()}>
-            <h3 style={{ color: "#4caf50", margin: "0 0 10px" }}>
-              🎉 Novos Achados!
-            </h3>
-            <div style={newFindingsListStyle()}>
-              {displayNewFindings.map((f, i) => (
-                <div key={i} style={newFindingItemStyle()}>
-                  <span style={findingIconStyle()}>{f.icon || "🔍"}</span>
-                  <div>
-                    <div style={findingNameStyle(true)}>{f.name}</div>
-                    <div style={findingDescStyle()}>{f.description}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
+        {/* 🔥 CORREÇÃO: Mostrar progresso CORRETO */}
         <div style={progressStyle()}>
           <span style={{ color: "#ddd" }}>
-            Progresso: {unlockedCount}/{totalCount}
+            Progresso:{" "}
+            <strong style={{ color: "gold" }}>{unlockedCount}</strong> /{" "}
+            {totalCount} descobertos
           </span>
           <div style={progressBarStyle()}>
             <div
@@ -143,22 +199,89 @@ export default function FindingsModal({ onClose, newFindings = [] }) {
           </div>
         </div>
 
-        <div style={findingsListStyle()}>
-          {allFindings.map((f) => {
-            const unlocked = unlockedIds.includes(f.id);
-            return (
-              <div key={f.id} style={findingItemStyle(unlocked)}>
-                <span style={findingIconStyle()}>
-                  {unlocked ? f.icon || "✅" : "🔒"}
-                </span>
-                <div style={findingContentStyle()}>
-                  <div style={findingNameStyle(unlocked)}>
-                    {f.name}
-                    {unlocked && " ✅"}
-                  </div>
-                  <div style={findingDescStyle()}>{f.description}</div>
-                </div>
+        {/* Novos achados */}
+        <AnimatePresence>
+          {displayNewFindings.length > 0 && (
+            <motion.div
+              style={newFindingsStyle()}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+            >
+              <h3 style={{ color: "gold", margin: "0 0 10px" }}>
+                🎉 Novos Achados!
+              </h3>
+              <div style={newFindingsListStyle()}>
+                {displayNewFindings.map((finding, i) => (
+                  <motion.div
+                    key={`new-finding-${i}-${finding.id}`}
+                    style={newFindingItemStyle()}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                  >
+                    <span style={achievementIconStyle()}>
+                      {finding.icon || "🔍"}
+                    </span>
+                    <div>
+                      <div style={achievementNameStyle(true)}>
+                        {finding.name}
+                      </div>
+                      <div style={achievementDescStyle()}>
+                        {finding.description}
+                      </div>
+                    </div>
+                    <span style={newBadgeStyle()}>🎉 NOVO!</span>
+                  </motion.div>
+                ))}
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Busca */}
+        <div style={searchContainerStyle()}>
+          <input
+            type="text"
+            placeholder="🔍 Buscar achado..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={searchInputStyle()}
+          />
+        </div>
+
+        {/* Lista de achados */}
+        <div style={findingsListStyle()}>
+          {filteredFindings.map((finding) => {
+            const unlocked = unlockedIds.has(finding.id);
+            return (
+              <motion.div
+                key={finding.id}
+                style={findingItemStyle(unlocked)}
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <span style={achievementIconStyle()}>
+                  {unlocked ? finding.icon || "✅" : "🔒"}
+                </span>
+                <div style={achievementContentStyle()}>
+                  <div style={achievementNameStyle(unlocked)}>
+                    {finding.name}
+                    {unlocked && (
+                      <span style={unlockedBadgeStyle()}>✅ DESBLOQUEADO</span>
+                    )}
+                    {!unlocked && (
+                      <span style={lockedBadgeStyle()}>🔒 BLOQUEADO</span>
+                    )}
+                  </div>
+                  <div style={achievementDescStyle()}>
+                    {finding.description}
+                  </div>
+                  {unlocked && (
+                    <div style={xpBonusStyle()}>✨ +{finding.xp || 0} XP</div>
+                  )}
+                </div>
+              </motion.div>
             );
           })}
         </div>
@@ -166,8 +289,8 @@ export default function FindingsModal({ onClose, newFindings = [] }) {
         <button onClick={onClose} style={buttonStyle()}>
           FECHAR
         </button>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -176,12 +299,13 @@ function overlayStyle() {
   return {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.9)",
+    background: "rgba(0,0,0,0.92)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1000,
     padding: 20,
+    backdropFilter: "blur(8px)",
   };
 }
 
@@ -192,11 +316,12 @@ function modalStyle() {
     borderRadius: 30,
     maxWidth: 600,
     width: "100%",
-    maxHeight: "80vh",
+    maxHeight: "85vh",
     overflowY: "auto",
     color: "white",
-    border: "2px solid #4caf50",
+    border: "2px solid gold",
     position: "relative",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
   };
 }
 
@@ -205,30 +330,34 @@ function closeButtonStyle() {
     position: "absolute",
     top: 15,
     right: 20,
-    background: "none",
+    background: "rgba(255,255,255,0.05)",
     border: "none",
     color: "white",
-    fontSize: "1.5rem",
+    fontSize: "1.3rem",
     cursor: "pointer",
-    padding: "5px",
+    padding: "5px 10px",
+    borderRadius: "50%",
+    transition: "all 0.3s ease",
   };
 }
 
 function titleStyle() {
   return {
     textAlign: "center",
-    color: "#4caf50",
+    color: "gold",
     margin: "0 0 20px",
     fontSize: "1.8rem",
+    fontWeight: "800",
+    letterSpacing: "1px",
   };
 }
 
 function progressStyle() {
   return {
     marginBottom: "20px",
-    padding: "10px",
+    padding: "12px 16px",
     background: "rgba(255,255,255,0.05)",
-    borderRadius: 10,
+    borderRadius: 12,
   };
 }
 
@@ -246,9 +375,29 @@ function progressBarStyle() {
 function progressFillStyle() {
   return {
     height: "100%",
-    background: "linear-gradient(90deg, #4caf50, #8bc34a)",
+    background: "linear-gradient(90deg, #4caf50, gold, #ff8c00)",
     borderRadius: 10,
-    transition: "width 0.5s ease",
+    transition: "width 0.8s ease",
+  };
+}
+
+function searchContainerStyle() {
+  return {
+    marginBottom: "15px",
+  };
+}
+
+function searchInputStyle() {
+  return {
+    width: "100%",
+    padding: "8px 14px",
+    borderRadius: 15,
+    border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgba(0,0,0,0.3)",
+    color: "white",
+    fontSize: "0.85rem",
+    outline: "none",
+    transition: "border-color 0.3s ease",
   };
 }
 
@@ -258,6 +407,8 @@ function findingsListStyle() {
     flexDirection: "column",
     gap: "8px",
     marginBottom: "20px",
+    maxHeight: "350px",
+    overflowY: "auto",
   };
 }
 
@@ -267,16 +418,17 @@ function findingItemStyle(unlocked) {
     alignItems: "center",
     gap: "12px",
     padding: "10px 15px",
-    borderRadius: 10,
-    background: unlocked ? "rgba(76,175,80,0.08)" : "rgba(255,255,255,0.03)",
+    borderRadius: 12,
+    background: unlocked ? "rgba(76,175,80,0.08)" : "rgba(255,255,255,0.02)",
     border: unlocked
-      ? "1px solid rgba(76,175,80,0.3)"
-      : "1px solid rgba(255,255,255,0.05)",
-    opacity: unlocked ? 1 : 0.6,
+      ? "1px solid rgba(76,175,80,0.2)"
+      : "1px solid rgba(255,255,255,0.03)",
+    opacity: unlocked ? 1 : 0.5,
+    cursor: "default",
   };
 }
 
-function findingIconStyle() {
+function achievementIconStyle() {
   return {
     fontSize: "1.5rem",
     minWidth: "40px",
@@ -284,36 +436,71 @@ function findingIconStyle() {
   };
 }
 
-function findingContentStyle() {
+function achievementContentStyle() {
   return {
     flex: 1,
   };
 }
 
-function findingNameStyle(unlocked) {
+function achievementNameStyle(unlocked) {
   return {
     fontWeight: "bold",
-    color: unlocked ? "#4caf50" : "#aaa",
-    fontSize: "0.95rem",
+    color: unlocked ? "gold" : "#aaa",
+    fontSize: "0.9rem",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
   };
 }
 
-function findingDescStyle() {
+function achievementDescStyle() {
   return {
-    fontSize: "0.8rem",
+    fontSize: "0.75rem",
     color: "#ccc",
+    marginTop: "2px",
+  };
+}
+
+function unlockedBadgeStyle() {
+  return {
+    fontSize: "0.55rem",
+    color: "#4caf50",
+    background: "rgba(76,175,80,0.15)",
+    padding: "1px 8px",
+    borderRadius: 10,
+    fontWeight: "600",
+  };
+}
+
+function lockedBadgeStyle() {
+  return {
+    fontSize: "0.55rem",
+    color: "#666",
+    background: "rgba(255,255,255,0.05)",
+    padding: "1px 8px",
+    borderRadius: 10,
+    fontWeight: "600",
+  };
+}
+
+function xpBonusStyle() {
+  return {
+    fontSize: "0.65rem",
+    color: "#4caf50",
     marginTop: "2px",
   };
 }
 
 function newFindingsStyle() {
   return {
-    background: "rgba(76,175,80,0.12)",
+    background:
+      "linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,215,0,0.05))",
     padding: "15px",
     borderRadius: 15,
     marginBottom: "20px",
-    border: "2px solid #4caf50",
-    animation: "pulse 2s ease-in-out infinite",
+    border: "2px solid gold",
+    boxShadow: "0 0 40px rgba(255,215,0,0.1)",
   };
 }
 
@@ -337,17 +524,31 @@ function newFindingItemStyle() {
   };
 }
 
+function newBadgeStyle() {
+  return {
+    fontSize: "0.6rem",
+    fontWeight: "bold",
+    color: "gold",
+    background: "rgba(255,215,0,0.2)",
+    padding: "2px 10px",
+    borderRadius: 10,
+    animation: "pulse 1.5s ease-in-out infinite",
+    marginLeft: "auto",
+  };
+}
+
 function buttonStyle() {
   return {
-    background: "radial-gradient(#4caf50,#2e7d32)",
+    background: "radial-gradient(#f7d97c,#d6a12e)",
     border: "none",
     fontWeight: "bold",
     fontSize: "1rem",
     padding: "12px 30px",
     borderRadius: 60,
     cursor: "pointer",
-    boxShadow: "0 4px 0 #1b5e20",
-    color: "white",
+    boxShadow: "0 4px 0 #7a4c1a",
+    color: "#2e241f",
     width: "100%",
+    transition: "all 0.3s ease",
   };
 }

@@ -1,8 +1,9 @@
-// components/Poker/OnlineLobby.jsx
+// components/Poker/OnlineLobby.jsx - VERSÃO PREMIUM
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
+import { motion, AnimatePresence } from "framer-motion";
 import RoomList from "./RoomList.jsx";
 
 export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
@@ -14,12 +15,13 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [createdRoomId, setCreatedRoomId] = useState("");
   const [userChips, setUserChips] = useState(0);
+  const [maxPlayers, setMaxPlayers] = useState(6);
+  const [isLoading, setIsLoading] = useState(true);
   const socketRef = useRef(null);
 
   const SOCKET_URL =
     process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
-  // ✅ Preencher com o usuário logado
   useEffect(() => {
     if (currentUser) {
       setPlayerName(currentUser);
@@ -27,7 +29,6 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
     }
   }, [currentUser]);
 
-  // ====================== BUSCAR FICHAS DO USUÁRIO ======================
   const fetchUserChips = async (username) => {
     if (!username) return;
 
@@ -40,7 +41,6 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       const data = await res.json();
       if (data.success) {
         setUserChips(data.chips || 1000);
-        console.log(`💰 ${username} tem ${data.chips} fichas no MongoDB`);
         return data.chips;
       }
     } catch (error) {
@@ -73,12 +73,14 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
     newSocket.on("connect", () => {
       setConnected(true);
       setError("");
+      setIsLoading(false);
       console.log("🟢 Conectado ao servidor Socket.IO");
     });
 
     newSocket.on("connect_error", (err) => {
       setConnected(false);
       setError(`❌ Erro de conexão: ${err.message}`);
+      setIsLoading(false);
       console.error("🔴 Erro de conexão:", err);
     });
 
@@ -133,6 +135,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
     currentSocket.emit("create-room", {
       playerName: playerName.trim(),
       initialChips: userChips,
+      maxPlayers: maxPlayers,
     });
 
     currentSocket.once("room-created", (data) => {
@@ -211,17 +214,73 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
     });
   };
 
-  // ✅ Função para fechar com "Nova Mão" automático
   const handleCancel = () => {
-    // Sinalizar que deve fazer "Nova Mão" ao voltar
     if (onCancel) {
-      onCancel(true); // ✅ Passar true para indicar "Nova Mão" automática
+      onCancel(true);
     }
   };
 
+  const copyRoomCode = () => {
+    if (createdRoomId) {
+      navigator.clipboard.writeText(createdRoomId);
+      setError("📋 Código copiado!");
+      setTimeout(() => setError(""), 3000);
+    }
+  };
+
+  // NOVO: Seletor de número de jogadores com design premium
+  const PlayerCountSelector = () => (
+    <div style={playerCountStyle()}>
+      <label style={labelStyle()}>👥 Número de jogadores:</label>
+      <div style={buttonGroupStyle()}>
+        {[2, 3, 4, 5, 6].map((num) => (
+          <motion.button
+            key={num}
+            onClick={() => setMaxPlayers(num)}
+            style={playerCountButtonStyle(num === maxPlayers)}
+            disabled={isConnecting}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            {num}
+          </motion.button>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <div style={overlayStyle()}>
+        <div style={modalStyle()}>
+          <div style={loadingContainerStyle()}>
+            <motion.div
+              style={loadingSpinnerStyle()}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            >
+              🎴
+            </motion.div>
+            <p style={loadingTextStyle()}>Conectando ao servidor...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={overlayStyle()}>
-      <div style={modalStyle()}>
+    <motion.div
+      style={overlayStyle()}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        style={modalStyle()}
+        initial={{ scale: 0.9, y: 20, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 28 }}
+      >
         <button onClick={handleCancel} style={cancelButtonStyle()}>
           ✕
         </button>
@@ -229,24 +288,32 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         <h2 style={titleStyle()}>🌐 JOGAR ONLINE</h2>
 
         <div style={statusStyle()}>
-          <span
+          <motion.span
             style={{
               color: connected ? "#4caf50" : "#f44336",
               fontWeight: "bold",
             }}
+            animate={{
+              opacity: connected ? [1, 0.7, 1] : 1,
+            }}
+            transition={{ duration: 2, repeat: Infinity }}
           >
             {connected ? "🟢 Conectado ao servidor" : "🔴 Desconectado"}
-          </span>
+          </motion.span>
         </div>
 
         {!connected && (
-          <div style={warningStyle()}>
+          <motion.div
+            style={warningStyle()}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
             ⚠️ Servidor Socket.IO não está rodando!
             <br />
             <span style={{ fontSize: "0.8rem", color: "#888" }}>
               URL: {SOCKET_URL}
             </span>
-          </div>
+          </motion.div>
         )}
 
         <div style={inputGroupStyle()}>
@@ -267,24 +334,35 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
           <span style={chipsHintStyle()}> (saldo global do MongoDB)</span>
         </div>
 
+        <PlayerCountSelector />
+
         {createdRoomId && (
-          <div style={successStyle()}>
+          <motion.div
+            style={successStyle()}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
             ✅ Sala criada: <strong>{createdRoomId}</strong>
+            <button onClick={copyRoomCode} style={copyButtonStyle()}>
+              📋 Copiar
+            </button>
             <br />
             <span style={{ fontSize: "0.8rem", color: "#aaa" }}>
               Compartilhe este código com seus amigos!
             </span>
-          </div>
+          </motion.div>
         )}
 
         <div style={buttonGroupStyle()}>
-          <button
+          <motion.button
             onClick={createRoom}
             style={buttonStyle(connected && !isConnecting)}
             disabled={!connected || isConnecting}
+            whileHover={{ scale: connected && !isConnecting ? 1.02 : 1 }}
+            whileTap={{ scale: connected && !isConnecting ? 0.98 : 1 }}
           >
             {isConnecting ? "⏳ Criando..." : "🆕 Criar Sala"}
-          </button>
+          </motion.button>
         </div>
 
         <div style={dividerStyle()}>OU</div>
@@ -302,27 +380,41 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
           />
         </div>
 
-        <button
+        <motion.button
           onClick={() => joinRoom()}
           style={buttonStyle(connected && !isConnecting && roomId.trim())}
           disabled={!connected || isConnecting || !roomId.trim()}
+          whileHover={{
+            scale: connected && !isConnecting && roomId.trim() ? 1.02 : 1,
+          }}
+          whileTap={{
+            scale: connected && !isConnecting && roomId.trim() ? 0.98 : 1,
+          }}
         >
           {isConnecting ? "⏳ Entrando..." : "🔗 Entrar na Sala"}
-        </button>
+        </motion.button>
 
         <RoomList socket={socket} onJoinRoom={joinRoom} />
 
-        {error && <div style={errorStyle()}>{error}</div>}
+        {error && (
+          <motion.div
+            style={errorStyle()}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            {error}
+          </motion.div>
+        )}
 
         <div style={infoStyle()}>
-          💡 Dica: Abra outra janela do navegador para testar!
+          💡 Dica: Abra várias janelas para testar com múltiplos jogadores!
           <br />
           <span style={{ fontSize: "0.7rem", color: "#666" }}>
             Servidor: {SOCKET_URL}
           </span>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -337,6 +429,7 @@ function overlayStyle() {
     alignItems: "center",
     zIndex: 1000,
     padding: 20,
+    backdropFilter: "blur(8px)",
   };
 }
 
@@ -352,6 +445,7 @@ function modalStyle() {
     maxHeight: "90vh",
     overflowY: "auto",
     position: "relative",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
   };
 }
 
@@ -360,13 +454,13 @@ function cancelButtonStyle() {
     position: "absolute",
     top: 15,
     right: 20,
-    background: "none",
+    background: "rgba(255,255,255,0.05)",
     border: "none",
     color: "#f44336",
-    fontSize: "1.5rem",
+    fontSize: "1.3rem",
     cursor: "pointer",
     padding: "5px 10px",
-    borderRadius: 10,
+    borderRadius: "50%",
     transition: "all 0.3s ease",
   };
 }
@@ -377,6 +471,8 @@ function titleStyle() {
     color: "gold",
     margin: "0 0 15px",
     fontSize: "1.8rem",
+    fontWeight: "800",
+    letterSpacing: "1px",
   };
 }
 
@@ -461,7 +557,10 @@ function inputHintStyle() {
 
 function buttonGroupStyle() {
   return {
+    display: "flex",
+    gap: "8px",
     marginBottom: "15px",
+    justifyContent: "center",
   };
 }
 
@@ -481,6 +580,29 @@ function buttonStyle(enabled) {
     width: "100%",
     opacity: enabled ? 1 : 0.5,
     transition: "all 0.3s ease",
+  };
+}
+
+function playerCountStyle() {
+  return {
+    marginBottom: "15px",
+  };
+}
+
+function playerCountButtonStyle(active) {
+  return {
+    background: active
+      ? "radial-gradient(#f7d97c,#d6a12e)"
+      : "rgba(255,255,255,0.1)",
+    border: active ? "none" : "1px solid rgba(255,255,255,0.2)",
+    color: active ? "#2e241f" : "#888",
+    padding: "8px 16px",
+    borderRadius: 20,
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "0.9rem",
+    transition: "all 0.3s ease",
+    flex: 1,
   };
 }
 
@@ -506,6 +628,19 @@ function successStyle() {
   };
 }
 
+function copyButtonStyle() {
+  return {
+    background: "rgba(255,255,255,0.1)",
+    border: "none",
+    borderRadius: 10,
+    padding: "2px 10px",
+    color: "#aaa",
+    cursor: "pointer",
+    fontSize: "0.7rem",
+    marginLeft: "8px",
+  };
+}
+
 function errorStyle() {
   return {
     marginTop: "15px",
@@ -528,5 +663,29 @@ function infoStyle() {
     textAlign: "center",
     fontSize: "0.8rem",
     lineHeight: "1.6",
+  };
+}
+
+function loadingContainerStyle() {
+  return {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "40px 20px",
+  };
+}
+
+function loadingSpinnerStyle() {
+  return {
+    fontSize: "4rem",
+    marginBottom: "20px",
+  };
+}
+
+function loadingTextStyle() {
+  return {
+    color: "#aaa",
+    fontSize: "1rem",
   };
 }

@@ -14,7 +14,6 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
   const [notification, setNotification] = useState(null);
   const [claimedIds, setClaimedIds] = useState(new Set());
 
-  // 🔥 CARREGAR MISSÕES
   const fetchMissions = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -42,13 +41,11 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
         setCompletedCount(data.completedCount || 0);
         setTotalCount(data.totalCount || validMissions.length);
 
-        // 🔥 ATUALIZAR SET DE IDs REIVINDICADOS
         const claimed = new Set(
           validMissions.filter((m) => m.claimed === true).map((m) => m.id),
         );
         setClaimedIds(claimed);
 
-        // 🔥 VERIFICAR NOVAS MISSÕES COMPLETADAS
         if (!silent) {
           const newCompleted = validMissions.filter(
             (m) => m.completed && !m.claimed,
@@ -70,7 +67,6 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
     }
   };
 
-  // 🔥 INICIALIZAR
   useEffect(() => {
     if (username) {
       fetchMissions();
@@ -101,9 +97,7 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
     }, 10000);
   };
 
-  // 🔥 REIVINDICAR RECOMPENSA
   const claimReward = async (missionId) => {
-    // 🔥 VERIFICAR SE JÁ FOI REIVINDICADA
     if (claimedIds.has(missionId)) {
       setNotification("⚠️ Esta missão já foi reivindicada!");
       setTimeout(() => setNotification(null), 3000);
@@ -132,17 +126,14 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
       }
 
       if (data.success) {
-        // 🔥 ATUALIZAR ESTADO LOCAL IMEDIATAMENTE
         setClaimedIds((prev) => new Set([...prev, missionId]));
 
-        // 🔥 ATUALIZAR MISSÃO LOCALMENTE
         setMissions((prev) =>
           prev.map((m) =>
             m.id === missionId ? { ...m, claimed: true, completed: true } : m,
           ),
         );
 
-        // 🔥 ATUALIZAR FICHAS
         if (data.chips !== undefined && onChipsUpdated) {
           onChipsUpdated(data.chips);
         }
@@ -163,10 +154,8 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
           }, 1000);
         }
 
-        // 🔥 FORÇAR RECARREGAMENTO PARA SINCRONIZAR
         setTimeout(() => fetchMissions(true), 100);
       } else {
-        // 🔥 SE O SERVIDOR DISSE QUE JÁ FOI REIVINDICADA
         if (data.error?.includes("já foi reivindicada")) {
           setClaimedIds((prev) => new Set([...prev, missionId]));
           setMissions((prev) =>
@@ -226,7 +215,6 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
         <div style={missionsListStyle()}>
           {missions.map((mission, index) => {
             const isCompleted = mission.completed || false;
-            // 🔥 VERIFICAR SE FOI REIVINDICADA (PELO ESTADO LOCAL OU PELO BANCO)
             const isClaimed = mission.claimed || claimedIds.has(mission.id);
             const progress = mission.progress || 0;
             const progressPercent = Math.round(progress * 100);
@@ -237,7 +225,7 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
 
             return (
               <div
-                key={mission.id || index}
+                key={mission.id || `mission-${index}-${mission.name}`}
                 style={missionItemStyle(isCompleted)}
               >
                 <div style={missionHeaderStyle()}>
@@ -285,7 +273,6 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
                     </span>
                   )}
 
-                  {/* 🔥 BOTÃO SÓ APARECE SE COMPLETADA E NÃO REIVINDICADA */}
                   {isCompleted && !isClaimed && (
                     <button
                       onClick={() => claimReward(mission.id)}

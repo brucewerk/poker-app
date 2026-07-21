@@ -1,4 +1,4 @@
-// app/api/auth/[...nextauth]/route.js
+// app/api/auth/[...nextauth]/route.js - AJUSTE DO ERRO SILENCIOSO
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
@@ -18,14 +18,14 @@ export const authOptions = {
           await dbConnect();
 
           if (!credentials?.username || !credentials?.password) {
-            console.error("❌ Credenciais incompletas");
+            // 🔥 RETORNAR NULL EM VEZ DE LANÇAR ERRO
             return null;
           }
 
           const user = await User.findOne({ username: credentials.username });
 
           if (!user) {
-            console.error(`❌ Usuário não encontrado: ${credentials.username}`);
+            // 🔥 RETORNAR NULL EM VEZ DE LANÇAR ERRO
             return null;
           }
 
@@ -35,7 +35,7 @@ export const authOptions = {
           );
 
           if (!isValid) {
-            console.error(`❌ Senha inválida para: ${credentials.username}`);
+            // 🔥 RETORNAR NULL EM VEZ DE LANÇAR ERRO
             return null;
           }
 
@@ -85,6 +85,17 @@ export const authOptions = {
   debug: false,
   pages: {
     signIn: "/login",
+  },
+  logger: {
+    error: (code, ...message) => {
+      console.error(`❌ NextAuth Error [${code}]:`, ...message);
+    },
+    warn: (code, ...message) => {
+      console.warn(`⚠️ NextAuth Warning [${code}]:`, ...message);
+    },
+    debug: (code, ...message) => {
+      // Não logar debug
+    },
   },
 };
 
