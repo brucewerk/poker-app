@@ -1,4 +1,4 @@
-// components/Poker/Chat.jsx - VERSÃO PREMIUM COM EMOJIS
+// components/Poker/Chat.jsx - VERSÃO PREMIUM COM EMOJIS E CORRIGIDA
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -38,6 +38,24 @@ export default function Chat({ socket, roomId, playerName }) {
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
+
+  // 🔥 ADICIONAR ESTILOS GLOBAIS NO CLIENTE APENAS
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      !document.getElementById("chat-styles")
+    ) {
+      const styleSheet = document.createElement("style");
+      styleSheet.id = "chat-styles";
+      styleSheet.textContent = `
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(styleSheet);
+    }
+  }, []);
 
   useEffect(() => {
     if (!socket) return;

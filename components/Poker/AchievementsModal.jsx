@@ -1,42 +1,308 @@
-// components/Poker/AchievementsModal.jsx - VERSÃO PREMIUM
+// components/Poker/AchievementsModal.jsx - CORRIGIDO (carregamento)
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { ACHIEVEMENTS, getAchievementsByRarity } from "@/lib/achievements";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+// 🔥 CONQUISTAS (mantidas as 26 originais)
+const ACHIEVEMENTS = [
+  {
+    id: "first_win",
+    name: "Primeira Vitória",
+    description: "Ganhe sua primeira mão",
+    category: "Comum",
+    xpBonus: 10,
+    icon: "🎯",
+  },
+  {
+    id: "win_5",
+    name: "Cinco Seguidas!",
+    description: "Ganhe 5 mãos consecutivas",
+    category: "Comum",
+    xpBonus: 25,
+    icon: "🔥",
+  },
+  {
+    id: "win_10",
+    name: "Dez Seguidas!",
+    description: "Ganhe 10 mãos consecutivas",
+    category: "Comum",
+    xpBonus: 50,
+    icon: "⚡",
+  },
+  {
+    id: "flush",
+    name: "Flush!",
+    description: "Ganhe com um Flush",
+    category: "Comum",
+    xpBonus: 30,
+    icon: "♠️",
+  },
+  {
+    id: "full_house",
+    name: "Full House!",
+    description: "Ganhe com um Full House",
+    category: "Incomum",
+    xpBonus: 50,
+    icon: "🏠",
+  },
+  {
+    id: "four_of_kind",
+    name: "Quadra!",
+    description: "Ganhe com uma Quadra",
+    category: "Incomum",
+    xpBonus: 75,
+    icon: "4️⃣",
+  },
+  {
+    id: "straight_flush",
+    name: "Straight Flush!",
+    description: "Ganhe com um Straight Flush",
+    category: "Raro",
+    xpBonus: 100,
+    icon: "🌈",
+  },
+  {
+    id: "royal_flush",
+    name: "Royal Flush!",
+    description: "Ganhe com um Royal Flush - A MAIOR MÃO DO POKER!",
+    category: "Lendário",
+    xpBonus: 200,
+    icon: "👑",
+  },
+  {
+    id: "all_in_win",
+    name: "All-In Vitorioso!",
+    description: "Ganhe uma mão após ir All-In",
+    category: "Incomum",
+    xpBonus: 40,
+    icon: "⚔️",
+  },
+  {
+    id: "comeback",
+    name: "Virada!",
+    description: "Ganhe uma mão com menos de 20% de chance",
+    category: "Raro",
+    xpBonus: 60,
+    icon: "🔄",
+  },
+  {
+    id: "big_pot",
+    name: "Pote Gigante!",
+    description: "Ganhe um pote com mais de 500 fichas",
+    category: "Incomum",
+    xpBonus: 35,
+    icon: "💰",
+  },
+  {
+    id: "win_50",
+    name: "50 Vitórias!",
+    description: "Ganhe 50 mãos no total",
+    category: "Raro",
+    xpBonus: 80,
+    icon: "🏆",
+  },
+  {
+    id: "win_100",
+    name: "100 Vitórias!",
+    description: "Ganhe 100 mãos no total",
+    category: "Épico",
+    xpBonus: 120,
+    icon: "🌟",
+  },
+  {
+    id: "win_500",
+    name: "500 Vitórias!",
+    description: "Ganhe 500 mãos no total",
+    category: "Lendário",
+    xpBonus: 200,
+    icon: "💎",
+  },
+  {
+    id: "poker_god",
+    name: "Deus do Poker!",
+    description: "Ganhe 1000 mãos no total",
+    category: "Mítico",
+    xpBonus: 500,
+    icon: "⚡",
+  },
+  {
+    id: "flop_100",
+    name: "Flopmaníaco",
+    description: "Veja 100 flops",
+    category: "Comum",
+    xpBonus: 15,
+    icon: "🎴",
+  },
+  {
+    id: "turn_100",
+    name: "Turnista",
+    description: "Veja 100 turns",
+    category: "Comum",
+    xpBonus: 15,
+    icon: "🔄",
+  },
+  {
+    id: "river_100",
+    name: "Reveriano",
+    description: "Veja 100 rivers",
+    category: "Comum",
+    xpBonus: 15,
+    icon: "🌊",
+  },
+  {
+    id: "bluff_10",
+    name: "Bluffer",
+    description: "Dê 10 blefes bem-sucedidos",
+    category: "Raro",
+    xpBonus: 40,
+    icon: "🎭",
+  },
+  {
+    id: "all_in_10",
+    name: "All-In",
+    description: "Vá All-In 10 vezes",
+    category: "Incomum",
+    xpBonus: 25,
+    icon: "⚡",
+  },
+  {
+    id: "chips_1000",
+    name: "Milionário",
+    description: "Acumule 1000 fichas",
+    category: "Incomum",
+    xpBonus: 30,
+    icon: "💎",
+  },
+  {
+    id: "chips_10000",
+    name: "Magnata",
+    description: "Acumule 10000 fichas",
+    category: "Épico",
+    xpBonus: 100,
+    icon: "💰",
+  },
+  {
+    id: "chips_100000",
+    name: "Bilionário",
+    description: "Acumule 100000 fichas",
+    category: "Lendário",
+    xpBonus: 250,
+    icon: "💎",
+  },
+  {
+    id: "win_streak_5",
+    name: "Sequência de 5",
+    description: "Ganhe 5 mãos seguidas",
+    category: "Incomum",
+    xpBonus: 30,
+    icon: "🔥",
+  },
+  {
+    id: "win_streak_10",
+    name: "Sequência de 10",
+    description: "Ganhe 10 mãos seguidas",
+    category: "Raro",
+    xpBonus: 60,
+    icon: "⚡",
+  },
+  {
+    id: "win_streak_20",
+    name: "Sequência de 20",
+    description: "Ganhe 20 mãos seguidas",
+    category: "Épico",
+    xpBonus: 120,
+    icon: "🌟",
+  },
+];
+
+const CATEGORY_COLORS = {
+  Comum: "#8a8a8a",
+  Incomum: "#4caf50",
+  Raro: "#2196f3",
+  Épico: "#9c27b0",
+  Lendário: "#ff9800",
+  Mítico: "#f44336",
+};
+
+const CATEGORY_ICONS = {
+  Comum: "🟤",
+  Incomum: "🟢",
+  Raro: "🔵",
+  Épico: "🟣",
+  Lendário: "🟠",
+  Mítico: "🔴",
+};
 
 export default function AchievementsModal({
   onClose,
   newAchievements = [],
   username,
 }) {
-  const [achievements, setAchievements] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [userAchievements, setUserAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [displayNewAchievements, setDisplayNewAchievements] =
-    useState(newAchievements);
-  const [selectedRarity, setSelectedRarity] = useState("todos");
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [searchTerm, setSearchTerm] = useState("");
+  const [highlightedIds, setHighlightedIds] = useState([]);
 
-  const allAchievements = Object.values(ACHIEVEMENTS);
-  const unlockedIds = achievements.map((a) => a.id);
-  const totalCount = allAchievements.length;
-  const unlockedCount = unlockedIds.length;
+  // 🔥 Buscar conquistas do usuário
+  useEffect(() => {
+    const fetchUserAchievements = async () => {
+      if (!username) {
+        setLoading(false);
+        return;
+      }
 
-  // Conquistas por raridade
-  const achievementsByRarity = useMemo(() => getAchievementsByRarity(), []);
+      try {
+        const res = await fetch(
+          `/api/get-stats?username=${encodeURIComponent(username)}`,
+        );
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        if (data.success && data.achievements) {
+          setUserAchievements(data.achievements);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar conquistas:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Filtrar conquistas
+    fetchUserAchievements();
+  }, [username]);
+
+  // 🔥 Destacar novas conquistas
+  useEffect(() => {
+    if (newAchievements && newAchievements.length > 0) {
+      const ids = newAchievements.map((a) => a.id);
+      setHighlightedIds(ids);
+
+      const timer = setTimeout(() => {
+        setHighlightedIds([]);
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [newAchievements]);
+
+  // 🔥 Categorias
+  const categories = useMemo(() => {
+    const cats = ["Todos", ...new Set(ACHIEVEMENTS.map((a) => a.category))];
+    return cats;
+  }, []);
+
+  // 🔥 Conquistas filtradas
   const filteredAchievements = useMemo(() => {
-    let filtered = allAchievements;
+    let filtered = ACHIEVEMENTS;
 
-    if (selectedRarity !== "todos") {
-      filtered = filtered.filter(
-        (a) => (a.rarity || "comum") === selectedRarity,
-      );
+    if (selectedCategory !== "Todos") {
+      filtered = filtered.filter((a) => a.category === selectedCategory);
     }
 
-    if (searchTerm) {
+    if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (a) =>
@@ -46,66 +312,49 @@ export default function AchievementsModal({
     }
 
     return filtered;
-  }, [allAchievements, selectedRarity, searchTerm]);
+  }, [selectedCategory, searchTerm]);
 
-  useEffect(() => {
-    if (newAchievements && newAchievements.length > 0) {
-      setDisplayNewAchievements(newAchievements);
+  // 🔥 Verificar se conquista está desbloqueada
+  const isUnlocked = useCallback(
+    (achievementId) => {
+      return userAchievements.some((a) => a.id === achievementId);
+    },
+    [userAchievements],
+  );
+
+  // 🔥 Verificar se é nova
+  const isNew = useCallback(
+    (achievementId) => {
+      return highlightedIds.includes(achievementId);
+    },
+    [highlightedIds],
+  );
+
+  // 🔥 Contagem por categoria
+  const getCategoryCount = useCallback((category) => {
+    if (category === "Todos") {
+      return ACHIEVEMENTS.length;
     }
-  }, [newAchievements]);
+    return ACHIEVEMENTS.filter((a) => a.category === category).length;
+  }, []);
 
-  useEffect(() => {
-    fetchAchievements();
-    const interval = setInterval(fetchAchievements, 5000);
-    return () => clearInterval(interval);
-  }, [username]);
-
-  const fetchAchievements = async () => {
-    try {
-      const url = username
-        ? `/api/get-stats?username=${encodeURIComponent(username)}&t=${Date.now()}`
-        : "/api/get-stats";
-      const res = await fetch(url, { cache: "no-store" });
-      const data = await res.json();
-      if (data.success) {
-        setAchievements(data.achievements || []);
-        setStats(data.stats);
-        if (data.newAchievements && data.newAchievements.length > 0) {
-          setDisplayNewAchievements(data.newAchievements);
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao carregar conquistas:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Cores por raridade
-  const rarityColors = {
-    comum: "#8BC34A",
-    incomum: "#4CAF50",
-    raro: "#2196F3",
-    épico: "#9C27B0",
-    lendário: "#FF6F00",
-  };
-
-  const rarityLabels = {
-    comum: "Comum",
-    incomum: "Incomum",
-    raro: "Raro",
-    épico: "Épico",
-    lendário: "Lendário",
-  };
-
-  const rarityOrder = ["comum", "incomum", "raro", "épico", "lendário"];
+  // 🔥 Contagem desbloqueada por categoria
+  const getUnlockedCount = useCallback(
+    (category) => {
+      const achievements =
+        category === "Todos"
+          ? ACHIEVEMENTS
+          : ACHIEVEMENTS.filter((a) => a.category === category);
+      return achievements.filter((a) => isUnlocked(a.id)).length;
+    },
+    [isUnlocked],
+  );
 
   if (loading) {
     return (
-      <div style={overlayStyle()}>
+      <div style={overlayStyle()} onClick={onClose}>
         <div style={modalStyle()}>
-          <h2 style={titleStyle()}>🏅 CONQUISTAS</h2>
-          <p style={{ textAlign: "center", color: "#aaa" }}>Carregando...</p>
+          <div style={loadingStyle()}>Carregando conquistas...</div>
         </div>
       </div>
     );
@@ -117,270 +366,303 @@ export default function AchievementsModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      onClick={onClose}
     >
       <motion.div
         style={modalStyle()}
-        initial={{ scale: 0.9, y: 20, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
         transition={{ type: "spring", stiffness: 400, damping: 28 }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onClose} style={closeButtonStyle()}>
-          ✕
-        </button>
-
-        <h2 style={titleStyle()}>🏅 CONQUISTAS</h2>
-
-        {/* Novas conquistas */}
-        <AnimatePresence>
-          {displayNewAchievements.length > 0 && (
-            <motion.div
-              style={newAchievementsStyle()}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-            >
-              <h3 style={{ color: "gold", margin: "0 0 10px" }}>
-                🎉 Novas Conquistas!
-              </h3>
-              <div style={newAchievementListStyle()}>
-                {displayNewAchievements.map((ach, i) => (
-                  <motion.div
-                    key={`new-ach-${i}-${ach.id || ach.name}`}
-                    style={newAchievementItemStyle()}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                  >
-                    <span style={achievementIconStyle()}>
-                      {ach.icon || "🏅"}
-                    </span>
-                    <div>
-                      <div style={achievementNameStyle(true)}>{ach.name}</div>
-                      <div style={achievementDescStyle()}>
-                        {ach.description}
-                      </div>
-                    </div>
-                    <span style={newBadgeStyle()}>🎉 NOVA!</span>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Barra de progresso */}
-        <div style={progressStyle()}>
-          <span style={{ color: "#ddd" }}>
-            Progresso: {unlockedCount}/{totalCount}
-          </span>
-          <div style={progressBarStyle()}>
-            <div
-              style={{
-                ...progressFillStyle(),
-                width: `${(unlockedCount / totalCount) * 100}%`,
-              }}
-            />
-          </div>
+        <div style={headerStyle()}>
+          <h2 style={titleStyle()}>🏆 CONQUISTAS</h2>
+          <button onClick={onClose} style={closeStyle()}>
+            ✕
+          </button>
         </div>
 
-        {/* Filtros */}
-        <div style={filtersStyle()}>
-          <div style={rarityFiltersStyle()}>
-            <button
-              onClick={() => setSelectedRarity("todos")}
-              style={filterButtonStyle(selectedRarity === "todos")}
-            >
-              Todos ({totalCount})
-            </button>
-            {rarityOrder.map((rarity) => (
-              <button
-                key={rarity}
-                onClick={() => setSelectedRarity(rarity)}
-                style={{
-                  ...filterButtonStyle(selectedRarity === rarity),
-                  color:
-                    selectedRarity === rarity ? rarityColors[rarity] : "#888",
-                  borderColor:
-                    selectedRarity === rarity
-                      ? rarityColors[rarity]
-                      : "transparent",
-                }}
-              >
-                {rarityLabels[rarity]} (
-                {achievementsByRarity[rarity]?.length || 0})
-              </button>
-            ))}
+        {newAchievements && newAchievements.length > 0 && (
+          <div style={newBadgeContainerStyle()}>
+            <span style={newBadgeStyle()}>🎉 Novas Conquistas!</span>
+            <div style={newAchievementsListStyle()}>
+              {newAchievements.map((ach) => (
+                <span key={ach.id} style={newAchievementItemStyle()}>
+                  {ach.icon || "🏅"} {ach.name}
+                </span>
+              ))}
+            </div>
           </div>
+        )}
+
+        <div style={progressContainerStyle()}>
+          <span style={progressTextStyle()}>
+            Progresso: {getUnlockedCount("Todos")}/{ACHIEVEMENTS.length}
+          </span>
+        </div>
+
+        <div style={categoriesStyle()}>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              style={categoryButtonStyle(selectedCategory === cat, cat)}
+            >
+              {cat === "Todos" ? "📋" : CATEGORY_ICONS[cat] || "🏅"} {cat}
+              <span style={categoryCountStyle()}>
+                {getUnlockedCount(cat)}/{getCategoryCount(cat)}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div style={searchContainerStyle()}>
           <input
             type="text"
-            placeholder="🔍 Buscar conquista..."
+            placeholder="Buscar conquista..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={searchInputStyle()}
           />
         </div>
 
-        {/* Lista de conquistas */}
         <div style={achievementsListStyle()}>
-          {filteredAchievements.map((ach) => {
-            const unlocked = unlockedIds.includes(ach.id);
-            const rarity = ach.rarity || "comum";
-            return (
-              <motion.div
-                key={ach.id}
-                style={achievementItemStyle(unlocked, rarity)}
-                whileHover={{ scale: 1.02 }}
-                transition={{ type: "spring", stiffness: 300 }}
-              >
-                <span style={achievementIconStyle()}>
-                  {unlocked ? ach.icon || "✅" : "🔒"}
-                </span>
-                <div style={achievementContentStyle()}>
-                  <div style={achievementNameStyle(unlocked)}>
-                    {ach.name}
-                    <span
-                      style={{
-                        ...rarityBadgeStyle(),
-                        color: rarityColors[rarity],
-                        borderColor: rarityColors[rarity],
-                      }}
-                    >
-                      {rarityLabels[rarity]}
-                    </span>
+          {filteredAchievements.length === 0 ? (
+            <p style={emptyStyle()}>Nenhuma conquista encontrada</p>
+          ) : (
+            filteredAchievements.map((ach) => {
+              const unlocked = isUnlocked(ach.id);
+              const newAchievement = isNew(ach.id);
+              return (
+                <motion.div
+                  key={ach.id}
+                  style={achievementItemStyle(unlocked, newAchievement)}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div style={achievementIconStyle(unlocked)}>
+                    {unlocked ? ach.icon : "🔒"}
                   </div>
-                  <div style={achievementDescStyle()}>{ach.description}</div>
-                  {unlocked && (
-                    <div style={xpBonusStyle()}>✨ +{ach.xpBonus} XP</div>
-                  )}
-                </div>
-                {unlocked && <span style={unlockedBadgeStyle()}>✅</span>}
-              </motion.div>
-            );
-          })}
+                  <div style={achievementInfoStyle()}>
+                    <div style={achievementNameStyle(unlocked, newAchievement)}>
+                      {ach.name}
+                      {newAchievement && (
+                        <span style={newTagStyle()}>NOVA</span>
+                      )}
+                    </div>
+                    <div style={achievementDescStyle(unlocked)}>
+                      {ach.description}
+                    </div>
+                    <div style={achievementMetaStyle()}>
+                      <span style={achievementCategoryStyle(ach.category)}>
+                        {CATEGORY_ICONS[ach.category] || "🏅"} {ach.category}
+                      </span>
+                      {ach.xpBonus > 0 && (
+                        <span style={achievementXpStyle()}>
+                          +{ach.xpBonus} XP
+                        </span>
+                      )}
+                      {unlocked && (
+                        <span style={unlockedBadgeStyle()}>
+                          ✅ DESBLOQUEADA
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={achievementStatusStyle(unlocked)}>
+                    {unlocked ? "✅" : "⏳"}
+                  </div>
+                </motion.div>
+              );
+            })
+          )}
         </div>
 
-        <button onClick={onClose} style={buttonStyle()}>
-          FECHAR
-        </button>
+        <div style={footerStyle()}>
+          <button onClick={onClose} style={footerButtonStyle()}>
+            FECHAR
+          </button>
+        </div>
       </motion.div>
     </motion.div>
   );
 }
 
-// ====================== ESTILOS PREMIUM ======================
+// ============================================================
+// 🎨 ESTILOS (SEM ROLAGEM HORIZONTAL)
+// ============================================================
+
 function overlayStyle() {
   return {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.92)",
+    background: "rgba(0,0,0,0.85)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 1000,
-    padding: 20,
-    backdropFilter: "blur(8px)",
+    zIndex: 3000,
+    padding: "20px",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
   };
 }
 
 function modalStyle() {
   return {
-    background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
-    padding: "30px 35px",
-    borderRadius: 30,
-    maxWidth: 650,
+    background: "var(--bg-modal)",
+    borderRadius: 24,
+    padding: "24px 28px",
+    maxWidth: "540px",
     width: "100%",
     maxHeight: "85vh",
     overflowY: "auto",
-    color: "white",
-    border: "2px solid gold",
-    position: "relative",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+    color: "var(--text-primary)",
+    border: "2px solid var(--border-gold)",
+    boxShadow: "0 20px 60px var(--shadow-dark)",
+    scrollbarWidth: "thin",
+    scrollbarColor: "rgba(255,215,0,0.3) transparent",
+    boxSizing: "border-box",
+    overflowX: "hidden",
   };
 }
 
-function closeButtonStyle() {
+function loadingStyle() {
   return {
-    position: "absolute",
-    top: 15,
-    right: 20,
-    background: "rgba(255,255,255,0.05)",
-    border: "none",
-    color: "white",
-    fontSize: "1.3rem",
-    cursor: "pointer",
-    padding: "5px 10px",
-    borderRadius: "50%",
-    transition: "all 0.3s ease",
+    textAlign: "center",
+    color: "var(--text-muted)",
+    padding: "30px 0",
+    fontSize: "1rem",
+  };
+}
+
+function headerStyle() {
+  return {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "12px",
+    paddingBottom: "12px",
+    borderBottom: "1px solid var(--border-light)",
   };
 }
 
 function titleStyle() {
   return {
-    textAlign: "center",
     color: "gold",
-    margin: "0 0 20px",
-    fontSize: "1.8rem",
-    fontWeight: "800",
-    letterSpacing: "1px",
+    margin: 0,
+    fontSize: "1.4rem",
+    fontWeight: "bold",
   };
 }
 
-function progressStyle() {
+function closeStyle() {
   return {
-    marginBottom: "20px",
-    padding: "12px 16px",
-    background: "rgba(255,255,255,0.05)",
+    background: "none",
+    border: "none",
+    color: "#888",
+    fontSize: "1.3rem",
+    cursor: "pointer",
+    padding: "4px 8px",
+    borderRadius: 8,
+    transition: "all 0.3s ease",
+  };
+}
+
+function newBadgeContainerStyle() {
+  return {
+    background: "rgba(255,215,0,0.1)",
+    border: "1px solid gold",
     borderRadius: 12,
+    padding: "8px 14px",
+    marginBottom: "14px",
   };
 }
 
-function progressBarStyle() {
+function newBadgeStyle() {
   return {
-    width: "100%",
-    height: "8px",
-    background: "rgba(255,255,255,0.1)",
-    borderRadius: 10,
-    marginTop: "5px",
-    overflow: "hidden",
+    display: "block",
+    fontWeight: "bold",
+    color: "gold",
+    fontSize: "0.9rem",
+    marginBottom: "4px",
   };
 }
 
-function progressFillStyle() {
-  return {
-    height: "100%",
-    background: "linear-gradient(90deg, #4caf50, gold, #ff8c00)",
-    borderRadius: 10,
-    transition: "width 0.8s ease",
-  };
-}
-
-function filtersStyle() {
+function newAchievementsListStyle() {
   return {
     display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    marginBottom: "15px",
-  };
-}
-
-function rarityFiltersStyle() {
-  return {
-    display: "flex",
-    gap: "6px",
     flexWrap: "wrap",
+    gap: "6px",
   };
 }
 
-function filterButtonStyle(active) {
+function newAchievementItemStyle() {
   return {
-    background: active ? "rgba(255,215,0,0.15)" : "rgba(255,255,255,0.03)",
-    border: active ? "1px solid gold" : "1px solid rgba(255,255,255,0.05)",
-    borderRadius: 15,
+    background: "rgba(255,215,0,0.15)",
+    padding: "2px 10px",
+    borderRadius: 12,
+    fontSize: "0.8rem",
+    color: "gold",
+  };
+}
+
+function progressContainerStyle() {
+  return {
+    marginBottom: "12px",
+    textAlign: "center",
+  };
+}
+
+function progressTextStyle() {
+  return {
+    fontSize: "0.85rem",
+    color: "var(--text-muted)",
+  };
+}
+
+function categoriesStyle() {
+  return {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginBottom: "12px",
+    justifyContent: "center",
+  };
+}
+
+function categoryButtonStyle(active, category) {
+  const color =
+    category === "Todos" ? "gold" : CATEGORY_COLORS[category] || "#888";
+  return {
     padding: "4px 12px",
-    color: active ? "gold" : "#888",
+    borderRadius: "16px",
+    border: active ? `2px solid ${color}` : "1px solid rgba(255,255,255,0.1)",
+    background: active ? `rgba(255,255,255,0.08)` : "transparent",
+    color: active ? color : "var(--text-muted)",
     fontSize: "0.7rem",
+    fontWeight: active ? "700" : "400",
     cursor: "pointer",
     transition: "all 0.3s ease",
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    whiteSpace: "nowrap",
+  };
+}
+
+function categoryCountStyle() {
+  return {
+    fontSize: "0.55rem",
+    opacity: 0.6,
+    marginLeft: "2px",
+  };
+}
+
+function searchContainerStyle() {
+  return {
+    marginBottom: "12px",
   };
 }
 
@@ -388,13 +670,14 @@ function searchInputStyle() {
   return {
     width: "100%",
     padding: "8px 14px",
-    borderRadius: 15,
-    border: "1px solid rgba(255,255,255,0.1)",
-    background: "rgba(0,0,0,0.3)",
-    color: "white",
+    borderRadius: "20px",
+    border: "1px solid var(--border-input)",
+    background: "var(--bg-input)",
+    color: "var(--text-primary)",
     fontSize: "0.85rem",
     outline: "none",
-    transition: "border-color 0.3s ease",
+    transition: "var(--transition-theme)",
+    boxSizing: "border-box",
   };
 }
 
@@ -403,155 +686,153 @@ function achievementsListStyle() {
     display: "flex",
     flexDirection: "column",
     gap: "8px",
-    marginBottom: "20px",
-    maxHeight: "350px",
+    maxHeight: "280px",
     overflowY: "auto",
+    paddingRight: "4px",
+    overflowX: "hidden",
   };
 }
 
-function achievementItemStyle(unlocked, rarity) {
-  const rarityColors = {
-    comum: "rgba(139,195,74,0.1)",
-    incomum: "rgba(76,175,80,0.1)",
-    raro: "rgba(33,150,243,0.1)",
-    épico: "rgba(156,39,176,0.1)",
-    lendário: "rgba(255,111,0,0.1)",
+function emptyStyle() {
+  return {
+    textAlign: "center",
+    color: "var(--text-muted)",
+    padding: "20px 0",
   };
+}
+
+function achievementItemStyle(unlocked, newAchievement) {
   return {
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    padding: "10px 15px",
-    borderRadius: 12,
+    padding: "10px 14px",
     background: unlocked
-      ? rarityColors[rarity] || "rgba(255,215,0,0.05)"
+      ? newAchievement
+        ? "rgba(255,215,0,0.12)"
+        : "rgba(76,175,80,0.06)"
       : "rgba(255,255,255,0.02)",
+    borderRadius: 12,
     border: unlocked
-      ? `1px solid ${rarityColors[rarity] || "rgba(255,215,0,0.2)"}`
-      : "1px solid rgba(255,255,255,0.03)",
-    opacity: unlocked ? 1 : 0.5,
-    cursor: "default",
+      ? newAchievement
+        ? "2px solid gold"
+        : "1px solid rgba(76,175,80,0.2)"
+      : "1px solid rgba(255,255,255,0.05)",
+    transition: "all 0.3s ease",
+    width: "100%",
+    boxSizing: "border-box",
   };
 }
 
-function achievementIconStyle() {
+function achievementIconStyle(unlocked) {
   return {
-    fontSize: "1.5rem",
-    minWidth: "40px",
+    fontSize: "1.6rem",
+    flexShrink: 0,
+    width: "32px",
     textAlign: "center",
+    opacity: unlocked ? 1 : 0.3,
   };
 }
 
-function achievementContentStyle() {
+function achievementInfoStyle() {
   return {
     flex: 1,
+    minWidth: 0,
   };
 }
 
-function achievementNameStyle(unlocked) {
+function achievementNameStyle(unlocked, newAchievement) {
   return {
     fontWeight: "bold",
-    color: unlocked ? "gold" : "#aaa",
     fontSize: "0.9rem",
+    color: unlocked ? "var(--text-primary)" : "var(--text-muted)",
     display: "flex",
     alignItems: "center",
-    gap: "8px",
+    gap: "6px",
     flexWrap: "wrap",
   };
 }
 
-function rarityBadgeStyle() {
+function newTagStyle() {
   return {
     fontSize: "0.55rem",
+    background: "gold",
+    color: "#1a1a1a",
     padding: "1px 8px",
-    borderRadius: 10,
-    border: "1px solid",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
+    borderRadius: 8,
+    fontWeight: "700",
   };
 }
 
-function achievementDescStyle() {
+function achievementDescStyle(unlocked) {
   return {
     fontSize: "0.75rem",
-    color: "#ccc",
+    color: unlocked ? "var(--text-secondary)" : "var(--text-muted)",
+    opacity: unlocked ? 1 : 0.6,
+  };
+}
+
+function achievementMetaStyle() {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
     marginTop: "2px",
   };
 }
 
-function xpBonusStyle() {
+function achievementCategoryStyle(category) {
   return {
-    fontSize: "0.65rem",
+    fontSize: "0.6rem",
+    color: CATEGORY_COLORS[category] || "#888",
+    fontWeight: "600",
+  };
+}
+
+function achievementXpStyle() {
+  return {
+    fontSize: "0.6rem",
     color: "#4caf50",
-    marginTop: "2px",
+    fontWeight: "600",
   };
 }
 
 function unlockedBadgeStyle() {
   return {
+    fontSize: "0.55rem",
+    color: "#4caf50",
+    fontWeight: "600",
+  };
+}
+
+function achievementStatusStyle(unlocked) {
+  return {
     fontSize: "1.2rem",
-    opacity: 0.6,
+    flexShrink: 0,
   };
 }
 
-function newAchievementsStyle() {
-  return {
-    background:
-      "linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,215,0,0.05))",
-    padding: "15px",
-    borderRadius: 15,
-    marginBottom: "20px",
-    border: "2px solid gold",
-    boxShadow: "0 0 40px rgba(255,215,0,0.1)",
-  };
-}
-
-function newAchievementListStyle() {
+function footerStyle() {
   return {
     display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    marginTop: "8px",
+    justifyContent: "center",
+    marginTop: "14px",
+    paddingTop: "12px",
+    borderTop: "1px solid var(--border-light)",
   };
 }
 
-function newAchievementItemStyle() {
+function footerButtonStyle() {
   return {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "8px 12px",
-    background: "rgba(255,255,255,0.05)",
-    borderRadius: 8,
-  };
-}
-
-function newBadgeStyle() {
-  return {
-    fontSize: "0.6rem",
-    fontWeight: "bold",
-    color: "gold",
-    background: "rgba(255,215,0,0.2)",
-    padding: "2px 10px",
-    borderRadius: 10,
-    animation: "pulse 1.5s ease-in-out infinite",
-    marginLeft: "auto",
-  };
-}
-
-function buttonStyle() {
-  return {
-    background: "radial-gradient(#f7d97c,#d6a12e)",
+    padding: "8px 32px",
+    borderRadius: 30,
     border: "none",
-    fontWeight: "bold",
-    fontSize: "1rem",
-    padding: "12px 30px",
-    borderRadius: 60,
-    cursor: "pointer",
-    boxShadow: "0 4px 0 #7a4c1a",
+    background: "radial-gradient(#f7d97c, #d6a12e)",
     color: "#2e241f",
-    width: "100%",
+    fontWeight: "bold",
+    fontSize: "0.9rem",
+    cursor: "pointer",
     transition: "all 0.3s ease",
   };
 }

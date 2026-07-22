@@ -1,4 +1,4 @@
-// app/page.jsx - COMPLETO COM TEMA ESCURO/CLARO
+// app/page.jsx - CORREÇÃO COM TOAST APENAS PARA EVENTOS IMPORTANTES
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -98,6 +98,15 @@ export default function PokerGame() {
   const [resultData, setResultData] = useState(null);
   const [resultModalLock, setResultModalLock] = useState(false);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
+  const [pendingInviteJoin, setPendingInviteJoin] = useState(null);
+
+  // 🔥 TOAST APENAS PARA EVENTOS IMPORTANTES
+  const [toastMessage, setToastMessage] = useState(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastType, setToastType] = useState("info");
+  const toastTimerRef = useRef(null);
+  const toastClosingRef = useRef(false);
+
   const cpuTimerRef = useRef(null);
   const pendingSaveRef = useRef(false);
   const gameInitialized = useRef(false);
@@ -118,6 +127,182 @@ export default function PokerGame() {
 
   const currentUser = session?.user?.username || null;
   const userChips = session?.user?.chips || 0;
+
+  // ============================================================
+  // 🔥 TOAST PADRONIZADO (APENAS EVENTOS IMPORTANTES)
+  // ============================================================
+
+  const showToastMessage = useCallback(
+    (message, type = "info", duration = 6000) => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+
+      if (toastMessage && toastMessage === message) {
+        toastTimerRef.current = setTimeout(() => {
+          setShowToast(false);
+          toastTimerRef.current = null;
+          setTimeout(() => setToastMessage(null), 400);
+        }, duration);
+        return;
+      }
+
+      setToastMessage(message);
+      setToastType(type);
+      setShowToast(true);
+
+      toastTimerRef.current = setTimeout(() => {
+        setShowToast(false);
+        toastTimerRef.current = null;
+        setTimeout(() => setToastMessage(null), 400);
+      }, duration);
+    },
+    [toastMessage],
+  );
+
+  const closeToast = useCallback(() => {
+    if (toastClosingRef.current) return;
+    toastClosingRef.current = true;
+
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+
+    setShowToast(false);
+
+    setTimeout(() => {
+      setToastMessage(null);
+      toastClosingRef.current = false;
+    }, 400);
+  }, []);
+
+  // ============================================================
+  // 🔥 TOAST COMPONENTE
+  // ============================================================
+  const ToastNotification = () => {
+    if (!showToast || !toastMessage) return null;
+
+    const isError = toastType === "error" || toastMessage.includes("❌");
+    const isLevelUp =
+      toastMessage.includes("🎊") || toastMessage.includes("Subiu para Nível");
+    const isAchievement =
+      toastMessage.includes("🎉") || toastMessage.includes("Conquista");
+
+    let icon = "ℹ️";
+    if (isError) icon = "❌";
+    else if (isLevelUp) icon = "🎊";
+    else if (isAchievement) icon = "🎉";
+    else if (toastMessage.includes("✅")) icon = "✅";
+
+    return (
+      <motion.div
+        style={toastStyle(isError, isLevelUp || isAchievement)}
+        initial={{ opacity: 0, y: -30, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -30, scale: 0.95 }}
+        transition={{
+          type: "spring",
+          stiffness: 500,
+          damping: 35,
+          duration: 0.25,
+        }}
+        key="toast-main"
+      >
+        <span style={toastIconStyle()}>{icon}</span>
+        <span style={toastTextStyle()}>{toastMessage}</span>
+        <button onClick={closeToast} style={toastCloseStyle()}>
+          ✕
+        </button>
+      </motion.div>
+    );
+  };
+
+  // ============================================================
+  // 🔥 ESTILOS DO TOAST
+  // ============================================================
+  function toastStyle(isError, isSpecial) {
+    let bgColor, textColor, borderColor;
+
+    if (isError) {
+      bgColor = "rgba(220, 50, 50, 0.95)";
+      textColor = "#ffffff";
+      borderColor = "rgba(244, 67, 54, 0.3)";
+    } else if (isSpecial) {
+      bgColor = "rgba(255, 215, 0, 0.95)";
+      textColor = "#1a1a1a";
+      borderColor = "rgba(255, 215, 0, 0.5)";
+    } else {
+      bgColor = "rgba(30, 30, 40, 0.92)";
+      textColor = "#ffffff";
+      borderColor = "rgba(255, 255, 255, 0.1)";
+    }
+
+    return {
+      position: "fixed",
+      top: "24px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 9999,
+      background: bgColor,
+      color: textColor,
+      padding: "14px 24px",
+      borderRadius: "16px",
+      boxShadow: "0 8px 40px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)",
+      display: "flex",
+      alignItems: "center",
+      gap: "14px",
+      maxWidth: "min(90vw, 500px)",
+      width: "auto",
+      minWidth: "min(280px, 90vw)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      border: `1px solid ${borderColor}`,
+      flexWrap: "nowrap",
+      overflow: "hidden",
+      boxSizing: "border-box",
+    };
+  }
+
+  function toastIconStyle() {
+    return {
+      fontSize: "1.4rem",
+      flexShrink: 0,
+      width: "28px",
+      textAlign: "center",
+    };
+  }
+
+  function toastTextStyle() {
+    return {
+      flex: "1 1 auto",
+      fontSize: "0.9rem",
+      fontWeight: "500",
+      lineHeight: "1.4",
+      minWidth: "0",
+      wordBreak: "break-word",
+      overflowWrap: "break-word",
+      maxWidth: "100%",
+    };
+  }
+
+  function toastCloseStyle() {
+    return {
+      background: "none",
+      border: "none",
+      color: "inherit",
+      cursor: "pointer",
+      fontSize: "1.1rem",
+      opacity: 0.5,
+      padding: "4px 6px",
+      transition: "all 0.3s ease",
+      flexShrink: 0,
+      borderRadius: "50%",
+      lineHeight: 1,
+      marginLeft: "2px",
+    };
+  }
 
   // ====================== BUSCAR FICHAS DIRETAMENTE DO BANCO ======================
   const fetchChipsFromDB = useCallback(async () => {
@@ -191,7 +376,7 @@ export default function PokerGame() {
     session,
   ]);
 
-  // ====================== SALVAR FICHAS - CORRIGIDO ======================
+  // ====================== SALVAR FICHAS ======================
   const saveChips = useCallback(
     async (user, chips, force = false) => {
       if (!user) return;
@@ -427,42 +612,60 @@ export default function PokerGame() {
     }
   }, []);
 
-  // ====================== NOTIFICAÇÃO - COM SONS PREMIUM ======================
-  const showNotification = useCallback((msg, isError = false) => {
-    setNotification({ msg, isError, visible: true });
+  // ============================================================
+  // 🔥 NOTIFICAÇÃO - MANTIDA NO STATUS PANEL (DENTRO DO CARD)
+  // ============================================================
+  const showNotification = useCallback(
+    (msg, isError = false) => {
+      // 🔥 Notificação para o StatusPanel (dentro do card)
+      setNotification({ msg, isError, visible: true });
 
-    try {
-      // Sons premium baseados no tipo de notificação
-      if (!isError && msg.includes("VENCEU")) {
-        // Som de vitória com sequência
-        if (msg.includes("ALL-IN") || msg.includes("ALL-IN")) {
-          soundManager.playWinSequence();
-        } else {
-          soundManager.playSound("win");
-        }
-      } else if (isError && msg.includes("perdeu")) {
-        soundManager.playLoseSequence();
-      } else if (msg.includes("ALL-IN")) {
-        soundManager.playSound("allin");
-      } else if (msg.includes("aumentou")) {
-        soundManager.playSound("raise");
-      } else if (msg.includes("desistiu")) {
-        soundManager.playSound("fold");
-      } else if (msg.includes("CHECK")) {
-        soundManager.playSound("check");
-      } else if (msg.includes("🏅 Achado")) {
-        soundManager.playSound("levelUp");
-      } else if (msg.includes("🎊 Subiu para Nível")) {
-        soundManager.playLevelUpSequence();
-      } else if (msg.includes("🎉 Conquista")) {
-        soundManager.playSound("celebration");
+      // 🔥 Toast apenas para eventos importantes (subiu de nível, conquistas)
+      const isImportant =
+        msg.includes("🎊 Subiu para Nível") ||
+        msg.includes("🎉 Conquista") ||
+        msg.includes("🏅 Achado");
+
+      if (isImportant) {
+        const type = isError ? "error" : "info";
+        const duration = msg.includes("🎊 Subiu para Nível") ? 7000 : 5000;
+        showToastMessage(msg, type, duration);
       }
-    } catch (e) {
-      // Silencioso em caso de erro
-    }
 
-    setTimeout(() => setNotification((n) => ({ ...n, visible: false })), 2000);
-  }, []);
+      // 🔥 Sons
+      try {
+        if (!isError && msg.includes("VENCEU")) {
+          if (msg.includes("ALL-IN")) {
+            soundManager.playWinSequence();
+          } else {
+            soundManager.playSound("win");
+          }
+        } else if (isError && msg.includes("perdeu")) {
+          soundManager.playLoseSequence();
+        } else if (msg.includes("ALL-IN")) {
+          soundManager.playSound("allin");
+        } else if (msg.includes("aumentou")) {
+          soundManager.playSound("raise");
+        } else if (msg.includes("desistiu")) {
+          soundManager.playSound("fold");
+        } else if (msg.includes("CHECK")) {
+          soundManager.playSound("check");
+        } else if (msg.includes("🏅 Achado")) {
+          soundManager.playSound("levelUp");
+        } else if (msg.includes("🎊 Subiu para Nível")) {
+          soundManager.playLevelUpSequence();
+        } else if (msg.includes("🎉 Conquista")) {
+          soundManager.playSound("celebration");
+        }
+      } catch (e) {}
+
+      setTimeout(
+        () => setNotification((n) => ({ ...n, visible: false })),
+        2000,
+      );
+    },
+    [showToastMessage],
+  );
 
   // ====================== SALVAR ESTADO AUTOMATICAMENTE ======================
   useEffect(() => {
@@ -656,7 +859,7 @@ export default function PokerGame() {
     return doShowdown(state, user);
   }
 
-  // ====================== DO SHOWDOWN - CORRIGIDO ======================
+  // ====================== DO SHOWDOWN ======================
   async function doShowdown(g, user) {
     if (!g.handActive || g.showdownStarted || isProcessingAction.current) {
       return g;
@@ -719,7 +922,6 @@ export default function PokerGame() {
           const comparison = compareHands(pScore, cScore);
 
           if (comparison === 0) {
-            // EMPATE
             const split = Math.floor(finalState.pot / 2);
             const remainder = finalState.pot - split * 2;
 
@@ -761,7 +963,6 @@ export default function PokerGame() {
               communityCards: state.community || [],
             };
           } else if (comparison > 0) {
-            // JOGADOR VENCE
             const won = finalState.pot;
             finalState.playerMoney += won;
             finalState.winnerMsg = `🏆 ${playerName} venceu com ${pName}!`;
@@ -801,7 +1002,6 @@ export default function PokerGame() {
               communityCards: state.community || [],
             };
           } else {
-            // CPU VENCE
             const lost = finalState.pot;
             finalState.cpuMoney += lost;
             finalState.winnerMsg = `🤖 CPU venceu com ${cName}!`;
@@ -881,7 +1081,7 @@ export default function PokerGame() {
     });
   }
 
-  // ====================== FECHAR MODAL - CORRIGIDO ======================
+  // ====================== FECHAR MODAL ======================
   const closeResultModal = useCallback(() => {
     if (!resultModalOpen) return;
 
@@ -1010,7 +1210,7 @@ export default function PokerGame() {
     return state;
   }
 
-  // ====================== INICIAR MÃO - CORRIGIDO ======================
+  // ====================== INICIAR MÃO ======================
   function startNewHand(user, initialMoney) {
     if (isProcessingAction.current) return;
 
@@ -1548,13 +1748,27 @@ export default function PokerGame() {
   // ====================== ONLINE ======================
   const handleJoinOnlineGame = useCallback(
     (data) => {
-      setOnlineGame(data);
-      setShowOnline(false);
-      pauseCpuGame();
-      hasLeftOnlineRef.current = false;
-      showNotification(`🌐 Entrou na sala ${data.roomId}!`, false);
+      console.log("🎮 [ONLINE] Entrando no jogo online:", data);
+
+      if (data && data.roomId) {
+        if (data.isInviteAccepted) {
+          setPendingInviteJoin(null);
+        }
+
+        setOnlineGame(data);
+        setShowOnline(false);
+        pauseCpuGame();
+        hasLeftOnlineRef.current = false;
+        showNotification(`🌐 Entrou na sala ${data.roomId}!`, false);
+      } else if (data === null) {
+        console.log("👋 Saindo do multiplayer, resetando estado...");
+        setOnlineGame(null);
+        setShowOnline(false);
+        hasLeftOnlineRef.current = true;
+        restoreCpuGame();
+      }
     },
-    [showNotification, pauseCpuGame],
+    [showNotification, pauseCpuGame, restoreCpuGame],
   );
 
   const handleLeaveOnlineGame = useCallback(
@@ -1564,9 +1778,14 @@ export default function PokerGame() {
 
       hasLeftOnlineRef.current = true;
 
+      // 🔥 Notificar FriendsList que saiu (passando null)
+      if (handleJoinOnlineGame) {
+        handleJoinOnlineGame(null);
+      }
+
       await refreshUserChips();
     },
-    [showNotification, refreshUserChips],
+    [showNotification, refreshUserChips, handleJoinOnlineGame],
   );
 
   // ====================== SUGESTÃO DO JOGADOR ======================
@@ -1627,7 +1846,7 @@ export default function PokerGame() {
     };
   }, []);
 
-  // ====================== MODAL DE RESULTADO - VERSÃO PREMIUM ======================
+  // ====================== MODAL DE RESULTADO ======================
   function ResultModal({ data, onClose }) {
     if (!data) return null;
 
@@ -2063,7 +2282,6 @@ export default function PokerGame() {
     showdown: "Showdown",
   };
 
-  // 🔥 ESTILO DO BOTÃO DE TORNEIOS
   const tournamentButtonStyle = {
     background: "rgba(255,215,0,0.15)",
     border: "1px solid rgba(255,215,0,0.3)",
@@ -2137,358 +2355,368 @@ export default function PokerGame() {
   }
 
   return (
-    <div
-      style={{
-        margin: 0,
-        minHeight: "100vh",
-        background: "var(--bg-primary)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        fontFamily: "'Segoe UI','Poppins',system-ui,sans-serif",
-        padding: 15,
-        userSelect: "none",
-        position: "relative",
-        transition: "var(--transition-theme)",
-      }}
-    >
-      {currentUser && (
+    <>
+      {/* 🔥 TOAST APENAS PARA EVENTOS IMPORTANTES */}
+      <AnimatePresence mode="wait">
+        <ToastNotification />
+      </AnimatePresence>
+
+      <div
+        style={{
+          margin: 0,
+          minHeight: "100vh",
+          background: "var(--bg-primary)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontFamily: "'Segoe UI','Poppins',system-ui,sans-serif",
+          padding: 15,
+          userSelect: "none",
+          position: "relative",
+          transition: "var(--transition-theme)",
+        }}
+      >
+        {currentUser && (
+          <div
+            style={{
+              position: "fixed",
+              top: 10,
+              right: 10,
+              zIndex: 100,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <ThemeToggle />
+            <motion.button
+              onClick={() => signOut()}
+              style={{
+                background: "rgba(200,50,50,0.8)",
+                color: "white",
+                border: "none",
+                padding: "8px 16px",
+                borderRadius: 20,
+                cursor: "pointer",
+                fontWeight: "bold",
+                backdropFilter: "blur(4px)",
+                fontSize: "0.9rem",
+              }}
+              whileHover={{ scale: 1.05, background: "rgba(200,50,50,0.95)" }}
+              whileTap={{ scale: 0.95 }}
+            >
+              🚪 Sair
+            </motion.button>
+          </div>
+        )}
+
         <div
           style={{
             position: "fixed",
             top: 10,
-            right: 10,
+            left: 10,
             zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
           }}
         >
-          <ThemeToggle />
           <motion.button
-            onClick={() => signOut()}
-            style={{
-              background: "rgba(200,50,50,0.8)",
-              color: "white",
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: 20,
-              cursor: "pointer",
-              fontWeight: "bold",
-              backdropFilter: "blur(4px)",
-              fontSize: "0.9rem",
-            }}
-            whileHover={{ scale: 1.05, background: "rgba(200,50,50,0.95)" }}
+            onClick={() => setShowTournamentLobby(true)}
+            style={tournamentButtonStyle}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            🚪 Sair
+            🏅 Torneios
           </motion.button>
         </div>
-      )}
 
-      {/* 🔥 BOTÃO TORNEIOS */}
-      <div
-        style={{
-          position: "fixed",
-          top: 10,
-          left: 10,
-          zIndex: 100,
-        }}
-      >
-        <motion.button
-          onClick={() => setShowTournamentLobby(true)}
-          style={tournamentButtonStyle}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          🏅 Torneios
-        </motion.button>
-      </div>
-
-      <ToolbarButtons
-        isTurbo={isTurbo}
-        onTurboToggle={handleTurboToggle}
-        onMultiplayerClick={() => setShowMultiplayerModal(true)}
-        isMultiplayerActive={multiplayerModeActive}
-        onOnlineClick={() => setShowOnline(true)}
-        isOnlineActive={!!onlineGame}
-      />
-
-      {showMultiplayerModal && (
-        <MultiplayerModal
-          onStart={handleMultiplayerStart}
-          onClose={() => setShowMultiplayerModal(false)}
+        <ToolbarButtons
+          isTurbo={isTurbo}
+          onTurboToggle={handleTurboToggle}
+          onMultiplayerClick={() => setShowMultiplayerModal(true)}
+          isMultiplayerActive={multiplayerModeActive}
+          onOnlineClick={() => setShowOnline(true)}
+          isOnlineActive={!!onlineGame}
         />
-      )}
 
-      {showOnline && !onlineGame && (
-        <OnlineLobby
-          onJoinGame={handleJoinOnlineGame}
-          onCancel={() => setShowOnline(false)}
-          currentUser={currentUser}
-        />
-      )}
+        {showMultiplayerModal && (
+          <MultiplayerModal
+            onStart={handleMultiplayerStart}
+            onClose={() => setShowMultiplayerModal(false)}
+          />
+        )}
 
-      {onlineGame && (
-        <OnlineGame
-          roomId={onlineGame.roomId}
-          playerName={onlineGame.playerName}
-          socket={onlineGame.socket}
-          onLeave={handleLeaveOnlineGame}
-        />
-      )}
+        {showOnline && !onlineGame && (
+          <OnlineLobby
+            onJoinGame={handleJoinOnlineGame}
+            onCancel={() => setShowOnline(false)}
+            currentUser={currentUser}
+          />
+        )}
 
-      {resultModalOpen && resultData && (
-        <ResultModal data={resultData} onClose={closeResultModal} />
-      )}
+        {onlineGame && (
+          <OnlineGame
+            roomId={onlineGame.roomId}
+            playerName={onlineGame.playerName}
+            socket={onlineGame.socket}
+            onLeave={handleLeaveOnlineGame}
+          />
+        )}
 
-      {showAchievementsModal && (
-        <AchievementsModal
-          onClose={() => {
-            setShowAchievementsModal(false);
-            setNewAchievements([]);
-          }}
-          newAchievements={newAchievements}
-          username={currentUser}
-        />
-      )}
+        {resultModalOpen && resultData && (
+          <ResultModal data={resultData} onClose={closeResultModal} />
+        )}
 
-      {showFindingsModal && (
-        <FindingsModal
-          onClose={() => {
-            setShowFindingsModal(false);
-            setNewFindings([]);
-          }}
-          newFindings={newFindings}
-        />
-      )}
+        {showAchievementsModal && (
+          <AchievementsModal
+            onClose={() => {
+              setShowAchievementsModal(false);
+              setNewAchievements([]);
+            }}
+            newAchievements={newAchievements}
+            username={currentUser}
+          />
+        )}
 
-      {showTournamentLobby && (
-        <TournamentLobby
-          onClose={() => setShowTournamentLobby(false)}
-          username={currentUser}
-        />
-      )}
+        {showFindingsModal && (
+          <FindingsModal
+            onClose={() => {
+              setShowFindingsModal(false);
+              setNewFindings([]);
+            }}
+            newFindings={newFindings}
+          />
+        )}
 
-      <motion.div
-        style={{
-          background:
-            "radial-gradient(circle at 30% 20%, var(--bg-felt), var(--bg-primary))",
-          borderRadius: 50,
-          boxShadow:
-            "var(--table-shadow), inset 0 2px 5px rgba(255,255,255,0.2)",
-          padding: 20,
-          maxWidth: 1600,
-          width: "100%",
-          transition: "var(--transition-theme)",
-        }}
-        initial={{ opacity: 0, scale: 0.97 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4 }}
-      >
-        <div
+        {showTournamentLobby && (
+          <TournamentLobby
+            onClose={() => setShowTournamentLobby(false)}
+            username={currentUser}
+          />
+        )}
+
+        <motion.div
           style={{
-            background: "rgba(0,20,0,0.3)",
-            borderRadius: 40,
-            padding: 15,
+            background:
+              "radial-gradient(circle at 30% 20%, var(--bg-felt), var(--bg-primary))",
+            borderRadius: 50,
+            boxShadow:
+              "var(--table-shadow), inset 0 2px 5px rgba(255,255,255,0.2)",
+            padding: 20,
+            maxWidth: 1600,
+            width: "100%",
+            transition: "var(--transition-theme)",
           }}
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
         >
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              background: "var(--bg-header)",
-              backdropFilter: "blur(8px)",
-              borderRadius: 50,
-              padding: "8px 20px",
-              marginBottom: 20,
-              flexWrap: "wrap",
-              gap: 10,
-              transition: "var(--transition-theme)",
+              background: "rgba(0,20,0,0.3)",
+              borderRadius: 40,
+              padding: 15,
             }}
           >
-            {[
-              ["💰", g.pot],
-              ["🎴", stageNames[g.stage] || g.stage],
-              ["👤", g.playerMoney],
-              ["🤖", g.cpuMoney],
-              ["📊", `Aposta: ${g.currentBet}`],
-              ["🚀", isTurbo ? "Turbo" : "Normal"],
-              ["👥", isMultiplayer && multiplayerModeActive ? "2P" : "1P"],
-            ].map(([icon, val], i) => (
-              <motion.div
-                key={`header-${i}-${icon}`}
-                style={{
-                  background: "var(--bg-button)",
-                  padding: "5px 15px",
-                  borderRadius: 40,
-                  color: "var(--text-primary)",
-                  fontWeight: "bold",
-                  fontSize: "0.9rem",
-                  whiteSpace: "nowrap",
-                  transition: "var(--transition-theme)",
-                }}
-                whileHover={{ scale: 1.03 }}
-                transition={{ type: "spring", stiffness: 300 }}
-              >
-                <span
-                  style={{
-                    color:
-                      icon === "🚀"
-                        ? isTurbo
-                          ? "#ff9800"
-                          : "#888"
-                        : icon === "👥"
-                          ? isMultiplayer && multiplayerModeActive
-                            ? "#4caf50"
-                            : "#888"
-                          : "gold",
-                    fontSize: "1.1rem",
-                    fontWeight: 800,
-                    marginRight: 5,
-                  }}
-                >
-                  {icon}
-                </span>
-                {val}
-              </motion.div>
-            ))}
-          </div>
-
-          {isMultiplayer &&
-            multiplayerModeActive &&
-            multiplayerPlayers.length > 0 && (
-              <PlayerSelector
-                players={multiplayerPlayers}
-                currentPlayer={currentPlayerIndex}
-                onSelectPlayer={handleSwitchPlayer}
-              />
-            )}
-
-          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-            <div style={{ flex: 3, minWidth: 280 }}>
-              <GameTable
-                communityCards={g.community || []}
-                playerCards={g.playerCards || []}
-                cpuCards={g.cpuCards || []}
-                playerHandName={g.playerHandName}
-                cpuHandName={g.cpuHandName}
-                cpuThought={g.cpuThought}
-                stage={g.stage}
-                pot={g.pot}
-                currentBet={g.currentBet}
-                playerBet={g.playerBet}
-                cpuBet={g.cpuBet}
-                isTurbo={isTurbo}
-                showCpuCards={showCpuCards}
-                isMultiplayer={isMultiplayer && multiplayerModeActive}
-                multiplayerPlayers={multiplayerPlayers}
-                currentPlayerIndex={currentPlayerIndex}
-                onSwitchPlayer={handleSwitchPlayer}
-                currentUser={currentUser}
-              />
-
-              <ActionButtons
-                disabled={disable}
-                canRaise={canRaise}
-                toCall={toCall}
-                nextRaise={nextRaise}
-                onFold={playerFold}
-                onCall={playerCall}
-                onRaise={playerRaise}
-                onAllIn={playerAllIn}
-                onReset={resetSession}
-              />
-
-              {g.winnerMsg && (
-                <motion.div
-                  style={{
-                    background: "#000000bb",
-                    backdropFilter: "blur(12px)",
-                    borderRadius: 40,
-                    padding: "6px 15px",
-                    textAlign: "center",
-                    fontWeight: "bold",
-                    fontSize: "0.85rem",
-                    color: "#ffd966",
-                    marginTop: 12,
-                  }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  {g.winnerMsg}
-                </motion.div>
-              )}
-              <div
-                style={{
-                  textAlign: "center",
-                  marginTop: 12,
-                  fontSize: "0.7rem",
-                  color: "var(--text-muted)",
-                  textShadow: "1px 1px 0 #2a1f0e",
-                  transition: "var(--transition-theme)",
-                }}
-              >
-                Desenvolvido por BruCe - 2026
-              </div>
-            </div>
-
             <div
               style={{
-                flex: 1,
-                minWidth: 220,
                 display: "flex",
-                flexDirection: "column",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "var(--bg-header)",
+                backdropFilter: "blur(8px)",
+                borderRadius: 50,
+                padding: "8px 20px",
+                marginBottom: 20,
+                flexWrap: "wrap",
                 gap: 10,
+                transition: "var(--transition-theme)",
               }}
             >
-              <StatusPanel
-                stage={g.stage}
-                pot={g.pot}
-                currentBet={g.currentBet}
-                playerBet={g.playerBet}
-                cpuBet={g.cpuBet}
-                nextRaise={nextRaise}
-                notification={notification}
-                stageNames={stageNames}
-                gameStatus={g.gameStatus}
-                winnerMsg={g.winnerMsg}
-                isTurbo={isTurbo}
-              />
+              {[
+                ["💰", g.pot],
+                ["🎴", stageNames[g.stage] || g.stage],
+                ["👤", g.playerMoney],
+                ["🤖", g.cpuMoney],
+                ["📊", `Aposta: ${g.currentBet}`],
+                ["🚀", isTurbo ? "Turbo" : "Normal"],
+                ["👥", isMultiplayer && multiplayerModeActive ? "2P" : "1P"],
+              ].map(([icon, val], i) => (
+                <motion.div
+                  key={`header-${i}-${icon}`}
+                  style={{
+                    background: "var(--bg-button)",
+                    padding: "5px 15px",
+                    borderRadius: 40,
+                    color: "var(--text-primary)",
+                    fontWeight: "bold",
+                    fontSize: "0.9rem",
+                    whiteSpace: "nowrap",
+                    transition: "var(--transition-theme)",
+                  }}
+                  whileHover={{ scale: 1.03 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <span
+                    style={{
+                      color:
+                        icon === "🚀"
+                          ? isTurbo
+                            ? "#ff9800"
+                            : "#888"
+                          : icon === "👥"
+                            ? isMultiplayer && multiplayerModeActive
+                              ? "#4caf50"
+                              : "#888"
+                            : "gold",
+                      fontSize: "1.1rem",
+                      fontWeight: 800,
+                      marginRight: 5,
+                    }}
+                  >
+                    {icon}
+                  </span>
+                  {val}
+                </motion.div>
+              ))}
+            </div>
 
-              <StatsPanel
-                username={currentUser}
-                onShowAchievements={() => setShowAchievementsModal(true)}
-                isResultModalOpen={isResultModalOpen}
-              />
+            {isMultiplayer &&
+              multiplayerModeActive &&
+              multiplayerPlayers.length > 0 && (
+                <PlayerSelector
+                  players={multiplayerPlayers}
+                  currentPlayer={currentPlayerIndex}
+                  onSelectPlayer={handleSwitchPlayer}
+                />
+              )}
 
-              <LevelDisplay
-                username={currentUser}
-                isResultModalOpen={isResultModalOpen}
-                onShowAchievements={() => setShowAchievementsModal(true)}
-                onShowFindings={() => setShowFindingsModal(true)}
-              />
+            <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+              <div style={{ flex: 3, minWidth: 280 }}>
+                <GameTable
+                  communityCards={g.community || []}
+                  playerCards={g.playerCards || []}
+                  cpuCards={g.cpuCards || []}
+                  playerHandName={g.playerHandName}
+                  cpuHandName={g.cpuHandName}
+                  cpuThought={g.cpuThought}
+                  stage={g.stage}
+                  pot={g.pot}
+                  currentBet={g.currentBet}
+                  playerBet={g.playerBet}
+                  cpuBet={g.cpuBet}
+                  isTurbo={isTurbo}
+                  showCpuCards={showCpuCards}
+                  isMultiplayer={isMultiplayer && multiplayerModeActive}
+                  multiplayerPlayers={multiplayerPlayers}
+                  currentPlayerIndex={currentPlayerIndex}
+                  onSwitchPlayer={handleSwitchPlayer}
+                  currentUser={currentUser}
+                />
 
-              <FriendsList username={currentUser} />
-              <MissionsPanel
-                username={currentUser}
-                onChipsUpdated={(newChips) => {
-                  setCurrentChips(newChips);
-                  setGame((prev) => ({ ...prev, playerMoney: newChips }));
+                <ActionButtons
+                  disabled={disable}
+                  canRaise={canRaise}
+                  toCall={toCall}
+                  nextRaise={nextRaise}
+                  onFold={playerFold}
+                  onCall={playerCall}
+                  onRaise={playerRaise}
+                  onAllIn={playerAllIn}
+                  onReset={resetSession}
+                />
+
+                {g.winnerMsg && (
+                  <motion.div
+                    style={{
+                      background: "#000000bb",
+                      backdropFilter: "blur(12px)",
+                      borderRadius: 40,
+                      padding: "6px 15px",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                      fontSize: "0.85rem",
+                      color: "#ffd966",
+                      marginTop: 12,
+                    }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
+                    {g.winnerMsg}
+                  </motion.div>
+                )}
+                <div
+                  style={{
+                    textAlign: "center",
+                    marginTop: 12,
+                    fontSize: "0.7rem",
+                    color: "var(--text-muted)",
+                    textShadow: "1px 1px 0 #2a1f0e",
+                    transition: "var(--transition-theme)",
+                  }}
+                >
+                  Desenvolvido por BruCe - 2026
+                </div>
+              </div>
+
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: 220,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
                 }}
-                isResultModalOpen={isResultModalOpen}
-              />
-              <HandHistory
-                username={currentUser}
-                isResultModalOpen={isResultModalOpen}
-              />
+              >
+                <StatusPanel
+                  stage={g.stage}
+                  pot={g.pot}
+                  currentBet={g.currentBet}
+                  playerBet={g.playerBet}
+                  cpuBet={g.cpuBet}
+                  nextRaise={nextRaise}
+                  notification={notification}
+                  stageNames={stageNames}
+                  gameStatus={g.gameStatus}
+                  winnerMsg={g.winnerMsg}
+                  isTurbo={isTurbo}
+                />
+
+                <StatsPanel
+                  username={currentUser}
+                  onShowAchievements={() => setShowAchievementsModal(true)}
+                  isResultModalOpen={isResultModalOpen}
+                />
+
+                <LevelDisplay
+                  username={currentUser}
+                  isResultModalOpen={isResultModalOpen}
+                  onShowAchievements={() => setShowAchievementsModal(true)}
+                  onShowFindings={() => setShowFindingsModal(true)}
+                />
+
+                <FriendsList
+                  username={currentUser}
+                  onJoinGame={handleJoinOnlineGame}
+                />
+
+                <MissionsPanel
+                  username={currentUser}
+                  onChipsUpdated={(newChips) => {
+                    setCurrentChips(newChips);
+                    setGame((prev) => ({ ...prev, playerMoney: newChips }));
+                  }}
+                  isResultModalOpen={isResultModalOpen}
+                />
+                <HandHistory
+                  username={currentUser}
+                  isResultModalOpen={isResultModalOpen}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      </motion.div>
-    </div>
+        </motion.div>
+      </div>
+    </>
   );
 }
 

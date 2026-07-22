@@ -1,7 +1,7 @@
-// components/Poker/OnlineGame.jsx - COM CHAT INTEGRADO
+// components/Poker/OnlineGame.jsx - COMPLETO CORRIGIDO
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import Chat from "./Chat.jsx";
@@ -38,33 +38,121 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   const [isSummaryClosing, setIsSummaryClosing] = useState(false);
   const [closedCount, setClosedCount] = useState(0);
   const [totalPlayers, setTotalPlayers] = useState(0);
-  const [showChat, setShowChat] = useState(true);
+  const [isStarting, setIsStarting] = useState(false);
+  const [gameError, setGameError] = useState("");
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [hasClosed, setHasClosed] = useState(false);
 
   const resultLockedRef = useRef(false);
   const resultClosedRef = useRef(false);
   const isClosingRef = useRef(false);
+  const isReadyRef = useRef(false);
+  const isMounted = useRef(true);
+  const leaveTimeoutRef = useRef(null);
+  const closeSummaryTimeoutRef = useRef(null);
+
+  // 🔥 ADICIONAR ESTILOS GLOBAIS
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      !document.getElementById("online-game-styles")
+    ) {
+      const styleSheet = document.createElement("style");
+      styleSheet.id = "online-game-styles";
+      styleSheet.textContent = `
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(styleSheet);
+    }
+
+    isMounted.current = true;
+
+    return () => {
+      isMounted.current = false;
+      if (leaveTimeoutRef.current) {
+        clearTimeout(leaveTimeoutRef.current);
+        leaveTimeoutRef.current = null;
+      }
+      if (closeSummaryTimeoutRef.current) {
+        clearTimeout(closeSummaryTimeoutRef.current);
+        closeSummaryTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  // 🔥 Sincronizar estado de ready
+  const syncReadyState = useCallback(
+    (playersList) => {
+      if (!playersList || !socket || !isMounted.current) return;
+      const me = playersList.find((p) => p.id === socket.id);
+      const ready = me?.isReady || false;
+      setIsReady(ready);
+      isReadyRef.current = ready;
+    },
+    [socket],
+  );
+
+  // 🔥 Verificar se todos estão prontos
+  const checkAllReady = useCallback((playersList) => {
+    if (!playersList || playersList.length < 2) return false;
+    return playersList.every((p) => p.isReady === true);
+  }, []);
 
   useEffect(() => {
-    console.log("🔄 OnlineGame montado, socket:", socket?.id);
+    if (!socket || !isMounted.current) return;
 
+    console.log("🔄 OnlineGame montado, socket:", socket?.id);
+    console.log(`📋 RoomId: ${roomId}, Player: ${playerName}`);
+
+    // 🔥 LIMPAR TODOS OS LISTENERS ANTIGOS
+    socket.off("room-update");
+    socket.off("game-started");
+    socket.off("game-update");
+    socket.off("player-turn");
+    socket.off("round-ended");
+    socket.off("game-reset");
+    socket.off("summary-closed");
+    socket.off("summary-progress");
+    socket.off("error");
+
+    // 🔥 LISTENER: ATUALIZAÇÃO DA SALA
     const onRoomUpdate = (data) => {
+      if (!isMounted.current) return;
       console.log("📡 room-update:", data);
       setPlayers(data.players || []);
-      const me = data.players?.find((p) => p.id === socket.id);
-      setIsReady(me?.isReady || false);
+      syncReadyState(data.players);
+
+      if (data.players && data.players.length >= 2) {
+        const allReady = checkAllReady(data.players);
+        if (allReady && !data.gameState && !isStarting) {
+          console.log("🚀 Todos prontos! Jogo vai começar...");
+          setIsStarting(true);
+        }
+      }
     };
 
+    // 🔥 LISTENER: JOGO INICIADO
     const onGameStarted = (data) => {
+      if (!isMounted.current) return;
       console.log("📡 game-started:", data);
       setGameState(data);
       setIsSummaryClosing(false);
+      setIsStarting(false);
+      setGameError("");
+      setHasClosed(false);
+
       if (data.currentPlayerIndex !== undefined) {
         const currentPlayer = data.players[data.currentPlayerIndex];
         setIsMyTurn(currentPlayer?.id === socket.id);
       }
     };
 
+    // 🔥 LISTENER: ATUALIZAÇÃO DO JOGO
     const onGameUpdate = (data) => {
+      if (!isMounted.current) return;
       console.log("📡 game-update:", data);
       setGameState(data);
       if (data.currentPlayerIndex !== undefined) {
@@ -73,12 +161,16 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
+    // 🔥 LISTENER: VEZ DO JOGADOR
     const onPlayerTurn = (data) => {
+      if (!isMounted.current) return;
       console.log("📡 player-turn:", data);
       setIsMyTurn(data.playerId === socket.id);
     };
 
+    // 🔥 LISTENER: RODADA TERMINADA
     const onRoundEnded = (data) => {
+      if (!isMounted.current) return;
       console.log("📡 ROUND-ENDED recebido!");
       resultLockedRef.current = true;
       resultClosedRef.current = false;
@@ -98,7 +190,9 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       );
     };
 
+    // 🔥 LISTENER: PROGRESSO DO RESUMO
     const onSummaryProgress = (data) => {
+      if (!isMounted.current) return;
       console.log("📡 summary-progress:", data);
       if (data.roomId === roomId) {
         setClosedCount(data.closedCount || 0);
@@ -114,9 +208,11 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
+    // 🔥 LISTENER: RESUMO FECHADO
     const onSummaryClosed = (data) => {
+      if (!isMounted.current) return;
       console.log("📡 summary-closed:", data);
-      if (data.roomId === roomId) {
+      if (data.roomId === roomId || data.roomId === roomId.toUpperCase()) {
         resultLockedRef.current = false;
         resultClosedRef.current = true;
         isClosingRef.current = true;
@@ -126,19 +222,38 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
         setGameState(null);
         setClosedCount(0);
         setTotalPlayers(0);
+        setIsStarting(false);
+        setHasClosed(true);
+
+        if (socket) {
+          socket.emit("list-rooms");
+        }
       }
     };
 
-    socket.off("room-update");
-    socket.off("game-started");
-    socket.off("game-update");
-    socket.off("player-turn");
-    socket.off("round-ended");
-    socket.off("game-reset");
-    socket.off("summary-closed");
-    socket.off("summary-progress");
-    socket.off("error");
+    // 🔥 LISTENER: RESET DO JOGO
+    const onGameReset = () => {
+      if (!isMounted.current) return;
+      console.log("📡 game-reset recebido!");
+      setGameState(null);
+      setIsStarting(false);
+      setGameError("");
+      setHasClosed(false);
+    };
 
+    // 🔥 LISTENER: ERRO - CORRIGIDO
+    const onError = (data) => {
+      if (!isMounted.current) return;
+      console.error("❌ Erro do servidor:", data);
+      if (data.message && data.message.includes("já está nesta sala")) {
+        console.log("⚠️ Já está na sala, ignorando erro...");
+        return;
+      }
+      setGameError(`❌ ${data.message || "Erro desconhecido"}`);
+      setTimeout(() => setGameError(""), 5000);
+    };
+
+    // 🔥 REGISTRAR LISTENERS
     socket.on("room-update", onRoomUpdate);
     socket.on("game-started", onGameStarted);
     socket.on("game-update", onGameUpdate);
@@ -146,6 +261,11 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     socket.on("round-ended", onRoundEnded);
     socket.on("summary-closed", onSummaryClosed);
     socket.on("summary-progress", onSummaryProgress);
+    socket.on("game-reset", onGameReset);
+    socket.on("error", onError);
+
+    // 🔥 SOLICITAR ATUALIZAÇÃO INICIAL
+    socket.emit("list-rooms");
 
     return () => {
       console.log("🔌 OnlineGame desmontando, removendo listeners...");
@@ -156,50 +276,126 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       socket.off("round-ended", onRoundEnded);
       socket.off("summary-closed", onSummaryClosed);
       socket.off("summary-progress", onSummaryProgress);
+      socket.off("game-reset", onGameReset);
+      socket.off("error", onError);
     };
-  }, [socket, update, roomId]);
+  }, [socket, roomId, playerName, syncReadyState, checkAllReady, isStarting]);
 
+  // 🔥 FECHAR RESUMO
   const handleCloseSummary = () => {
     if (isClosingRef.current) return;
     if (resultClosedRef.current) return;
     if (!resultLockedRef.current) return;
+    if (hasClosed) return;
 
     console.log("🖱️ USUÁRIO CLICOU EM FECHAR!");
     isClosingRef.current = true;
     setIsSummaryClosing(true);
+    setHasClosed(true);
 
     console.log(`📤 Emitindo close-summary para sala ${roomId}`);
     socket.emit("close-summary", { roomId });
+
+    if (closeSummaryTimeoutRef.current) {
+      clearTimeout(closeSummaryTimeoutRef.current);
+    }
+    closeSummaryTimeoutRef.current = setTimeout(() => {
+      if (isMounted.current && showResult) {
+        console.log("⏰ Fallback: Fechando resumo manualmente...");
+        setShowResult(false);
+        setResultData(null);
+        setIsSummaryClosing(false);
+        setGameState(null);
+        resultLockedRef.current = false;
+        resultClosedRef.current = true;
+        isClosingRef.current = true;
+        setHasClosed(true);
+
+        if (socket) {
+          socket.emit("list-rooms");
+        }
+      }
+      closeSummaryTimeoutRef.current = null;
+    }, 5000);
   };
 
+  // 🔥 AÇÕES DO JOGADOR
   const handleAction = (action, amount = 0) => {
+    if (!socket || !isMounted.current) return;
     console.log(`📤 Enviando ação: ${action}`, { roomId, action, amount });
     socket.emit("player-action", { roomId, action, amount });
   };
 
-  const toggleReady = () => {
-    console.log(`📤 Toggle ready para sala ${roomId}`);
-    socket.emit("player-ready", { roomId });
-  };
+  // 🔥 ALTERNAR PRONTO
+  const toggleReady = useCallback(() => {
+    if (!socket || !isMounted.current) return;
 
-  const leaveRoom = async () => {
+    console.log(`📤 Toggle ready para sala ${roomId}`);
+    console.log(`📤 Jogador: ${playerName}, Socket ID: ${socket?.id}`);
+
+    if (!roomId) {
+      console.error("❌ RoomId não disponível!");
+      return;
+    }
+
+    socket.emit("player-ready", {
+      roomId: roomId,
+      playerName: playerName,
+    });
+
+    const newReadyState = !isReady;
+    setIsReady(newReadyState);
+    isReadyRef.current = newReadyState;
+    console.log(`✅ Ready toggled para: ${newReadyState}`);
+  }, [socket, roomId, playerName, isReady]);
+
+  // components/Poker/OnlineGame.jsx - PARTE MODIFICADA (localize a função leaveRoom)
+
+  // 🔥 SAIR DA SALA
+  const leaveRoom = useCallback(async () => {
+    if (isLeaving) return;
+    setIsLeaving(true);
+
     console.log(`📤 Saindo da sala ${roomId}`);
-    socket.emit("leave-room", { roomId });
+
+    if (socket) {
+      socket.emit("leave-room", { roomId });
+
+      // 🔥 Emitir evento adicional para garantir que o FriendsList reset
+      socket.emit("player-left-room", {
+        roomId: roomId,
+        playerName: playerName,
+      });
+    }
 
     await update();
     console.log("🔄 Sessão atualizada ao sair da sala");
 
-    onLeave(true);
-  };
+    if (leaveTimeoutRef.current) {
+      clearTimeout(leaveTimeoutRef.current);
+    }
+    leaveTimeoutRef.current = setTimeout(() => {
+      if (isMounted.current) {
+        onLeave(true);
+      }
+    }, 300);
+  }, [roomId, socket, update, onLeave, isLeaving, playerName]);
 
+  // ============================================================
   // ✅ MODAL DE RESULTADO
-  if (showResult && resultData && resultLockedRef.current) {
+  // ============================================================
+  if (showResult && resultData && resultLockedRef.current && !hasClosed) {
     const total = totalPlayers || resultData.players?.length || 0;
     const closed =
       closedCount ||
       resultData.players?.filter((p) => p.hasClosedSummary).length ||
       0;
     const isAllClosed = closed >= total && total > 0;
+
+    if (isAllClosed && !isClosingRef.current) {
+      console.log("✅ Todos fecharam! Fechando automaticamente...");
+      handleCloseSummary();
+    }
 
     return (
       <motion.div
@@ -312,7 +508,9 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     );
   }
 
-  // ====================== LOBBY ======================
+  // ============================================================
+  // 🏠 LOBBY
+  // ============================================================
   if (!gameState) {
     return (
       <div style={lobbyStyle()}>
@@ -323,47 +521,99 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           </button>
         </div>
 
+        {gameError && (
+          <div style={errorStyle()}>
+            {gameError}
+            <button onClick={() => setGameError("")} style={errorCloseStyle()}>
+              ✕
+            </button>
+          </div>
+        )}
+
         <div style={playersListStyle()}>
-          <h3>👥 Jogadores:</h3>
-          {players.map((player, index) => (
-            <motion.div
-              key={index}
-              style={playerItemStyle(player.isReady)}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <span>{player.name}</span>
-              <span>{player.id === socket?.id ? " 👈 (você)" : ""}</span>
-              <span>{player.isReady ? "✅ Pronto" : "⏳ Aguardando..."}</span>
-            </motion.div>
-          ))}
+          <h3 style={playersListTitleStyle()}>👥 Jogadores:</h3>
+          {players.length === 0 ? (
+            <div style={emptyPlayersStyle()}>
+              <span style={{ fontSize: "2rem" }}>🔄</span>
+              <p>Aguardando jogadores...</p>
+            </div>
+          ) : (
+            players.map((player, index) => (
+              <motion.div
+                key={index}
+                style={playerItemStyle(player.isReady)}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <span style={playerNameTextStyle()}>
+                  {player.name}
+                  {player.id === socket?.id && (
+                    <span style={youBadgeStyle()}> (você)</span>
+                  )}
+                </span>
+                <span style={playerStatusStyle(player.isReady)}>
+                  {player.isReady ? "✅ Pronto" : "⏳ Aguardando..."}
+                </span>
+              </motion.div>
+            ))
+          )}
         </div>
 
-        <motion.button
-          onClick={toggleReady}
-          style={readyButtonStyle()}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {isReady ? "⏳ Aguardando..." : "✅ Pronto para jogar"}
-        </motion.button>
+        {isStarting ? (
+          <motion.div
+            style={startingStyle()}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <span style={spinnerStyle()} />
+            <span>🚀 Todos prontos! Iniciando partida...</span>
+          </motion.div>
+        ) : (
+          <motion.button
+            onClick={toggleReady}
+            style={readyButtonStyle(isReady)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={!socket || !roomId}
+          >
+            {isReady ? "⏳ Aguardando..." : "✅ Pronto para jogar"}
+          </motion.button>
+        )}
 
         <p style={infoStyle()}>
           {players.length >= 2
-            ? "🎮 Todos prontos? O jogo vai começar!"
-            : "👥 Aguardando mais jogadores..."}
+            ? isStarting
+              ? "🎮 Iniciando o jogo..."
+              : "🎮 Todos prontos? O jogo vai começar!"
+            : `👥 Aguardando mais jogadores... (${players.length}/2)`}
         </p>
 
-        {/* Chat no lobby */}
+        {players.length < 2 && (
+          <div style={waitingHintStyle()}>
+            <span>💡</span>
+            <span>Compartilhe o código da sala com seus amigos!</span>
+          </div>
+        )}
+
         <Chat socket={socket} roomId={roomId} playerName={playerName} />
       </div>
     );
   }
 
-  // ====================== JOGO ======================
+  // ============================================================
+  // 🎮 JOGO ATIVO
+  // ============================================================
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const isCurrentPlayerMe = currentPlayer?.id === socket?.id;
+
+  const currentBet = gameState.currentBet || 0;
+  const playerBet = currentPlayer?.bet || 0;
+  const callAmount = currentBet - playerBet;
+  const canCheck = callAmount <= 0;
+  const canCall = callAmount > 0 && currentPlayer?.chips >= callAmount;
+  const canRaise = currentPlayer?.chips > callAmount + 50;
 
   return (
     <div style={gameStyle()}>
@@ -375,9 +625,16 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       </div>
 
       <div style={tableStyle()}>
-        <div style={potStyle()}>💰 Pote: {gameState.pot}</div>
+        <div style={potStyle()}>
+          💰 Pote: <span style={{ color: "gold" }}>{gameState.pot}</span>
+        </div>
 
         <div style={communityStyle()}>
+          <span
+            style={{ color: "#888", fontSize: "0.8rem", marginRight: "10px" }}
+          >
+            Mesa:
+          </span>
           {gameState.communityCards && gameState.communityCards.length > 0 ? (
             gameState.communityCards.map((card, i) => (
               <CardDisplay key={i} card={card} />
@@ -394,13 +651,15 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             return (
               <motion.div
                 key={index}
-                style={playerGameStyle(isCurrent, player.isFolded)}
+                style={playerGameStyle(isCurrent, player.isFolded, isTurn)}
                 whileHover={{ scale: isCurrent ? 1.02 : 1 }}
               >
-                <div style={playerNameStyle()}>
-                  {player.name} {isCurrent && "👈"}
+                <div style={playerNameGameStyle()}>
+                  {player.name}
+                  {isCurrent && " 👈"}
                   {isTurn && " 🔥"}
                   {player.isFolded && " (FOLDED)"}
+                  {player.isAllIn && " (ALL-IN)"}
                 </div>
                 <div style={playerCardsStyle()}>
                   {player.cards && player.cards.length > 0 ? (
@@ -449,48 +708,60 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             >
               ❌ FOLD
             </motion.button>
-            <motion.button
-              onClick={() => handleAction("check")}
-              style={actionButtonStyle("#4caf50")}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              ✅ CHECK
-            </motion.button>
-            <motion.button
-              onClick={() => handleAction("call")}
-              style={actionButtonStyle("#ff9800")}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              💰 CALL ({gameState.currentBet - currentPlayer.bet})
-            </motion.button>
-            <motion.button
-              onClick={() => handleAction("raise", gameState.currentBet + 50)}
-              style={actionButtonStyle("#2196f3")}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              📈 RAISE
-            </motion.button>
+
+            {canCheck && (
+              <motion.button
+                onClick={() => handleAction("check")}
+                style={actionButtonStyle("#4caf50")}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                ✅ CHECK
+              </motion.button>
+            )}
+
+            {canCall && (
+              <motion.button
+                onClick={() => handleAction("call")}
+                style={actionButtonStyle("#ff9800")}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                💰 CALL ({callAmount})
+              </motion.button>
+            )}
+
+            {canRaise && (
+              <motion.button
+                onClick={() => handleAction("raise", gameState.currentBet + 50)}
+                style={actionButtonStyle("#2196f3")}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                📈 RAISE ({gameState.currentBet + 50})
+              </motion.button>
+            )}
+
             <motion.button
               onClick={() => handleAction("all-in")}
               style={actionButtonStyle("#9c27b0")}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              ⚡ ALL-IN
+              ⚡ ALL-IN ({currentPlayer?.chips || 0})
             </motion.button>
           </div>
         )}
 
-      {/* Chat durante o jogo */}
       <Chat socket={socket} roomId={roomId} playerName={playerName} />
     </div>
   );
 }
 
-// ====================== ESTILOS (MANTIDOS E ATUALIZADOS) ======================
+// ============================================================
+// 🎨 ESTILOS
+// ============================================================
+
 function resultOverlayStyle() {
   return {
     position: "fixed",
@@ -745,9 +1016,51 @@ function leaveButtonStyle() {
   };
 }
 
+function errorStyle() {
+  return {
+    background: "rgba(244,67,54,0.2)",
+    border: "1px solid #f44336",
+    borderRadius: 12,
+    padding: "10px 14px",
+    color: "#f44336",
+    marginBottom: "16px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    fontSize: "0.9rem",
+  };
+}
+
+function errorCloseStyle() {
+  return {
+    background: "none",
+    border: "none",
+    color: "#f44336",
+    cursor: "pointer",
+    fontSize: "1rem",
+    padding: "0 4px",
+  };
+}
+
 function playersListStyle() {
   return {
     marginBottom: "20px",
+  };
+}
+
+function playersListTitleStyle() {
+  return {
+    margin: "0 0 12px 0",
+    fontSize: "1rem",
+    color: "#aaa",
+  };
+}
+
+function emptyPlayersStyle() {
+  return {
+    textAlign: "center",
+    padding: "30px 0",
+    color: "#666",
   };
 }
 
@@ -755,6 +1068,7 @@ function playerItemStyle(isReady) {
   return {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
     padding: "10px 15px",
     marginBottom: "8px",
     background: isReady ? "rgba(76,175,80,0.2)" : "rgba(255,255,255,0.05)",
@@ -763,18 +1077,72 @@ function playerItemStyle(isReady) {
   };
 }
 
-function readyButtonStyle() {
+function playerNameTextStyle() {
   return {
-    background: "radial-gradient(#f7d97c,#d6a12e)",
-    border: "none",
+    fontWeight: "bold",
+    fontSize: "0.95rem",
+  };
+}
+
+function youBadgeStyle() {
+  return {
+    color: "gold",
+    fontSize: "0.75rem",
+    marginLeft: "4px",
+  };
+}
+
+function playerStatusStyle(isReady) {
+  return {
+    fontSize: "0.8rem",
+    color: isReady ? "#4caf50" : "#888",
+  };
+}
+
+function readyButtonStyle(isReady) {
+  return {
+    background: isReady
+      ? "rgba(255,152,0,0.2)"
+      : "radial-gradient(#f7d97c,#d6a12e)",
+    border: isReady ? "1px solid #ff9800" : "none",
     fontWeight: "bold",
     fontSize: "1rem",
     padding: "12px 20px",
     borderRadius: 60,
-    cursor: "pointer",
-    boxShadow: "0 4px 0 #7a4c1a",
-    color: "#2e241f",
+    cursor: isReady ? "pointer" : "pointer",
+    boxShadow: isReady ? "none" : "0 4px 0 #7a4c1a",
+    color: isReady ? "#ff9800" : "#2e241f",
     width: "100%",
+    transition: "all 0.3s ease",
+  };
+}
+
+function startingStyle() {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "12px",
+    padding: "12px 20px",
+    background: "rgba(255,215,0,0.1)",
+    borderRadius: 60,
+    border: "1px solid gold",
+    color: "gold",
+    fontWeight: "bold",
+    fontSize: "1rem",
+    marginBottom: "12px",
+  };
+}
+
+function spinnerStyle() {
+  return {
+    display: "inline-block",
+    width: 20,
+    height: 20,
+    border: "2px solid rgba(255,215,0,0.2)",
+    borderTop: "2px solid gold",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
   };
 }
 
@@ -783,6 +1151,21 @@ function infoStyle() {
     textAlign: "center",
     color: "#aaa",
     marginTop: "15px",
+  };
+}
+
+function waitingHintStyle() {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    padding: "10px",
+    background: "rgba(255,215,0,0.05)",
+    borderRadius: 10,
+    marginTop: "10px",
+    color: "#888",
+    fontSize: "0.85rem",
   };
 }
 
@@ -798,8 +1181,7 @@ function tableStyle() {
 function potStyle() {
   return {
     textAlign: "center",
-    fontSize: "1.5rem",
-    color: "gold",
+    fontSize: "1.3rem",
     marginBottom: "15px",
   };
 }
@@ -825,10 +1207,18 @@ function playersTableStyle() {
   };
 }
 
-function playerGameStyle(isCurrent, isFolded) {
+function playerGameStyle(isCurrent, isFolded, isTurn) {
   return {
-    background: isCurrent ? "rgba(255,215,0,0.2)" : "rgba(255,255,255,0.05)",
-    border: isCurrent ? "2px solid gold" : "1px solid rgba(255,255,255,0.1)",
+    background: isCurrent
+      ? "rgba(255,215,0,0.2)"
+      : isTurn
+        ? "rgba(76,175,80,0.1)"
+        : "rgba(255,255,255,0.05)",
+    border: isCurrent
+      ? "2px solid gold"
+      : isTurn
+        ? "2px solid #4caf50"
+        : "1px solid rgba(255,255,255,0.1)",
     borderRadius: 15,
     padding: "15px",
     minWidth: "150px",
@@ -837,10 +1227,11 @@ function playerGameStyle(isCurrent, isFolded) {
   };
 }
 
-function playerNameStyle() {
+function playerNameGameStyle() {
   return {
     fontWeight: "bold",
     marginBottom: "8px",
+    fontSize: "0.9rem",
   };
 }
 

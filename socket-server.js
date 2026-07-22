@@ -1,8 +1,9 @@
-// socket-server.js
+// socket-server.js - COMPLETO CORRIGIDO
 const { Server } = require("socket.io");
 
 // ====================== ESTADO ======================
 const rooms = new Map();
+const onlineUsers = new Map();
 
 function generateRoomId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -183,7 +184,7 @@ function sanitizeGameState(gameState) {
           isActive: p.isActive,
           hasActed: p.hasActed,
           hasClosedSummary: p.hasClosedSummary || false,
-          position: p.position || 0, // NOVO: posição na mesa
+          position: p.position || 0,
         }))
       : [],
     pot: gameState.pot,
@@ -194,9 +195,9 @@ function sanitizeGameState(gameState) {
     lastRaiser: gameState.lastRaiser,
     roundStartIndex: gameState.roundStartIndex,
     bettingRoundComplete: gameState.bettingRoundComplete,
-    smallBlind: gameState.smallBlind || 25, // NOVO
-    bigBlind: gameState.bigBlind || 50, // NOVO
-    chatMessages: gameState.chatMessages || [], // NOVO
+    smallBlind: gameState.smallBlind || 25,
+    bigBlind: gameState.bigBlind || 50,
+    chatMessages: gameState.chatMessages || [],
   };
 }
 
@@ -205,9 +206,14 @@ async function broadcastRoomList() {
   const roomList = [];
 
   for (const [roomId, room] of rooms) {
+    if (!room) continue;
+
     const updatedPlayers = [];
     for (const player of room.players) {
-      const currentChips = await getChipsFromDatabase(player.name);
+      if (!player || !player.name) continue;
+      const currentChips = await getChipsFromDatabase(player.name).catch(
+        () => player.chips || 1000,
+      );
       updatedPlayers.push({
         name: player.name,
         chips: currentChips,
@@ -219,19 +225,122 @@ async function broadcastRoomList() {
     roomList.push({
       roomId: roomId,
       players: updatedPlayers,
-      playerCount: room.players.length,
-      maxPlayers: room.maxPlayers || 6, // NOVO: suporte a 6 jogadores
+      playerCount: room.players ? room.players.length : 0,
+      maxPlayers: room.maxPlayers || 6,
       isGameActive: !!room.gameState,
-      hasAvailableSlot: room.players.length < (room.maxPlayers || 6),
+      hasAvailableSlot:
+        (room.players ? room.players.length : 0) < (room.maxPlayers || 6),
     });
   }
 
   io.emit("room-list", roomList);
+  console.log(`📡 Broadcast room-list: ${roomList.length} salas`);
 }
 
 // ====================== EVENTOS ======================
 io.on("connection", (socket) => {
   console.log(`🟢 Conectado: ${socket.id}`);
+
+  // ====================== AMIGO ONLINE ======================
+  socket.on("friend-online", (data) => {
+    const { username } = data;
+
+    if (!username) return;
+
+    console.log(`🟢 ${username} está online (socket: ${socket.id})`);
+
+    let oldId = null;
+    for (const [id, user] of onlineUsers) {
+      if (user.username === username) {
+        oldId = id;
+        break;
+      }
+    }
+    if (oldId) {
+      onlineUsers.delete(oldId);
+    }
+
+    onlineUsers.set(socket.id, { username, socket });
+
+    const onlineList = Array.from(onlineUsers.values()).map((u) => u.username);
+    console.log(
+      `📡 Broadcast friends-online: ${onlineList.length} usuários online`,
+    );
+    io.emit("friends-online", { online: onlineList });
+  });
+
+  // ====================== CONVITE EM GRUPO ======================
+  socket.on("group-invite", (data) => {
+    const { inviteId, from, players, message, roomId } = data;
+    console.log(`📤 ${from} convidou ${players.length} amigos:`, players);
+
+    const finalRoomId = roomId || `ROOM_${inviteId}`;
+
+    let sentCount = 0;
+    for (const [id, user] of onlineUsers) {
+      if (players.includes(user.username)) {
+        user.socket.emit("group-invite", {
+          inviteId,
+          from,
+          players,
+          message,
+          roomId: finalRoomId,
+          timestamp: Date.now(),
+        });
+        sentCount++;
+      }
+    }
+
+    socket.emit("invite-sent", {
+      success: true,
+      players: players,
+      sentCount: sentCount,
+      roomId: finalRoomId,
+    });
+
+    console.log(`✅ ${sentCount} convites enviados para a sala ${finalRoomId}`);
+  });
+
+  // ====================== ACEITAR CONVITE ======================
+  socket.on("accept-invite", (data) => {
+    const { inviteId, from } = data;
+    console.log(`✅ ${from} aceitou o convite ${inviteId}`);
+
+    io.emit("invite-accepted", {
+      inviteId,
+      from,
+      timestamp: Date.now(),
+    });
+  });
+
+  // ====================== RECUSAR CONVITE ======================
+  socket.on("decline-invite", (data) => {
+    const { inviteId, from } = data;
+    console.log(`❌ ${from} recusou o convite ${inviteId}`);
+
+    io.emit("invite-declined", {
+      inviteId,
+      from,
+      timestamp: Date.now(),
+    });
+  });
+
+  // ====================== MENSAGEM PRIVADA ======================
+  socket.on("private-message", (data) => {
+    const { to, from, message } = data;
+    console.log(`💬 ${from} -> ${to}: ${message}`);
+
+    for (const [id, user] of onlineUsers) {
+      if (user.username === to) {
+        user.socket.emit("private-message", {
+          from,
+          message,
+          timestamp: Date.now(),
+        });
+        break;
+      }
+    }
+  });
 
   // ====================== LISTAR SALAS ======================
   socket.on("list-rooms", async () => {
@@ -240,8 +349,24 @@ io.on("connection", (socket) => {
 
   // ====================== CRIAR SALA ======================
   socket.on("create-room", async (data) => {
-    const { playerName, maxPlayers = 6 } = data; // NOVO: maxPlayers
-    const roomId = generateRoomId();
+    const {
+      playerName,
+      maxPlayers = 6,
+      invitedPlayers = [],
+      roomId: customRoomId,
+    } = data;
+
+    let roomId = customRoomId;
+    if (!roomId) {
+      roomId = generateRoomId();
+    }
+
+    roomId = roomId.toUpperCase();
+
+    if (rooms.has(roomId)) {
+      socket.emit("error", { message: `Sala ${roomId} já existe!` });
+      return;
+    }
 
     const userChips = await getChipsFromDatabase(playerName);
 
@@ -259,18 +384,19 @@ io.on("connection", (socket) => {
       gameState: null,
       isSummaryVisible: false,
       summaryTimer: null,
-      maxPlayers: Math.min(Math.max(maxPlayers, 2), 6), // NOVO: 2-6 jogadores
-      chatMessages: [], // NOVO: histórico do chat
+      maxPlayers: Math.min(Math.max(maxPlayers, 2), 6),
+      chatMessages: [],
+      invitedPlayers: invitedPlayers || [],
     });
 
     socket.join(roomId);
     socket.emit("room-created", { roomId });
-    socket.emit("room-update", rooms.get(roomId));
 
+    io.to(roomId).emit("room-update", rooms.get(roomId));
     await broadcastRoomList();
 
     console.log(
-      `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas) | Máx: ${maxPlayers} jogadores`,
+      `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas) | Máx: ${maxPlayers} jogadores | Convidados: ${invitedPlayers.join(", ")}`,
     );
   });
 
@@ -279,8 +405,13 @@ io.on("connection", (socket) => {
     const { roomId, playerName } = data;
     const normalizedRoomId = roomId.toUpperCase();
 
+    console.log(
+      `📤 Tentando entrar na sala ${normalizedRoomId} por ${playerName}`,
+    );
+
     const room = rooms.get(normalizedRoomId);
     if (!room) {
+      console.log(`❌ Sala não encontrada: ${normalizedRoomId}`);
       socket.emit("error", {
         message: `Sala não encontrada: ${normalizedRoomId}`,
       });
@@ -288,7 +419,8 @@ io.on("connection", (socket) => {
     }
 
     if (room.players.find((p) => p.id === socket.id)) {
-      socket.emit("error", { message: "Você já está nesta sala!" });
+      console.log(`⚠️ ${playerName} já está na sala ${normalizedRoomId}`);
+      socket.emit("room-update", room);
       return;
     }
 
@@ -311,7 +443,10 @@ io.on("connection", (socket) => {
     });
     socket.join(normalizedRoomId);
 
-    // NOVO: Notificar que alguém entrou
+    console.log(
+      `✅ ${playerName} entrou na sala ${normalizedRoomId} (${userChips} fichas)`,
+    );
+
     io.to(normalizedRoomId).emit("chat-message", {
       player: "Sistema",
       message: `🎉 ${playerName} entrou na sala!`,
@@ -321,10 +456,6 @@ io.on("connection", (socket) => {
 
     io.to(normalizedRoomId).emit("room-update", room);
     await broadcastRoomList();
-
-    console.log(
-      `✅ ${playerName} entrou na sala ${normalizedRoomId} (${userChips} fichas)`,
-    );
   });
 
   // ====================== PRONTO PARA JOGAR ======================
@@ -332,14 +463,22 @@ io.on("connection", (socket) => {
     const { roomId } = data;
     const normalizedRoomId = roomId.toUpperCase();
     const room = rooms.get(normalizedRoomId);
-    if (!room) return;
+    if (!room) {
+      socket.emit("error", {
+        message: `Sala não encontrada: ${normalizedRoomId}`,
+      });
+      return;
+    }
 
     const player = room.players.find((p) => p.id === socket.id);
     if (player) {
       player.isReady = !player.isReady;
+      console.log(
+        `🔄 ${player.name} ${player.isReady ? "✅ pronto" : "⏸️ não pronto"} na sala ${normalizedRoomId}`,
+      );
+
       io.to(normalizedRoomId).emit("room-update", room);
 
-      // NOVO: Notificar status de prontidão
       io.to(normalizedRoomId).emit("chat-message", {
         player: "Sistema",
         message: `${player.name} ${player.isReady ? "✅ está pronto!" : "⏸️ não está mais pronto"}`,
@@ -349,7 +488,9 @@ io.on("connection", (socket) => {
 
       const allReady = room.players.every((p) => p.isReady);
       if (allReady && room.players.length >= 2) {
-        // NOVO: Contagem regressiva antes de iniciar
+        console.log(
+          `🚀 Todos prontos na sala ${normalizedRoomId}! Iniciando...`,
+        );
         io.to(normalizedRoomId).emit("chat-message", {
           player: "Sistema",
           message: "🚀 Todos prontos! Iniciando partida...",
@@ -369,7 +510,6 @@ io.on("connection", (socket) => {
     const deck = createDeck();
     const numPlayers = room.players.length;
 
-    // NOVO: Configurar blinds baseado no número de jogadores
     const smallBlind = 25;
     const bigBlind = 50;
 
@@ -403,18 +543,15 @@ io.on("connection", (socket) => {
       chatMessages: room.chatMessages || [],
     };
 
-    // Distribuir cartas
     gameState.players.forEach((p) => {
       p.cards = [deck.pop(), deck.pop()];
     });
 
-    // NOVO: Sistema de blinds rotativo
     const sbIdx = 1 % numPlayers;
     const bbIdx = 2 % numPlayers;
 
     gameState.dealerIndex = 0;
 
-    // Small Blind
     const sbPlayer = gameState.players[sbIdx];
     if (sbPlayer.chips >= smallBlind) {
       sbPlayer.chips -= smallBlind;
@@ -426,7 +563,6 @@ io.on("connection", (socket) => {
     }
     gameState.pot += sbPlayer.bet;
 
-    // Big Blind
     const bbPlayer = gameState.players[bbIdx];
     if (bbPlayer.chips >= bigBlind) {
       bbPlayer.chips -= bigBlind;
@@ -445,7 +581,6 @@ io.on("connection", (socket) => {
 
     room.gameState = gameState;
 
-    // NOVO: Notificar início
     io.to(roomId).emit("chat-message", {
       player: "Sistema",
       message: `🃏 Partida iniciada! Small Blind: ${smallBlind}, Big Blind: ${bigBlind}`,
@@ -484,7 +619,6 @@ io.on("connection", (socket) => {
     player.hasActed = true;
     gameState.actionCount++;
 
-    // NOVO: Registrar ação para o chat
     let actionMessage = "";
 
     switch (action) {
@@ -582,7 +716,6 @@ io.on("connection", (socket) => {
         break;
     }
 
-    // NOVO: Enviar ação para o chat
     if (actionMessage) {
       io.to(normalizedRoomId).emit("chat-message", {
         player: "Ação",
@@ -600,12 +733,16 @@ io.on("connection", (socket) => {
     const { roomId, message } = data;
     const normalizedRoomId = roomId.toUpperCase();
     const room = rooms.get(normalizedRoomId);
-    if (!room) return;
+    if (!room) {
+      socket.emit("error", {
+        message: `Sala não encontrada: ${normalizedRoomId}`,
+      });
+      return;
+    }
 
     const player = room.players.find((p) => p.id === socket.id);
     if (!player) return;
 
-    // NOVO: Limitar mensagens para evitar spam
     if (message.length > 500) {
       socket.emit("error", { message: "Mensagem muito longa!" });
       return;
@@ -618,7 +755,6 @@ io.on("connection", (socket) => {
       isSystem: false,
     };
 
-    // Manter histórico do chat (últimas 100 mensagens)
     if (!room.chatMessages) room.chatMessages = [];
     room.chatMessages.push(chatMessage);
     if (room.chatMessages.length > 100) {
@@ -725,7 +861,6 @@ io.on("connection", (socket) => {
     gameState.actionCount = 0;
     gameState.bettingRoundComplete = false;
 
-    // NOVO: Anunciar fase no chat
     let phaseMessage = "";
 
     switch (gameState.phase) {
@@ -829,7 +964,6 @@ io.on("connection", (socket) => {
       playerId: socket.id,
     });
 
-    // NOVO: Notificar progresso
     io.to(normalizedRoomId).emit("summary-progress", {
       roomId: normalizedRoomId,
       closedCount: closedCount,
@@ -950,7 +1084,6 @@ io.on("connection", (socket) => {
         p.hasClosedSummary = false;
       });
 
-      // NOVO: Anunciar vencedor no chat
       io.to(roomId).emit("chat-message", {
         player: "Sistema",
         message: `🏆 ${winner.name} venceu ${gameState.pot} fichas com ${results.find((r) => r.isWinner)?.hand || "boa mão"}!`,
@@ -977,7 +1110,6 @@ io.on("connection", (socket) => {
 
       console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
 
-      // Timer de 25 segundos (fallback)
       if (room.summaryTimer) {
         clearTimeout(room.summaryTimer);
       }
@@ -1039,7 +1171,6 @@ io.on("connection", (socket) => {
         `💾 Fichas de ${player.name} salvas ao sair: ${player.chips}`,
       );
 
-      // NOVO: Notificar saída
       io.to(normalizedRoomId).emit("chat-message", {
         player: "Sistema",
         message: `👋 ${player.name} saiu da sala`,
@@ -1065,9 +1196,36 @@ io.on("connection", (socket) => {
     await broadcastRoomList();
   });
 
+  // ====================== JOGADOR SAIU DA SALA (confirmacao) ======================
+  socket.on("player-left-room", (data) => {
+    const { roomId, playerName } = data;
+    console.log(`👤 ${playerName} confirmou saída da sala ${roomId}`);
+
+    // 🔥 Notificar o FriendsList do jogador que ele saiu
+    socket.emit("leave-room-response", {
+      roomId: roomId,
+      playerName: playerName,
+      timestamp: Date.now(),
+    });
+  });
+
   // ====================== DESCONEXÃO ======================
   socket.on("disconnect", () => {
     console.log(`🔴 Desconectado: ${socket.id}`);
+
+    const user = onlineUsers.get(socket.id);
+    if (user) {
+      console.log(`🔴 ${user.username} desconectou`);
+      onlineUsers.delete(socket.id);
+      const onlineList = Array.from(onlineUsers.values()).map(
+        (u) => u.username,
+      );
+      console.log(
+        `📡 Broadcast friends-online após desconexão: ${onlineList.length} usuários online`,
+      );
+      io.emit("friends-online", { online: onlineList });
+    }
+
     rooms.forEach((room, roomId) => {
       const idx = room.players.findIndex((p) => p.id === socket.id);
       if (idx !== -1) {
@@ -1113,3 +1271,12 @@ console.log(`   ✅ Chat em tempo real`);
 console.log(`   ✅ Cada jogador fecha o resumo individualmente`);
 console.log(`   ✅ Timer de 25 segundos como fallback`);
 console.log(`   ✅ Indicador de progresso (quem já fechou)`);
+console.log(`   ✅ Convites múltiplos para amigos`);
+console.log(
+  `   ✅ Redirecionamento automático para o lobby ao aceitar convite`,
+);
+console.log(`   ✅ Suporte a roomId customizado nos convites`);
+console.log(`   ✅ Criação de sala antes do envio de convites`);
+console.log(`   ✅ Logs detalhados para debug`);
+console.log(`   ✅ Broadcast de salas para todos os usuários`);
+console.log(`   ✅ Reset automático do estado do lobby ao sair`);

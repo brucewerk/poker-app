@@ -1,417 +1,567 @@
-// components/Poker/OnlineLobby.jsx - VERSÃO PREMIUM
+// components/Poker/OnlineLobby.jsx - CORRIGIDO (sem document no server)
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { io } from "socket.io-client";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import RoomList from "./RoomList.jsx";
+import { io } from "socket.io-client";
+import Chat from "./Chat.jsx";
 
 export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
-  const [socket, setSocket] = useState(null);
   const [roomId, setRoomId] = useState("");
-  const [playerName, setPlayerName] = useState("");
-  const [connected, setConnected] = useState(false);
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [createdRoomId, setCreatedRoomId] = useState("");
-  const [userChips, setUserChips] = useState(0);
+  const [success, setSuccess] = useState("");
+  const [isConnected, setIsConnected] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(6);
-  const [isLoading, setIsLoading] = useState(true);
+  const [pendingInvite, setPendingInvite] = useState(null);
+  const [currentRoomId, setCurrentRoomId] = useState(null);
   const socketRef = useRef(null);
+  const roomListInterval = useRef(null);
 
   const SOCKET_URL =
     process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
+  // 🔥 ADICIONAR ESTILOS GLOBAIS NO CLIENTE APENAS
   useEffect(() => {
-    if (currentUser) {
-      setPlayerName(currentUser);
-      fetchUserChips(currentUser);
+    // Verificar se está no navegador
+    if (
+      typeof window !== "undefined" &&
+      !document.getElementById("online-lobby-styles")
+    ) {
+      const styleSheet = document.createElement("style");
+      styleSheet.id = "online-lobby-styles";
+      styleSheet.textContent = `
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(styleSheet);
     }
-  }, [currentUser]);
+  }, []);
 
-  const fetchUserChips = async (username) => {
-    if (!username) return;
+  // ====================== CONECTAR AO SOCKET ======================
+  useEffect(() => {
+    if (!currentUser) return;
 
-    try {
-      const res = await fetch("/api/public/get-chips", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username }),
+    console.log(`🔵 OnlineLobby: Conectando ao Socket.IO para ${currentUser}`);
+
+    if (!socketRef.current) {
+      socketRef.current = io(SOCKET_URL, {
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 10000,
+        autoConnect: true,
+        reconnection: true,
       });
-      const data = await res.json();
-      if (data.success) {
-        setUserChips(data.chips || 1000);
-        return data.chips;
-      }
-    } catch (error) {
-      console.error("Erro ao buscar fichas:", error);
-      setUserChips(1000);
     }
-    return 1000;
-  };
 
-  useEffect(() => {
-    console.log("🔄 Conectando ao servidor Socket.IO...");
-    console.log(`📍 URL: ${SOCKET_URL}`);
+    const socket = socketRef.current;
 
-    const newSocket = io(SOCKET_URL, {
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      timeout: 10000,
-      autoConnect: true,
-      reconnection: true,
+    socket.on("connect", () => {
+      console.log(`🟢 OnlineLobby: Socket conectado (${socket.id})`);
+      setIsConnected(true);
+      socket.emit("friend-online", { username: currentUser });
+      fetchRooms();
     });
 
-    socketRef.current = newSocket;
-    setSocket(newSocket);
-
-    newSocket.off("connect");
-    newSocket.off("connect_error");
-    newSocket.off("disconnect");
-    newSocket.off("error");
-
-    newSocket.on("connect", () => {
-      setConnected(true);
-      setError("");
-      setIsLoading(false);
-      console.log("🟢 Conectado ao servidor Socket.IO");
+    socket.on("disconnect", () => {
+      console.log(`🔴 OnlineLobby: Socket desconectado`);
+      setIsConnected(false);
     });
 
-    newSocket.on("connect_error", (err) => {
-      setConnected(false);
-      setError(`❌ Erro de conexão: ${err.message}`);
-      setIsLoading(false);
-      console.error("🔴 Erro de conexão:", err);
+    socket.on("connect_error", (err) => {
+      console.error(`❌ OnlineLobby: Erro de conexão:`, err.message);
+      setIsConnected(false);
+      setError("❌ Erro de conexão com o servidor");
     });
 
-    newSocket.on("disconnect", () => {
-      setConnected(false);
-      console.log("🔴 Desconectado do servidor");
+    // 🔥 RECEBER LISTA DE SALAS
+    socket.on("room-list", (roomList) => {
+      console.log("📡 Lista de salas recebida:", roomList.length);
+      setRooms(roomList || []);
+      setLoading(false);
     });
 
-    const errorHandler = (data) => {
-      console.log("📡 Erro do lobby:", data);
-      setError(`❌ ${data.message}`);
-      setTimeout(() => setError(""), 5000);
-    };
+    // 🔥 CONVITE EM GRUPO - REDIRECIONAR PARA A SALA
+    socket.on("group-invite", (data) => {
+      console.log("📡 Convite recebido no lobby:", data);
 
-    newSocket.on("error", errorHandler);
+      if (data.players?.includes(currentUser)) {
+        setPendingInvite(data);
+        setSuccess(`🎯 ${data.from} te convidou para uma partida!`);
 
-    newSocket.onAny((event, ...args) => {
-      if (event !== "error") {
-        console.log(`📡 Evento: ${event}`, args);
+        setTimeout(() => {
+          handleAcceptInvite(data);
+        }, 1000);
       }
     });
+
+    // 🔥 CONVITE ACEITO
+    socket.on("invite-accepted", (data) => {
+      console.log("📡 Convite aceito no lobby:", data);
+      if (data.from === currentUser) {
+        setSuccess(`✅ Convite aceito! Entrando na sala...`);
+
+        const inviteData = pendingInvite;
+        if (inviteData && onJoinGame) {
+          const roomId = inviteData.roomId || `room_${inviteData.inviteId}`;
+          socket.emit("join-room", {
+            roomId: roomId,
+            playerName: currentUser,
+          });
+
+          onJoinGame({
+            roomId: roomId,
+            playerName: currentUser,
+            socket: socket,
+            invitedPlayers: inviteData.players || [],
+            isInviteAccepted: true,
+          });
+        }
+      }
+    });
+
+    // 🔥 SALA CRIADA
+    socket.on("room-created", (data) => {
+      console.log("✅ Sala criada:", data);
+      setCreating(false);
+      setCurrentRoomId(data.roomId);
+      setSuccess(`✅ Sala ${data.roomId} criada com sucesso!`);
+
+      setTimeout(() => {
+        if (onJoinGame) {
+          onJoinGame({
+            roomId: data.roomId,
+            playerName: currentUser,
+            socket: socket,
+            isInviteCreator: true,
+          });
+        }
+      }, 500);
+    });
+
+    // 🔥 ATUALIZAÇÃO DA SALA
+    socket.on("room-update", (data) => {
+      console.log("📡 Atualização da sala recebida");
+      fetchRooms();
+    });
+
+    // 🔥 MENSAGEM DE ERRO
+    socket.on("error", (data) => {
+      console.error("❌ Erro do servidor:", data);
+      setError(`❌ ${data.message || "Erro desconhecido"}`);
+      setTimeout(() => setError(""), 5000);
+    });
+
+    // 🔥 Buscar salas periodicamente
+    roomListInterval.current = setInterval(() => {
+      if (isConnected) {
+        fetchRooms();
+      }
+    }, 10000);
 
     return () => {
-      console.log("🔌 Componente OnlineLobby desmontando...");
-      newSocket.off("connect");
-      newSocket.off("connect_error");
-      newSocket.off("disconnect");
-      newSocket.off("error");
-      newSocket.offAny();
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("connect_error");
+      socket.off("room-list");
+      socket.off("group-invite");
+      socket.off("invite-accepted");
+      socket.off("room-created");
+      socket.off("room-update");
+      socket.off("error");
+
+      if (roomListInterval.current) {
+        clearInterval(roomListInterval.current);
+        roomListInterval.current = null;
+      }
     };
-  }, [SOCKET_URL]);
+  }, [currentUser, onJoinGame]);
 
-  const createRoom = async () => {
-    if (!playerName.trim()) {
-      setError("❌ Digite seu nome!");
+  // ====================== BUSCAR SALAS ======================
+  const fetchRooms = useCallback(() => {
+    if (!socketRef.current || !isConnected) return;
+    socketRef.current.emit("list-rooms");
+  }, [isConnected]);
+
+  // ====================== CRIAR SALA ======================
+  const createRoom = useCallback(() => {
+    if (!socketRef.current || !isConnected) {
+      setError("❌ Não conectado ao servidor");
       return;
     }
-    if (!connected) {
-      setError("❌ Não conectado ao servidor!");
+
+    if (!currentUser) {
+      setError("❌ Você precisa estar logado");
       return;
     }
 
-    await fetchUserChips(playerName);
+    setCreating(true);
+    setError("");
+    setSuccess("");
 
-    setIsConnecting(true);
-    console.log(`📤 Criando sala para: ${playerName} (${userChips} fichas)`);
-    const currentSocket = socketRef.current;
-
-    currentSocket.off("room-created");
-    currentSocket.off("error");
-
-    currentSocket.emit("create-room", {
-      playerName: playerName.trim(),
-      initialChips: userChips,
+    socketRef.current.emit("create-room", {
+      playerName: currentUser,
       maxPlayers: maxPlayers,
     });
+  }, [currentUser, maxPlayers, isConnected]);
 
-    currentSocket.once("room-created", (data) => {
-      setIsConnecting(false);
-      setCreatedRoomId(data.roomId);
-      console.log(`✅ Sala criada: ${data.roomId}`);
+  // ====================== ENTRAR NA SALA ======================
+  const joinRoom = useCallback(
+    (roomIdToJoin) => {
+      if (!socketRef.current || !isConnected) {
+        setError("❌ Não conectado ao servidor");
+        return;
+      }
 
-      setError(`✅ Sala criada! Código: ${data.roomId}`);
-      setTimeout(() => setError(""), 5000);
+      if (!currentUser) {
+        setError("❌ Você precisa estar logado");
+        return;
+      }
 
-      onJoinGame({
-        roomId: data.roomId,
-        playerName: playerName.trim(),
-        socket: currentSocket,
-        userChips: userChips,
+      const normalizedRoomId = roomIdToJoin.toUpperCase();
+
+      const room = rooms.find((r) => r.roomId === normalizedRoomId);
+      if (room) {
+        const playerInRoom = room.players?.some((p) => p.name === currentUser);
+        if (playerInRoom) {
+          setError(`❌ Você já está na sala ${normalizedRoomId}`);
+          return;
+        }
+
+        if (room.playerCount >= room.maxPlayers) {
+          setError(`❌ Sala ${normalizedRoomId} está lotada!`);
+          return;
+        }
+      }
+
+      setJoining(true);
+      setError("");
+      setSuccess("");
+      setCurrentRoomId(normalizedRoomId);
+
+      socketRef.current.emit("join-room", {
+        roomId: normalizedRoomId,
+        playerName: currentUser,
       });
-    });
 
-    currentSocket.once("error", (data) => {
-      setIsConnecting(false);
-      setError(`❌ ${data.message}`);
-      console.error("❌ Erro ao criar sala:", data);
-      setTimeout(() => setError(""), 3000);
-    });
-  };
+      const joinTimeout = setTimeout(() => {
+        setJoining(false);
+        if (onJoinGame) {
+          onJoinGame({
+            roomId: normalizedRoomId,
+            playerName: currentUser,
+            socket: socketRef.current,
+          });
+        }
+      }, 3000);
 
-  const joinRoom = async (roomIdToJoin) => {
-    const roomIdToUse = roomIdToJoin || roomId.trim().toUpperCase();
+      const handleRoomUpdate = (data) => {
+        if (data.players?.some((p) => p.name === currentUser)) {
+          setJoining(false);
+          clearTimeout(joinTimeout);
+          if (onJoinGame) {
+            onJoinGame({
+              roomId: normalizedRoomId,
+              playerName: currentUser,
+              socket: socketRef.current,
+            });
+          }
+          socketRef.current.off("room-update", handleRoomUpdate);
+        }
+      };
 
-    if (!playerName.trim()) {
-      setError("❌ Digite seu nome!");
-      return;
-    }
-    if (!roomIdToUse) {
-      setError("❌ Digite o código da sala!");
-      return;
-    }
-    if (!connected) {
-      setError("❌ Não conectado ao servidor!");
-      return;
-    }
+      socketRef.current.on("room-update", handleRoomUpdate);
 
-    await fetchUserChips(playerName);
-
-    setIsConnecting(true);
-    const roomIdUpper = roomIdToUse.toUpperCase();
-    console.log(`📤 Tentando entrar na sala: ${roomIdUpper}`);
-    console.log(`📤 Jogador: ${playerName} (${userChips} fichas)`);
-
-    const currentSocket = socketRef.current;
-
-    currentSocket.off("room-update");
-    currentSocket.off("error");
-
-    currentSocket.emit("join-room", {
-      roomId: roomIdUpper,
-      playerName: playerName.trim(),
-    });
-
-    currentSocket.once("room-update", (data) => {
-      setIsConnecting(false);
-      console.log(`✅ Entrou na sala: ${roomIdUpper}`);
-      onJoinGame({
-        roomId: roomIdUpper,
-        playerName: playerName.trim(),
-        socket: currentSocket,
-        userChips: userChips,
-      });
-    });
-
-    currentSocket.once("error", (data) => {
-      setIsConnecting(false);
-      setError(`❌ ${data.message}`);
-      console.error("❌ Erro ao entrar na sala:", data);
-      setTimeout(() => setError(""), 3000);
-    });
-  };
-
-  const handleCancel = () => {
-    if (onCancel) {
-      onCancel(true);
-    }
-  };
-
-  const copyRoomCode = () => {
-    if (createdRoomId) {
-      navigator.clipboard.writeText(createdRoomId);
-      setError("📋 Código copiado!");
-      setTimeout(() => setError(""), 3000);
-    }
-  };
-
-  // NOVO: Seletor de número de jogadores com design premium
-  const PlayerCountSelector = () => (
-    <div style={playerCountStyle()}>
-      <label style={labelStyle()}>👥 Número de jogadores:</label>
-      <div style={buttonGroupStyle()}>
-        {[2, 3, 4, 5, 6].map((num) => (
-          <motion.button
-            key={num}
-            onClick={() => setMaxPlayers(num)}
-            style={playerCountButtonStyle(num === maxPlayers)}
-            disabled={isConnecting}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {num}
-          </motion.button>
-        ))}
-      </div>
-    </div>
+      return () => {
+        clearTimeout(joinTimeout);
+        socketRef.current?.off("room-update", handleRoomUpdate);
+      };
+    },
+    [currentUser, isConnected, onJoinGame, rooms],
   );
 
-  if (isLoading) {
-    return (
-      <div style={overlayStyle()}>
-        <div style={modalStyle()}>
-          <div style={loadingContainerStyle()}>
-            <motion.div
-              style={loadingSpinnerStyle()}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            >
-              🎴
-            </motion.div>
-            <p style={loadingTextStyle()}>Conectando ao servidor...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ====================== ACEITAR CONVITE ======================
+  const handleAcceptInvite = useCallback(
+    (inviteData) => {
+      if (!socketRef.current || !isConnected) {
+        setError("❌ Não conectado ao servidor");
+        return;
+      }
 
+      console.log("✅ Aceitando convite:", inviteData);
+
+      const roomId = inviteData.roomId || `room_${inviteData.inviteId}`;
+      setCurrentRoomId(roomId);
+
+      socketRef.current.emit("join-room", {
+        roomId: roomId,
+        playerName: currentUser,
+      });
+
+      socketRef.current.emit("accept-invite", {
+        inviteId: inviteData.inviteId,
+        from: currentUser,
+      });
+
+      setTimeout(() => {
+        if (onJoinGame) {
+          onJoinGame({
+            roomId: roomId,
+            playerName: currentUser,
+            socket: socketRef.current,
+            invitedPlayers: inviteData.players || [],
+            isInviteAccepted: true,
+          });
+        }
+      }, 500);
+
+      setPendingInvite(null);
+    },
+    [currentUser, isConnected, onJoinGame],
+  );
+
+  // ====================== RECUSAR CONVITE ======================
+  const handleDeclineInvite = useCallback(
+    (inviteData) => {
+      if (!socketRef.current || !isConnected) return;
+
+      socketRef.current.emit("decline-invite", {
+        inviteId: inviteData.inviteId,
+        from: currentUser,
+      });
+
+      setPendingInvite(null);
+      setError(`❌ Convite recusado`);
+      setTimeout(() => setError(""), 3000);
+    },
+    [currentUser, isConnected],
+  );
+
+  // ====================== RENDER ======================
   return (
     <motion.div
       style={overlayStyle()}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel?.();
+      }}
     >
       <motion.div
         style={modalStyle()}
-        initial={{ scale: 0.9, y: 20, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 400, damping: 28 }}
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={handleCancel} style={cancelButtonStyle()}>
-          ✕
-        </button>
-
-        <h2 style={titleStyle()}>🌐 JOGAR ONLINE</h2>
-
-        <div style={statusStyle()}>
-          <motion.span
-            style={{
-              color: connected ? "#4caf50" : "#f44336",
-              fontWeight: "bold",
-            }}
-            animate={{
-              opacity: connected ? [1, 0.7, 1] : 1,
-            }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            {connected ? "🟢 Conectado ao servidor" : "🔴 Desconectado"}
-          </motion.span>
+        <div style={headerStyle()}>
+          <h2 style={titleStyle()}>🌐 Lobby Multiplayer</h2>
+          <button onClick={onCancel} style={closeButtonStyle()}>
+            ✕
+          </button>
         </div>
 
-        {!connected && (
-          <motion.div
-            style={warningStyle()}
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            ⚠️ Servidor Socket.IO não está rodando!
-            <br />
-            <span style={{ fontSize: "0.8rem", color: "#888" }}>
-              URL: {SOCKET_URL}
-            </span>
-          </motion.div>
+        {!isConnected && (
+          <div style={connectionErrorStyle()}>⚠️ Conectando ao servidor...</div>
         )}
-
-        <div style={inputGroupStyle()}>
-          <label style={labelStyle()}>Seu nome:</label>
-          <input
-            type="text"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            placeholder="Digite seu nome"
-            style={inputStyle()}
-            disabled={true}
-          />
-          <span style={inputHintStyle()}>✅ Nome do usuário logado</span>
-        </div>
-
-        <div style={chipsDisplayStyle()}>
-          💰 Suas fichas: <strong>{userChips}</strong>
-          <span style={chipsHintStyle()}> (saldo global do MongoDB)</span>
-        </div>
-
-        <PlayerCountSelector />
-
-        {createdRoomId && (
-          <motion.div
-            style={successStyle()}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-          >
-            ✅ Sala criada: <strong>{createdRoomId}</strong>
-            <button onClick={copyRoomCode} style={copyButtonStyle()}>
-              📋 Copiar
-            </button>
-            <br />
-            <span style={{ fontSize: "0.8rem", color: "#aaa" }}>
-              Compartilhe este código com seus amigos!
-            </span>
-          </motion.div>
-        )}
-
-        <div style={buttonGroupStyle()}>
-          <motion.button
-            onClick={createRoom}
-            style={buttonStyle(connected && !isConnecting)}
-            disabled={!connected || isConnecting}
-            whileHover={{ scale: connected && !isConnecting ? 1.02 : 1 }}
-            whileTap={{ scale: connected && !isConnecting ? 0.98 : 1 }}
-          >
-            {isConnecting ? "⏳ Criando..." : "🆕 Criar Sala"}
-          </motion.button>
-        </div>
-
-        <div style={dividerStyle()}>OU</div>
-
-        <div style={inputGroupStyle()}>
-          <label style={labelStyle()}>Código da sala:</label>
-          <input
-            type="text"
-            value={roomId}
-            onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-            placeholder="Ex: ABC123"
-            style={inputStyle()}
-            maxLength={6}
-            disabled={isConnecting}
-          />
-        </div>
-
-        <motion.button
-          onClick={() => joinRoom()}
-          style={buttonStyle(connected && !isConnecting && roomId.trim())}
-          disabled={!connected || isConnecting || !roomId.trim()}
-          whileHover={{
-            scale: connected && !isConnecting && roomId.trim() ? 1.02 : 1,
-          }}
-          whileTap={{
-            scale: connected && !isConnecting && roomId.trim() ? 0.98 : 1,
-          }}
-        >
-          {isConnecting ? "⏳ Entrando..." : "🔗 Entrar na Sala"}
-        </motion.button>
-
-        <RoomList socket={socket} onJoinRoom={joinRoom} />
 
         {error && (
-          <motion.div
-            style={errorStyle()}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
+          <div style={errorStyle()}>
             {error}
+            <button onClick={() => setError("")} style={errorCloseStyle()}>
+              ✕
+            </button>
+          </div>
+        )}
+
+        {success && (
+          <div style={successStyle()}>
+            {success}
+            <button onClick={() => setSuccess("")} style={successCloseStyle()}>
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* 🔥 CONVITE PENDENTE */}
+        {pendingInvite && (
+          <motion.div
+            style={inviteBannerStyle()}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <div style={inviteContentStyle()}>
+              <span style={inviteIconStyle()}>🎯</span>
+              <div>
+                <div style={inviteTitleStyle()}>
+                  {pendingInvite.from} te convidou!
+                </div>
+                <div style={invitePlayersStyle()}>
+                  👥 {pendingInvite.players?.join(", ") || "Jogadores"}
+                </div>
+              </div>
+            </div>
+            <div style={inviteActionsStyle()}>
+              <button
+                onClick={() => handleAcceptInvite(pendingInvite)}
+                style={inviteAcceptStyle()}
+              >
+                Aceitar
+              </button>
+              <button
+                onClick={() => handleDeclineInvite(pendingInvite)}
+                style={inviteDeclineStyle()}
+              >
+                Recusar
+              </button>
+            </div>
           </motion.div>
         )}
 
-        <div style={infoStyle()}>
-          💡 Dica: Abra várias janelas para testar com múltiplos jogadores!
-          <br />
-          <span style={{ fontSize: "0.7rem", color: "#666" }}>
-            Servidor: {SOCKET_URL}
-          </span>
+        <div style={createSectionStyle()}>
+          <h3 style={sectionTitleStyle()}>🎯 Criar Nova Sala</h3>
+          <div style={createRowStyle()}>
+            <div style={playersSelectStyle()}>
+              <label style={labelStyle()}>Jogadores:</label>
+              <select
+                value={maxPlayers}
+                onChange={(e) => setMaxPlayers(Number(e.target.value))}
+                style={selectStyle()}
+                disabled={creating}
+              >
+                {[2, 3, 4, 5, 6].map((n) => (
+                  <option key={n} value={n}>
+                    {n} jogadores
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={createRoom}
+              style={createButtonStyle(creating || !isConnected)}
+              disabled={creating || !isConnected}
+            >
+              {creating ? (
+                <span
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  <span style={spinnerStyle()} />
+                  Criando...
+                </span>
+              ) : (
+                "🚀 Criar Sala"
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div style={roomsSectionStyle()}>
+          <div style={roomsHeaderStyle()}>
+            <h3 style={sectionTitleStyle()}>📋 Salas Disponíveis</h3>
+            <button
+              onClick={fetchRooms}
+              style={refreshButtonStyle()}
+              disabled={loading || !isConnected}
+            >
+              🔄
+            </button>
+          </div>
+
+          {loading ? (
+            <div style={loadingStyle()}>
+              <span style={spinnerStyle()} />
+              Carregando salas...
+            </div>
+          ) : rooms.length === 0 ? (
+            <div style={emptyStyle()}>
+              <p>Nenhuma sala disponível no momento.</p>
+              <p style={emptySubStyle()}>Crie uma sala para começar!</p>
+            </div>
+          ) : (
+            <div style={roomsListStyle()}>
+              {rooms.map((room) => {
+                const isFull = room.playerCount >= room.maxPlayers;
+                const playerNames = room.players?.map((p) => p.name) || [];
+                const isInRoom = playerNames.includes(currentUser);
+
+                return (
+                  <motion.div
+                    key={room.roomId}
+                    style={roomItemStyle(isFull, isInRoom)}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
+                    <div style={roomInfoStyle()}>
+                      <div style={roomIdStyle()}>
+                        🏠 {room.roomId}
+                        {room.isGameActive && (
+                          <span style={gameActiveBadgeStyle()}>🎮 Em jogo</span>
+                        )}
+                        {isInRoom && (
+                          <span style={inRoomBadgeStyle()}>
+                            ✅ Você está aqui
+                          </span>
+                        )}
+                      </div>
+                      <div style={roomDetailsStyle()}>
+                        <span>
+                          👥 {room.playerCount}/{room.maxPlayers}
+                        </span>
+                        <span style={playerNamesStyle()}>
+                          {playerNames.join(", ")}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (isInRoom) {
+                          if (onJoinGame) {
+                            onJoinGame({
+                              roomId: room.roomId,
+                              playerName: currentUser,
+                              socket: socketRef.current,
+                            });
+                          }
+                        } else {
+                          joinRoom(room.roomId);
+                        }
+                      }}
+                      style={joinButtonStyle(isFull || isInRoom, isInRoom)}
+                      disabled={isFull && !isInRoom}
+                    >
+                      {isInRoom ? "🔁 Entrar" : isFull ? "Lotada" : "🎯 Entrar"}
+                    </button>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* 🔥 CHAT DO LOBBY */}
+        {currentRoomId && socketRef.current && (
+          <div style={chatWrapperStyle()}>
+            <Chat
+              socket={socketRef.current}
+              roomId={currentRoomId}
+              playerName={currentUser}
+            />
+          </div>
+        )}
+
+        <div style={footerStyle()}>
+          <button onClick={onCancel} style={cancelButtonStyle()}>
+            ❌ Fechar
+          </button>
         </div>
       </motion.div>
     </motion.div>
@@ -419,199 +569,108 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
 }
 
 // ====================== ESTILOS ======================
+
 function overlayStyle() {
   return {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.95)",
+    background: "rgba(0,0,0,0.75)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 1000,
-    padding: 20,
-    backdropFilter: "blur(8px)",
+    zIndex: 2000,
+    padding: "20px",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
   };
 }
 
 function modalStyle() {
   return {
-    background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
-    padding: "30px 40px",
-    borderRadius: 30,
-    maxWidth: 480,
+    background: "var(--bg-modal)",
+    borderRadius: 24,
+    padding: "24px 28px",
+    maxWidth: "550px",
     width: "100%",
-    color: "white",
-    border: "2px solid gold",
     maxHeight: "90vh",
     overflowY: "auto",
-    position: "relative",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+    color: "var(--text-primary)",
+    border: "2px solid var(--border-gold)",
+    boxShadow: "0 20px 60px var(--shadow-dark)",
+    scrollbarWidth: "thin",
+    scrollbarColor: "rgba(255,215,0,0.3) transparent",
   };
 }
 
-function cancelButtonStyle() {
+function headerStyle() {
   return {
-    position: "absolute",
-    top: 15,
-    right: 20,
-    background: "rgba(255,255,255,0.05)",
-    border: "none",
-    color: "#f44336",
-    fontSize: "1.3rem",
-    cursor: "pointer",
-    padding: "5px 10px",
-    borderRadius: "50%",
-    transition: "all 0.3s ease",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+    paddingBottom: "12px",
+    borderBottom: "1px solid var(--border-light)",
   };
 }
 
 function titleStyle() {
   return {
-    textAlign: "center",
     color: "gold",
-    margin: "0 0 15px",
-    fontSize: "1.8rem",
-    fontWeight: "800",
-    letterSpacing: "1px",
+    margin: 0,
+    fontSize: "1.4rem",
+    fontWeight: "bold",
   };
 }
 
-function statusStyle() {
+function closeButtonStyle() {
   return {
-    textAlign: "center",
-    marginBottom: "15px",
-    fontSize: "0.9rem",
+    background: "none",
+    border: "none",
+    color: "#888",
+    fontSize: "1.3rem",
+    cursor: "pointer",
+    padding: "4px 8px",
+    borderRadius: 8,
+    transition: "all 0.3s ease",
   };
 }
 
-function warningStyle() {
+function connectionErrorStyle() {
   return {
     background: "rgba(255,152,0,0.15)",
     border: "1px solid #ff9800",
-    borderRadius: 15,
-    padding: "12px",
-    marginBottom: "15px",
-    fontSize: "0.85rem",
+    borderRadius: 12,
+    padding: "10px 14px",
     color: "#ff9800",
     textAlign: "center",
-    lineHeight: "1.6",
-  };
-}
-
-function chipsDisplayStyle() {
-  return {
-    textAlign: "center",
-    padding: "8px",
-    background: "rgba(255,215,0,0.1)",
-    borderRadius: 10,
-    marginBottom: "15px",
-    color: "#ffd700",
-    fontSize: "0.95rem",
-  };
-}
-
-function chipsHintStyle() {
-  return {
-    fontSize: "0.7rem",
-    color: "#888",
-  };
-}
-
-function inputGroupStyle() {
-  return {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    marginBottom: "15px",
-  };
-}
-
-function labelStyle() {
-  return {
-    color: "#ffefb9",
+    marginBottom: "16px",
     fontSize: "0.9rem",
-    fontWeight: "bold",
   };
 }
 
-function inputStyle() {
+function errorStyle() {
   return {
-    padding: "12px 15px",
-    borderRadius: 15,
-    border: "1px solid rgba(255,215,0,0.3)",
-    background: "rgba(0,0,0,0.3)",
-    color: "white",
-    fontSize: "1rem",
-    cursor: "not-allowed",
-    opacity: 0.7,
-  };
-}
-
-function inputHintStyle() {
-  return {
-    fontSize: "0.7rem",
-    color: "#4caf50",
-    marginTop: "2px",
-  };
-}
-
-function buttonGroupStyle() {
-  return {
+    background: "rgba(244,67,54,0.15)",
+    border: "1px solid #f44336",
+    borderRadius: 12,
+    padding: "10px 14px",
+    color: "#f44336",
+    marginBottom: "16px",
     display: "flex",
-    gap: "8px",
-    marginBottom: "15px",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    alignItems: "center",
+    fontSize: "0.9rem",
   };
 }
 
-function buttonStyle(enabled) {
+function errorCloseStyle() {
   return {
-    background: enabled
-      ? "radial-gradient(#f7d97c,#d6a12e)"
-      : "rgba(255,255,255,0.1)",
-    border: enabled ? "none" : "1px solid rgba(255,255,255,0.2)",
-    fontWeight: "bold",
-    fontSize: "1rem",
-    padding: "12px 20px",
-    borderRadius: 60,
-    cursor: enabled ? "pointer" : "not-allowed",
-    boxShadow: enabled ? "0 4px 0 #7a4c1a" : "none",
-    color: enabled ? "#2e241f" : "#666",
-    width: "100%",
-    opacity: enabled ? 1 : 0.5,
-    transition: "all 0.3s ease",
-  };
-}
-
-function playerCountStyle() {
-  return {
-    marginBottom: "15px",
-  };
-}
-
-function playerCountButtonStyle(active) {
-  return {
-    background: active
-      ? "radial-gradient(#f7d97c,#d6a12e)"
-      : "rgba(255,255,255,0.1)",
-    border: active ? "none" : "1px solid rgba(255,255,255,0.2)",
-    color: active ? "#2e241f" : "#888",
-    padding: "8px 16px",
-    borderRadius: 20,
+    background: "none",
+    border: "none",
+    color: "#f44336",
     cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: "0.9rem",
-    transition: "all 0.3s ease",
-    flex: 1,
-  };
-}
-
-function dividerStyle() {
-  return {
-    textAlign: "center",
-    color: "#888",
-    margin: "15px 0",
-    fontSize: "0.9rem",
+    fontSize: "1rem",
+    padding: "0 4px",
   };
 }
 
@@ -619,73 +678,401 @@ function successStyle() {
   return {
     background: "rgba(76,175,80,0.15)",
     border: "1px solid #4caf50",
-    borderRadius: 15,
-    padding: "10px",
-    marginBottom: "15px",
-    fontSize: "0.9rem",
+    borderRadius: 12,
+    padding: "10px 14px",
     color: "#4caf50",
-    textAlign: "center",
-  };
-}
-
-function copyButtonStyle() {
-  return {
-    background: "rgba(255,255,255,0.1)",
-    border: "none",
-    borderRadius: 10,
-    padding: "2px 10px",
-    color: "#aaa",
-    cursor: "pointer",
-    fontSize: "0.7rem",
-    marginLeft: "8px",
-  };
-}
-
-function errorStyle() {
-  return {
-    marginTop: "15px",
-    padding: "10px",
-    background: "rgba(244,67,54,0.2)",
-    borderRadius: 15,
-    color: "#f44336",
-    textAlign: "center",
+    marginBottom: "16px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
     fontSize: "0.9rem",
   };
 }
 
-function infoStyle() {
+function successCloseStyle() {
   return {
-    marginTop: "15px",
-    padding: "10px",
-    background: "rgba(255,215,0,0.05)",
-    borderRadius: 15,
-    color: "#888",
-    textAlign: "center",
-    fontSize: "0.8rem",
-    lineHeight: "1.6",
+    background: "none",
+    border: "none",
+    color: "#4caf50",
+    cursor: "pointer",
+    fontSize: "1rem",
+    padding: "0 4px",
   };
 }
 
-function loadingContainerStyle() {
+function inviteBannerStyle() {
+  return {
+    background: "rgba(255,215,0,0.12)",
+    border: "2px solid gold",
+    borderRadius: 16,
+    padding: "14px 18px",
+    marginBottom: "18px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "12px",
+  };
+}
+
+function inviteContentStyle() {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  };
+}
+
+function inviteIconStyle() {
+  return {
+    fontSize: "2rem",
+  };
+}
+
+function inviteTitleStyle() {
+  return {
+    fontWeight: "bold",
+    fontSize: "1rem",
+    color: "gold",
+  };
+}
+
+function invitePlayersStyle() {
+  return {
+    fontSize: "0.8rem",
+    color: "var(--text-muted)",
+  };
+}
+
+function inviteActionsStyle() {
+  return {
+    display: "flex",
+    gap: "8px",
+  };
+}
+
+function inviteAcceptStyle() {
+  return {
+    background: "rgba(76,175,80,0.2)",
+    border: "1px solid #4caf50",
+    borderRadius: 12,
+    padding: "6px 16px",
+    color: "#4caf50",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "0.85rem",
+    transition: "all 0.3s ease",
+  };
+}
+
+function inviteDeclineStyle() {
+  return {
+    background: "rgba(244,67,54,0.15)",
+    border: "1px solid #f44336",
+    borderRadius: 12,
+    padding: "6px 16px",
+    color: "#f44336",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "0.85rem",
+    transition: "all 0.3s ease",
+  };
+}
+
+function createSectionStyle() {
+  return {
+    background: "rgba(255,215,0,0.05)",
+    borderRadius: 16,
+    padding: "16px",
+    marginBottom: "20px",
+    border: "1px solid rgba(255,215,0,0.1)",
+  };
+}
+
+function sectionTitleStyle() {
+  return {
+    margin: "0 0 12px 0",
+    fontSize: "0.95rem",
+    color: "var(--text-secondary)",
+    fontWeight: "600",
+  };
+}
+
+function createRowStyle() {
+  return {
+    display: "flex",
+    gap: "12px",
+    alignItems: "flex-end",
+    flexWrap: "wrap",
+  };
+}
+
+function playersSelectStyle() {
   return {
     display: "flex",
     flexDirection: "column",
+    gap: "4px",
+    flex: 1,
+    minWidth: "120px",
+  };
+}
+
+function labelStyle() {
+  return {
+    fontSize: "0.8rem",
+    color: "var(--text-muted)",
+    fontWeight: "500",
+  };
+}
+
+function selectStyle() {
+  return {
+    padding: "8px 12px",
+    borderRadius: 12,
+    border: "1px solid var(--border-input)",
+    background: "var(--bg-input)",
+    color: "var(--text-primary)",
+    fontSize: "0.9rem",
+    outline: "none",
+    cursor: "pointer",
+    transition: "var(--transition-theme)",
+  };
+}
+
+function createButtonStyle(disabled) {
+  return {
+    padding: "10px 24px",
+    borderRadius: 30,
+    border: "none",
+    background: disabled ? "#444" : "radial-gradient(#f7d97c, #d6a12e)",
+    color: disabled ? "#888" : "#2e241f",
+    fontWeight: "bold",
+    fontSize: "0.95rem",
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.6 : 1,
+    transition: "all 0.3s ease",
+    whiteSpace: "nowrap",
+    minWidth: "120px",
+    display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "40px 20px",
   };
 }
 
-function loadingSpinnerStyle() {
+function roomsSectionStyle() {
   return {
-    fontSize: "4rem",
-    marginBottom: "20px",
+    marginBottom: "16px",
   };
 }
 
-function loadingTextStyle() {
+function roomsHeaderStyle() {
   return {
-    color: "#aaa",
-    fontSize: "1rem",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "12px",
+  };
+}
+
+function refreshButtonStyle() {
+  return {
+    background: "none",
+    border: "none",
+    color: "var(--text-muted)",
+    fontSize: "1.2rem",
+    cursor: "pointer",
+    padding: "4px 8px",
+    borderRadius: 8,
+    transition: "all 0.3s ease",
+  };
+}
+
+function loadingStyle() {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "12px",
+    padding: "30px 0",
+    color: "var(--text-muted)",
+    fontSize: "0.9rem",
+  };
+}
+
+function spinnerStyle() {
+  return {
+    display: "inline-block",
+    width: 20,
+    height: 20,
+    border: "2px solid rgba(255,215,0,0.2)",
+    borderTop: "2px solid gold",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+  };
+}
+
+function emptyStyle() {
+  return {
+    textAlign: "center",
+    padding: "30px 0",
+    color: "var(--text-muted)",
+  };
+}
+
+function emptySubStyle() {
+  return {
+    fontSize: "0.8rem",
+    marginTop: "4px",
+    opacity: 0.7,
+  };
+}
+
+function roomsListStyle() {
+  return {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    maxHeight: "250px",
+    overflowY: "auto",
+    paddingRight: "4px",
+  };
+}
+
+function roomItemStyle(isFull, isInRoom) {
+  return {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "12px 16px",
+    background: isInRoom
+      ? "rgba(76,175,80,0.08)"
+      : isFull
+        ? "rgba(244,67,54,0.05)"
+        : "rgba(255,255,255,0.03)",
+    borderRadius: 12,
+    border: isInRoom
+      ? "2px solid #4caf50"
+      : isFull
+        ? "1px solid rgba(244,67,54,0.2)"
+        : "1px solid var(--border-light)",
+    transition: "all 0.3s ease",
+  };
+}
+
+function roomInfoStyle() {
+  return {
+    flex: 1,
+    minWidth: 0,
+  };
+}
+
+function roomIdStyle() {
+  return {
+    fontWeight: "bold",
+    fontSize: "0.95rem",
+    color: "gold",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  };
+}
+
+function gameActiveBadgeStyle() {
+  return {
+    fontSize: "0.6rem",
+    background: "rgba(255,152,0,0.2)",
+    color: "#ff9800",
+    padding: "2px 8px",
+    borderRadius: 10,
+    border: "1px solid rgba(255,152,0,0.2)",
+  };
+}
+
+function inRoomBadgeStyle() {
+  return {
+    fontSize: "0.6rem",
+    background: "rgba(76,175,80,0.2)",
+    color: "#4caf50",
+    padding: "2px 8px",
+    borderRadius: 10,
+    border: "1px solid rgba(76,175,80,0.2)",
+  };
+}
+
+function roomDetailsStyle() {
+  return {
+    fontSize: "0.75rem",
+    color: "var(--text-muted)",
+    marginTop: "4px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  };
+}
+
+function playerNamesStyle() {
+  return {
+    fontSize: "0.7rem",
+    color: "var(--text-muted)",
+    opacity: 0.7,
+  };
+}
+
+function joinButtonStyle(isFull, isInRoom) {
+  return {
+    padding: "6px 16px",
+    borderRadius: 20,
+    border: "none",
+    background: isInRoom
+      ? "rgba(76,175,80,0.2)"
+      : isFull
+        ? "#333"
+        : "rgba(76,175,80,0.15)",
+    color: isInRoom ? "#4caf50" : isFull ? "#666" : "#4caf50",
+    fontWeight: "bold",
+    fontSize: "0.8rem",
+    cursor: isFull && !isInRoom ? "not-allowed" : "pointer",
+    opacity: isFull && !isInRoom ? 0.5 : 1,
+    transition: "all 0.3s ease",
+    whiteSpace: "nowrap",
+    border: isInRoom
+      ? "1px solid #4caf50"
+      : isFull
+        ? "1px solid #444"
+        : "1px solid rgba(76,175,80,0.3)",
+  };
+}
+
+function chatWrapperStyle() {
+  return {
+    marginTop: "16px",
+    paddingTop: "12px",
+    borderTop: "1px solid var(--border-light)",
+  };
+}
+
+function footerStyle() {
+  return {
+    display: "flex",
+    justifyContent: "flex-end",
+    marginTop: "16px",
+    paddingTop: "12px",
+    borderTop: "1px solid var(--border-light)",
+  };
+}
+
+function cancelButtonStyle() {
+  return {
+    padding: "8px 20px",
+    borderRadius: 20,
+    border: "1px solid rgba(244,67,54,0.3)",
+    background: "rgba(244,67,54,0.1)",
+    color: "#f44336",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "0.85rem",
+    transition: "all 0.3s ease",
   };
 }
