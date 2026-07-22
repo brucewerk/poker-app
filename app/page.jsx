@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // app/page.jsx - CORREÇÃO COM TOAST APENAS PARA EVENTOS IMPORTANTES
+=======
+// app/page.jsx - COMPLETO COM TEMA ESCURO/CLARO
+>>>>>>> cdb7dbac22452f7964d2af978845d05889b05119
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -2355,6 +2359,7 @@ export default function PokerGame() {
   }
 
   return (
+<<<<<<< HEAD
     <>
       {/* 🔥 TOAST APENAS PARA EVENTOS IMPORTANTES */}
       <AnimatePresence mode="wait">
@@ -2410,14 +2415,36 @@ export default function PokerGame() {
           </div>
         )}
 
+=======
+    <div
+      style={{
+        margin: 0,
+        minHeight: "100vh",
+        background: "var(--bg-primary)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        fontFamily: "'Segoe UI','Poppins',system-ui,sans-serif",
+        padding: 15,
+        userSelect: "none",
+        position: "relative",
+        transition: "var(--transition-theme)",
+      }}
+    >
+      {currentUser && (
+>>>>>>> cdb7dbac22452f7964d2af978845d05889b05119
         <div
           style={{
             position: "fixed",
             top: 10,
             left: 10,
             zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
+          <ThemeToggle />
           <motion.button
             onClick={() => setShowTournamentLobby(true)}
             style={tournamentButtonStyle}
@@ -2486,6 +2513,7 @@ export default function PokerGame() {
           />
         )}
 
+<<<<<<< HEAD
         {showTournamentLobby && (
           <TournamentLobby
             onClose={() => setShowTournamentLobby(false)}
@@ -2494,6 +2522,25 @@ export default function PokerGame() {
         )}
 
         <motion.div
+=======
+      <motion.div
+        style={{
+          background:
+            "radial-gradient(circle at 30% 20%, var(--bg-felt), var(--bg-primary))",
+          borderRadius: 50,
+          boxShadow:
+            "var(--table-shadow), inset 0 2px 5px rgba(255,255,255,0.2)",
+          padding: 20,
+          maxWidth: 1600,
+          width: "100%",
+          transition: "var(--transition-theme)",
+        }}
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+      >
+        <div
+>>>>>>> cdb7dbac22452f7964d2af978845d05889b05119
           style={{
             background:
               "radial-gradient(circle at 30% 20%, var(--bg-felt), var(--bg-primary))",
@@ -2511,11 +2558,154 @@ export default function PokerGame() {
         >
           <div
             style={{
+<<<<<<< HEAD
               background: "rgba(0,20,0,0.3)",
               borderRadius: 40,
               padding: 15,
             }}
           >
+=======
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              background: "var(--bg-header)",
+              backdropFilter: "blur(8px)",
+              borderRadius: 50,
+              padding: "8px 20px",
+              marginBottom: 20,
+              flexWrap: "wrap",
+              gap: 10,
+              transition: "var(--transition-theme)",
+            }}
+          >
+            {[
+              ["💰", g.pot],
+              ["🎴", stageNames[g.stage] || g.stage],
+              ["👤", g.playerMoney],
+              ["🤖", g.cpuMoney],
+              ["📊", `Aposta: ${g.currentBet}`],
+              ["🚀", isTurbo ? "Turbo" : "Normal"],
+              ["👥", isMultiplayer && multiplayerModeActive ? "2P" : "1P"],
+            ].map(([icon, val], i) => (
+              <motion.div
+                key={`header-${i}-${icon}`}
+                style={{
+                  background: "var(--bg-button)",
+                  padding: "5px 15px",
+                  borderRadius: 40,
+                  color: "var(--text-primary)",
+                  fontWeight: "bold",
+                  fontSize: "0.9rem",
+                  whiteSpace: "nowrap",
+                  transition: "var(--transition-theme)",
+                }}
+                whileHover={{ scale: 1.03 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <span
+                  style={{
+                    color:
+                      icon === "🚀"
+                        ? isTurbo
+                          ? "#ff9800"
+                          : "#888"
+                        : icon === "👥"
+                          ? isMultiplayer && multiplayerModeActive
+                            ? "#4caf50"
+                            : "#888"
+                          : "gold",
+                    fontSize: "1.1rem",
+                    fontWeight: 800,
+                    marginRight: 5,
+                  }}
+                >
+                  {icon}
+                </span>
+                {val}
+              </motion.div>
+            ))}
+          </div>
+
+          {isMultiplayer &&
+            multiplayerModeActive &&
+            multiplayerPlayers.length > 0 && (
+              <PlayerSelector
+                players={multiplayerPlayers}
+                currentPlayer={currentPlayerIndex}
+                onSelectPlayer={handleSwitchPlayer}
+              />
+            )}
+
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            <div style={{ flex: 3, minWidth: 280 }}>
+              <GameTable
+                communityCards={g.community || []}
+                playerCards={g.playerCards || []}
+                cpuCards={g.cpuCards || []}
+                playerHandName={g.playerHandName}
+                cpuHandName={g.cpuHandName}
+                cpuThought={g.cpuThought}
+                stage={g.stage}
+                pot={g.pot}
+                currentBet={g.currentBet}
+                playerBet={g.playerBet}
+                cpuBet={g.cpuBet}
+                isTurbo={isTurbo}
+                showCpuCards={showCpuCards}
+                isMultiplayer={isMultiplayer && multiplayerModeActive}
+                multiplayerPlayers={multiplayerPlayers}
+                currentPlayerIndex={currentPlayerIndex}
+                onSwitchPlayer={handleSwitchPlayer}
+                currentUser={currentUser}
+              />
+
+              <ActionButtons
+                disabled={disable}
+                canRaise={canRaise}
+                toCall={toCall}
+                nextRaise={nextRaise}
+                onFold={playerFold}
+                onCall={playerCall}
+                onRaise={playerRaise}
+                onAllIn={playerAllIn}
+                onReset={resetSession}
+              />
+
+              {g.winnerMsg && (
+                <motion.div
+                  style={{
+                    background: "#000000bb",
+                    backdropFilter: "blur(12px)",
+                    borderRadius: 40,
+                    padding: "6px 15px",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                    fontSize: "0.85rem",
+                    color: "#ffd966",
+                    marginTop: 12,
+                  }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  {g.winnerMsg}
+                </motion.div>
+              )}
+              <div
+                style={{
+                  textAlign: "center",
+                  marginTop: 12,
+                  fontSize: "0.7rem",
+                  color: "var(--text-muted)",
+                  textShadow: "1px 1px 0 #2a1f0e",
+                  transition: "var(--transition-theme)",
+                }}
+              >
+                Desenvolvido por BruCe - 2026
+              </div>
+            </div>
+
+>>>>>>> cdb7dbac22452f7964d2af978845d05889b05119
             <div
               style={{
                 display: "flex",
