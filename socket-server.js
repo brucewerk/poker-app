@@ -1,4 +1,4 @@
-// socket-server.js - COMPLETO CORRIGIDO
+// socket-server.js - COMPLETO CORRIGIDO SEM ERROS DE SINTAXE
 const { Server } = require("socket.io");
 
 // ====================== ESTADO ======================
@@ -6,7 +6,12 @@ const rooms = new Map();
 const onlineUsers = new Map();
 
 function generateRoomId() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let result = "";
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
 
 function createDeck() {
@@ -123,8 +128,7 @@ const io = new Server({
 });
 
 // ====================== FUNÇÕES PARA API PÚBLICA ======================
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://poker-chi-neon.vercel.app";
+const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 async function getChipsFromDatabase(playerName) {
   try {
@@ -205,36 +209,55 @@ function sanitizeGameState(gameState) {
 async function broadcastRoomList() {
   const roomList = [];
 
+  console.log(`📡 Broadcast room-list: ${rooms.size} salas no total`);
+
   for (const [roomId, room] of rooms) {
-    if (!room) continue;
+    if (!room || !room.players || room.players.length === 0) {
+      if (room && room.players && room.players.length === 0) {
+        rooms.delete(roomId);
+        console.log(`🗑️ Sala ${roomId} removida (vazia)`);
+      }
+      continue;
+    }
 
     const updatedPlayers = [];
     for (const player of room.players) {
       if (!player || !player.name) continue;
-      const currentChips = await getChipsFromDatabase(player.name).catch(
-        () => player.chips || 1000,
-      );
-      updatedPlayers.push({
-        name: player.name,
-        chips: currentChips,
-        isReady: player.isReady || false,
-      });
-      player.chips = currentChips;
+      try {
+        const currentChips = await getChipsFromDatabase(player.name);
+        player.chips = currentChips;
+        updatedPlayers.push({
+          name: player.name,
+          chips: currentChips,
+          isReady: player.isReady || false,
+        });
+      } catch (error) {
+        updatedPlayers.push({
+          name: player.name,
+          chips: player.chips || 1000,
+          isReady: player.isReady || false,
+        });
+      }
     }
 
     roomList.push({
       roomId: roomId,
       players: updatedPlayers,
-      playerCount: room.players ? room.players.length : 0,
+      playerCount: updatedPlayers.length,
       maxPlayers: room.maxPlayers || 6,
       isGameActive: !!room.gameState,
-      hasAvailableSlot:
-        (room.players ? room.players.length : 0) < (room.maxPlayers || 6),
+      hasAvailableSlot: updatedPlayers.length < (room.maxPlayers || 6),
     });
   }
 
+  console.log(`📡 Enviando ${roomList.length} salas para todos os clientes`);
+  roomList.forEach((room) => {
+    console.log(
+      `  🏠 ${room.roomId} - ${room.playerCount}/${room.maxPlayers} jogadores`,
+    );
+  });
+
   io.emit("room-list", roomList);
-  console.log(`📡 Broadcast room-list: ${roomList.length} salas`);
 }
 
 // ====================== EVENTOS ======================
@@ -344,6 +367,7 @@ io.on("connection", (socket) => {
 
   // ====================== LISTAR SALAS ======================
   socket.on("list-rooms", async () => {
+    console.log(`📡 Cliente ${socket.id} solicitou lista de salas`);
     await broadcastRoomList();
   });
 
@@ -393,7 +417,15 @@ io.on("connection", (socket) => {
     socket.emit("room-created", { roomId });
 
     io.to(roomId).emit("room-update", rooms.get(roomId));
+
+    // 🔥 FORÇAR ATUALIZAÇÃO DA LISTA DE SALAS
     await broadcastRoomList();
+    setTimeout(async () => {
+      await broadcastRoomList();
+    }, 200);
+    setTimeout(async () => {
+      await broadcastRoomList();
+    }, 500);
 
     console.log(
       `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas) | Máx: ${maxPlayers} jogadores | Convidados: ${invitedPlayers.join(", ")}`,
@@ -455,7 +487,10 @@ io.on("connection", (socket) => {
     });
 
     io.to(normalizedRoomId).emit("room-update", room);
-    await broadcastRoomList();
+
+    setTimeout(async () => {
+      await broadcastRoomList();
+    }, 100);
   });
 
   // ====================== PRONTO PARA JOGAR ======================
@@ -1196,12 +1231,11 @@ io.on("connection", (socket) => {
     await broadcastRoomList();
   });
 
-  // ====================== JOGADOR SAIU DA SALA (confirmacao) ======================
+  // ====================== JOGADOR SAIU DA SALA ======================
   socket.on("player-left-room", (data) => {
     const { roomId, playerName } = data;
     console.log(`👤 ${playerName} confirmou saída da sala ${roomId}`);
 
-    // 🔥 Notificar o FriendsList do jogador que ele saiu
     socket.emit("leave-room-response", {
       roomId: roomId,
       playerName: playerName,
@@ -1280,3 +1314,6 @@ console.log(`   ✅ Criação de sala antes do envio de convites`);
 console.log(`   ✅ Logs detalhados para debug`);
 console.log(`   ✅ Broadcast de salas para todos os usuários`);
 console.log(`   ✅ Reset automático do estado do lobby ao sair`);
+console.log(`   ✅ LISTA DE SALAS ATUALIZADA EM TEMPO REAL`);
+console.log(`   ✅ SALAS DISPONÍVEIS NO LOBBY CORRETAMENTE`);
+console.log(`   ✅ MÚLTIPLOS BROADCAST APÓS CRIAR SALA`);

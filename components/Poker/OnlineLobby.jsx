@@ -1,4 +1,4 @@
-// components/Poker/OnlineLobby.jsx - CORRIGIDO (sem document no server)
+// components/Poker/OnlineLobby.jsx - CORRIGIDO: SALAS APARECEM NA LISTA
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -20,13 +20,14 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
   const [currentRoomId, setCurrentRoomId] = useState(null);
   const socketRef = useRef(null);
   const roomListInterval = useRef(null);
+  const isMounted = useRef(true);
+  const fetchTimeoutRef = useRef(null);
 
   const SOCKET_URL =
     process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
-  // 🔥 ADICIONAR ESTILOS GLOBAIS NO CLIENTE APENAS
+  // 🔥 ADICIONAR ESTILOS GLOBAIS
   useEffect(() => {
-    // Verificar se está no navegador
     if (
       typeof window !== "undefined" &&
       !document.getElementById("online-lobby-styles")
@@ -45,7 +46,12 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
 
   // ====================== CONECTAR AO SOCKET ======================
   useEffect(() => {
-    if (!currentUser) return;
+    isMounted.current = true;
+
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
 
     console.log(`🔵 OnlineLobby: Conectando ao Socket.IO para ${currentUser}`);
 
@@ -65,7 +71,11 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       console.log(`🟢 OnlineLobby: Socket conectado (${socket.id})`);
       setIsConnected(true);
       socket.emit("friend-online", { username: currentUser });
-      fetchRooms();
+
+      // 🔥 SOLICITAR LISTA DE SALAS AO CONECTAR (com delay para garantir)
+      setTimeout(() => {
+        fetchRooms();
+      }, 500);
     });
 
     socket.on("disconnect", () => {
@@ -79,14 +89,39 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       setError("❌ Erro de conexão com o servidor");
     });
 
-    // 🔥 RECEBER LISTA DE SALAS
+    // 🔥 RECEBER LISTA DE SALAS - CORRIGIDO
     socket.on("room-list", (roomList) => {
-      console.log("📡 Lista de salas recebida:", roomList.length);
-      setRooms(roomList || []);
-      setLoading(false);
+      console.log(
+        "📡 Lista de salas recebida:",
+        roomList?.length || 0,
+        "salas",
+      );
+
+      if (isMounted.current) {
+        if (roomList && Array.isArray(roomList)) {
+          // 🔥 FILTRAR SALAS VÁLIDAS - APENAS COM JOGADORES
+          const validRooms = roomList.filter((room) => {
+            const hasValidId = room.roomId && room.roomId.length > 0;
+            const hasPlayers = room.players && room.players.length > 0;
+            return hasValidId && hasPlayers;
+          });
+
+          console.log("📡 Salas válidas:", validRooms.length);
+          if (validRooms.length > 0) {
+            console.log(
+              "📡 Detalhes das salas:",
+              JSON.stringify(validRooms, null, 2),
+            );
+          }
+          setRooms(validRooms);
+        } else {
+          setRooms([]);
+        }
+        setLoading(false);
+      }
     });
 
-    // 🔥 CONVITE EM GRUPO - REDIRECIONAR PARA A SALA
+    // 🔥 CONVITE EM GRUPO
     socket.on("group-invite", (data) => {
       console.log("📡 Convite recebido no lobby:", data);
 
@@ -125,15 +160,24 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       }
     });
 
-    // 🔥 SALA CRIADA
+    // 🔥 SALA CRIADA - FORÇAR ATUALIZAÇÃO DA LISTA
     socket.on("room-created", (data) => {
       console.log("✅ Sala criada:", data);
       setCreating(false);
       setCurrentRoomId(data.roomId);
       setSuccess(`✅ Sala ${data.roomId} criada com sucesso!`);
 
+      // 🔥 FORÇAR ATUALIZAÇÃO DA LISTA DE SALAS (múltiplas tentativas)
+      const fetchRoomsMultiple = () => {
+        fetchRooms();
+        setTimeout(() => fetchRooms(), 500);
+        setTimeout(() => fetchRooms(), 1500);
+      };
+
+      fetchRoomsMultiple();
+
       setTimeout(() => {
-        if (onJoinGame) {
+        if (onJoinGame && isMounted.current) {
           onJoinGame({
             roomId: data.roomId,
             playerName: currentUser,
@@ -141,30 +185,36 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
             isInviteCreator: true,
           });
         }
-      }, 500);
+      }, 800);
     });
 
     // 🔥 ATUALIZAÇÃO DA SALA
     socket.on("room-update", (data) => {
-      console.log("📡 Atualização da sala recebida");
-      fetchRooms();
+      console.log("📡 Atualização da sala recebida:", data);
+      // 🔥 FORÇAR ATUALIZAÇÃO DA LISTA
+      setTimeout(() => fetchRooms(), 300);
     });
 
     // 🔥 MENSAGEM DE ERRO
     socket.on("error", (data) => {
       console.error("❌ Erro do servidor:", data);
-      setError(`❌ ${data.message || "Erro desconhecido"}`);
+      if (data && data.message) {
+        setError(`❌ ${data.message}`);
+      } else {
+        setError("❌ Erro desconhecido");
+      }
       setTimeout(() => setError(""), 5000);
     });
 
-    // 🔥 Buscar salas periodicamente
+    // 🔥 Buscar salas periodicamente (a cada 5 segundos)
     roomListInterval.current = setInterval(() => {
-      if (isConnected) {
+      if (isConnected && isMounted.current) {
         fetchRooms();
       }
-    }, 10000);
+    }, 5000);
 
     return () => {
+      isMounted.current = false;
       socket.off("connect");
       socket.off("disconnect");
       socket.off("connect_error");
@@ -179,12 +229,20 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         clearInterval(roomListInterval.current);
         roomListInterval.current = null;
       }
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+      }
     };
   }, [currentUser, onJoinGame]);
 
   // ====================== BUSCAR SALAS ======================
   const fetchRooms = useCallback(() => {
-    if (!socketRef.current || !isConnected) return;
+    if (!socketRef.current || !isConnected) {
+      console.log("⚠️ Socket não conectado, não é possível buscar salas");
+      return;
+    }
+    console.log("📡 Solicitando lista de salas...");
     socketRef.current.emit("list-rooms");
   }, [isConnected]);
 
@@ -203,6 +261,10 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
     setCreating(true);
     setError("");
     setSuccess("");
+
+    console.log(
+      `📤 Criando sala para ${currentUser} com ${maxPlayers} jogadores...`,
+    );
 
     socketRef.current.emit("create-room", {
       playerName: currentUser,
@@ -244,6 +306,8 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       setSuccess("");
       setCurrentRoomId(normalizedRoomId);
 
+      console.log(`📤 Entrando na sala ${normalizedRoomId}...`);
+
       socketRef.current.emit("join-room", {
         roomId: normalizedRoomId,
         playerName: currentUser,
@@ -251,7 +315,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
 
       const joinTimeout = setTimeout(() => {
         setJoining(false);
-        if (onJoinGame) {
+        if (onJoinGame && isMounted.current) {
           onJoinGame({
             roomId: normalizedRoomId,
             playerName: currentUser,
@@ -264,7 +328,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         if (data.players?.some((p) => p.name === currentUser)) {
           setJoining(false);
           clearTimeout(joinTimeout);
-          if (onJoinGame) {
+          if (onJoinGame && isMounted.current) {
             onJoinGame({
               roomId: normalizedRoomId,
               playerName: currentUser,
@@ -309,7 +373,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       });
 
       setTimeout(() => {
-        if (onJoinGame) {
+        if (onJoinGame && isMounted.current) {
           onJoinGame({
             roomId: roomId,
             playerName: currentUser,
@@ -568,7 +632,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
   );
 }
 
-// ====================== ESTILOS ======================
+// ====================== ESTILOS (MANTIDOS IGUAIS) ======================
 
 function overlayStyle() {
   return {

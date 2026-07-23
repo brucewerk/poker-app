@@ -1,4 +1,4 @@
-// components/Poker/ThemeToggle.jsx
+// components/Poker/ThemeToggle.jsx - ESTILO UNIFICADO COM OS DEMAIS BOTÕES
 "use client";
 
 import { useTheme } from "@/app/theme/ThemeContext";
@@ -27,26 +27,29 @@ export default function ThemeToggle() {
           <span style={iconStyle()}>☀️</span>
         )}
       </motion.div>
-      <span style={labelStyle()}>{isDark ? "Escuro" : "Claro"}</span>
     </motion.button>
   );
 }
 
+// ====================== ESTILOS ======================
 function buttonStyle() {
   return {
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: 30,
-    padding: "6px 14px",
+    width: 44,
+    height: 44,
+    background: "rgba(0,0,0,0.6)",
+    border: "1px solid rgba(255,255,255,0.2)",
+    borderRadius: "50%",
     color: "white",
+    fontSize: "1.2rem",
     cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    transition: "all 0.3s ease",
     backdropFilter: "blur(4px)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    transition: "all 0.3s ease",
+    position: "relative",
     fontFamily: "inherit",
-    fontSize: "0.8rem",
+    outline: "none",
   };
 }
 
@@ -64,13 +67,5 @@ function iconStyle() {
   return {
     fontSize: "1.1rem",
     lineHeight: 1,
-  };
-}
-
-function labelStyle() {
-  return {
-    fontSize: "0.7rem",
-    fontWeight: "600",
-    color: "#aaa",
   };
 }

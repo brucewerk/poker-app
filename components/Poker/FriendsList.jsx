@@ -1,4 +1,4 @@
-// components/Poker/FriendsList.jsx - CONVITE FLUTUANTE + FEEDBACKS CLICÁVEIS + FILA DE CONVITES
+// components/Poker/FriendsList.jsx - COM NOTIFICAÇÕES DE CHAT E CONVITES
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -33,10 +33,14 @@ export default function FriendsList({ username, onJoinGame }) {
   const [isInLobby, setIsInLobby] = useState(false);
   const [isProcessingInvite, setIsProcessingInvite] = useState(false);
 
-  // 🔥 CONVITE FLUTUANTE (COM BOTÕES)
+  // 🔥 CONVITE FLUTUANTE
   const [floatingInvite, setFloatingInvite] = useState(null);
   const [showFloatingInvite, setShowFloatingInvite] = useState(false);
-  const [pendingInviteQueue, setPendingInviteQueue] = useState([]); // 🔥 FILA DE CONVITES
+  const [pendingInviteQueue, setPendingInviteQueue] = useState([]);
+
+  // 🔥 NOTIFICAÇÕES
+  const [notificationBadge, setNotificationBadge] = useState(0);
+  const [lastNotification, setLastNotification] = useState(null);
 
   // 🔥 FEEDBACKS NO CARD
   const [cardFeedback, setCardFeedback] = useState(null);
@@ -61,22 +65,19 @@ export default function FriendsList({ username, onJoinGame }) {
     process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
   // ============================================================
-  // 🔥 useMemo - CALCULAR TOTAL DE NÃO LIDAS
+  // 🔥 useMemo
   // ============================================================
   const totalUnread = useMemo(() => {
     return Object.values(unreadChats).reduce((a, b) => a + b, 0);
   }, [unreadChats]);
 
-  // ============================================================
-  // 🔥 useMemo - LISTA DE AMIGOS ORDENADA
-  // ============================================================
   const sortedFriends = useMemo(
     () => [...friends].sort((a, b) => b.chips - a.chips),
     [friends],
   );
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA ROLAR PARA O FINAL DO CHAT
+  // 🔥 FUNÇÃO PARA ROLAR CHAT
   // ============================================================
   const scrollChatToBottom = useCallback(() => {
     if (chatEndRef.current) {
@@ -86,7 +87,6 @@ export default function FriendsList({ username, onJoinGame }) {
       });
       return;
     }
-
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop =
         messagesContainerRef.current.scrollHeight;
@@ -94,7 +94,7 @@ export default function FriendsList({ username, onJoinGame }) {
   }, []);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA MOSTRAR FEEDBACK NO CARD (CLICÁVEL OU NÃO)
+  // 🔥 FUNÇÃO PARA MOSTRAR FEEDBACK NO CARD
   // ============================================================
   const showCardFeedback = useCallback(
     (
@@ -109,6 +109,19 @@ export default function FriendsList({ username, onJoinGame }) {
         cardFeedbackTimerRef.current = null;
       }
 
+      if (
+        cardFeedback?.message === message &&
+        cardFeedback?.isError === isError
+      ) {
+        cardFeedbackTimerRef.current = setTimeout(() => {
+          setCardFeedback(null);
+          setFeedbackIsClickable(false);
+          setFeedbackClickAction(null);
+          cardFeedbackTimerRef.current = null;
+        }, duration);
+        return;
+      }
+
       setCardFeedback({ message, isError });
       setFeedbackIsClickable(clickable);
       setFeedbackClickAction(() => onClick);
@@ -120,20 +133,31 @@ export default function FriendsList({ username, onJoinGame }) {
         cardFeedbackTimerRef.current = null;
       }, duration);
     },
-    [],
+    [cardFeedback],
   );
+
+  // ============================================================
+  // 🔥 FUNÇÃO PARA LIMPAR FEEDBACK
+  // ============================================================
+  const clearCardFeedback = useCallback(() => {
+    if (cardFeedbackTimerRef.current) {
+      clearTimeout(cardFeedbackTimerRef.current);
+      cardFeedbackTimerRef.current = null;
+    }
+    setCardFeedback(null);
+    setFeedbackIsClickable(false);
+    setFeedbackClickAction(null);
+  }, []);
 
   // ============================================================
   // 🔥 FUNÇÃO PARA MOSTRAR CONVITE FLUTUANTE
   // ============================================================
   const showFloatingInviteCard = useCallback(
     (inviteData) => {
-      // 🔥 Se o chat estiver aberto, adicionar à fila
       if (isChatOpenRef.current) {
-        console.log("📥 Chat aberto, convite adicionado à fila");
         setPendingInviteQueue((prev) => [...prev, inviteData]);
         showCardFeedback(
-          `🎯 Novo convite de ${inviteData.from} (aguardando...`,
+          `🎯 Novo convite de ${inviteData.from} (aguardando...)`,
           false,
           4000,
         );
@@ -142,6 +166,10 @@ export default function FriendsList({ username, onJoinGame }) {
 
       setFloatingInvite(inviteData);
       setShowFloatingInvite(true);
+
+      // 🔥 ATUALIZAR BADGE DE NOTIFICAÇÃO
+      setNotificationBadge((prev) => prev + 1);
+      setLastNotification(`🎯 Convite de ${inviteData.from}`);
     },
     [isChatOpenRef, showCardFeedback],
   );
@@ -150,7 +178,6 @@ export default function FriendsList({ username, onJoinGame }) {
     setShowFloatingInvite(false);
     setTimeout(() => setFloatingInvite(null), 300);
 
-    // 🔥 Verificar se há convites na fila
     if (pendingInviteQueue.length > 0) {
       setTimeout(() => {
         const nextInvite = pendingInviteQueue[0];
@@ -179,14 +206,15 @@ export default function FriendsList({ username, onJoinGame }) {
     currentRoomIdRef.current = null;
     closeFloatingInvite();
     setPendingInviteQueue([]);
+    clearCardFeedback();
 
     setTimeout(() => {
       resettingRef.current = false;
     }, 300);
-  }, [username, closeFloatingInvite]);
+  }, [username, closeFloatingInvite, clearCardFeedback]);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA ABRIR CHAT E LIMPAR FEEDBACK
+  // 🔥 FUNÇÃO PARA ABRIR CHAT
   // ============================================================
   const openChat = useCallback(
     (friendUsername) => {
@@ -194,21 +222,18 @@ export default function FriendsList({ username, onJoinGame }) {
       setShowChat(true);
       isChatOpenRef.current = true;
 
-      // 🔥 Limpar feedbacks
-      setCardFeedback(null);
-      setFeedbackIsClickable(false);
-      setFeedbackClickAction(null);
-      if (cardFeedbackTimerRef.current) {
-        clearTimeout(cardFeedbackTimerRef.current);
-        cardFeedbackTimerRef.current = null;
-      }
+      clearCardFeedback();
 
-      // 🔥 Limpar não lidas
+      // 🔥 LIMPAR NÃO LIDAS DO AMIGO
       setUnreadChats((prev) => {
         const newUnread = { ...prev };
         delete newUnread[friendUsername];
         return newUnread;
       });
+
+      // 🔥 ATUALIZAR BADGE
+      const remaining = Object.values(unreadChats).reduce((a, b) => a + b, 0);
+      setNotificationBadge(remaining);
 
       setTimeout(() => {
         if (chatInputRef.current) {
@@ -217,7 +242,7 @@ export default function FriendsList({ username, onJoinGame }) {
         scrollChatToBottom();
       }, 200);
     },
-    [scrollChatToBottom],
+    [scrollChatToBottom, clearCardFeedback, unreadChats],
   );
 
   // ============================================================
@@ -227,9 +252,10 @@ export default function FriendsList({ username, onJoinGame }) {
     if (previousOnJoinGameRef.current !== null && onJoinGame === null) {
       console.log(`🔄 Detectada saída do multiplayer, resetando estado...`);
       resetLobbyState();
+      clearCardFeedback();
     }
     previousOnJoinGameRef.current = onJoinGame;
-  }, [onJoinGame, resetLobbyState]);
+  }, [onJoinGame, resetLobbyState, clearCardFeedback]);
 
   // ============================================================
   // 🔥 useEffect - CONECTAR AO SOCKET
@@ -299,7 +325,7 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
-    // 🔥 RECEBER CONVITE - FLUTUANTE (com fila)
+    // 🔥 RECEBER CONVITE
     socket.on("group-invite", (data) => {
       if (isProcessingInvite) {
         console.log("📡 Já processando um convite, ignorando...");
@@ -321,7 +347,6 @@ export default function FriendsList({ username, onJoinGame }) {
         message: data.message || `${data.from} te convidou para uma partida!`,
       };
 
-      // 🔥 Se o chat estiver aberto, enfileirar
       if (isChatOpenRef.current) {
         setPendingInviteQueue((prev) => [...prev, inviteData]);
         showCardFeedback(
@@ -333,6 +358,7 @@ export default function FriendsList({ username, onJoinGame }) {
         return;
       }
 
+      // 🔥 MOSTRAR CONVITE FLUTUANTE
       showFloatingInviteCard(inviteData);
 
       setPendingInvites((prev) => {
@@ -351,7 +377,7 @@ export default function FriendsList({ username, onJoinGame }) {
       });
     });
 
-    // 🔥 CONVITE ACEITO - FEEDBACK NO CARD
+    // 🔥 CONVITE ACEITO
     socket.on("invite-accepted", (data) => {
       console.log("📡 Convite aceito:", data);
 
@@ -395,7 +421,7 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
-    // 🔥 CONVITE RECUSADO - FEEDBACK NO CARD
+    // 🔥 CONVITE RECUSADO
     socket.on("invite-declined", (data) => {
       console.log("📡 Convite recusado:", data);
 
@@ -434,7 +460,7 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
-    // 🔥 MENSAGEM PRIVADA - FEEDBACK CLICÁVEL
+    // 🔥 MENSAGEM PRIVADA - NOTIFICAÇÃO CLICÁVEL
     socket.on("private-message", (data) => {
       console.log(
         `📡 Mensagem privada recebida de ${data.from}:`,
@@ -458,12 +484,17 @@ export default function FriendsList({ username, onJoinGame }) {
       });
 
       if (selectedChatFriend !== data.from || !showChat) {
+        // 🔥 INCREMENTAR CONTADOR DE NÃO LIDAS
         setUnreadChats((prev) => ({
           ...prev,
           [data.from]: (prev[data.from] || 0) + 1,
         }));
 
-        // 🔥 Feedback clicável - ao clicar abre o chat
+        // 🔥 ATUALIZAR BADGE DE NOTIFICAÇÃO
+        setNotificationBadge((prev) => prev + 1);
+        setLastNotification(`💬 Nova mensagem de ${data.from}`);
+
+        // 🔥 FEEDBACK CLICÁVEL PARA ABRIR CHAT
         showCardFeedback(
           `💬 Nova mensagem de ${data.from} (clique para abrir)`,
           false,
@@ -476,6 +507,7 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
+    // 🔥 ROOM UPDATE
     socket.on("room-update", (data) => {
       if (data && data.players && !resettingRef.current) {
         const playerInRoom = data.players.some((p) => p.name === username);
@@ -484,7 +516,9 @@ export default function FriendsList({ username, onJoinGame }) {
             `🔄 ${username} saiu da sala (room-update), resetando estado...`,
           );
           resetLobbyState();
-          showCardFeedback(`👋 Você saiu da sala`, false, 2000);
+          if (!cardFeedback) {
+            showCardFeedback(`👋 Você saiu da sala`, false, 2000);
+          }
         }
         if (playerInRoom && data.roomId) {
           currentRoomIdRef.current = data.roomId;
@@ -492,6 +526,7 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
+    // 🔥 LEAVE ROOM RESPONSE
     socket.on("leave-room-response", (data) => {
       if (
         data &&
@@ -504,7 +539,9 @@ export default function FriendsList({ username, onJoinGame }) {
         );
         currentRoomIdRef.current = null;
         resetLobbyState();
-        showCardFeedback(`👋 Você saiu da sala`, false, 2000);
+        if (!cardFeedback) {
+          showCardFeedback(`👋 Você saiu da sala`, false, 2000);
+        }
       }
     });
 
@@ -514,7 +551,9 @@ export default function FriendsList({ username, onJoinGame }) {
           `🔄 Jogo resetado, resetando estado do lobby para ${username}`,
         );
         resetLobbyState();
-        showCardFeedback(`🔄 Jogo resetado!`, false, 2000);
+        if (!cardFeedback) {
+          showCardFeedback(`🔄 Jogo resetado!`, false, 2000);
+        }
       }
     });
 
@@ -558,10 +597,7 @@ export default function FriendsList({ username, onJoinGame }) {
         clearTimeout(redirectTimeoutRef.current);
         redirectTimeoutRef.current = null;
       }
-      if (cardFeedbackTimerRef.current) {
-        clearTimeout(cardFeedbackTimerRef.current);
-        cardFeedbackTimerRef.current = null;
-      }
+      clearCardFeedback();
     };
   }, [
     username,
@@ -578,6 +614,8 @@ export default function FriendsList({ username, onJoinGame }) {
     closeFloatingInvite,
     openChat,
     isChatOpenRef,
+    cardFeedback,
+    clearCardFeedback,
   ]);
 
   // ============================================================
@@ -656,8 +694,9 @@ export default function FriendsList({ username, onJoinGame }) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      clearCardFeedback();
     };
-  }, [username, fetchFriends]);
+  }, [username, fetchFriends, clearCardFeedback]);
 
   // ============================================================
   // 🔥 useEffect - POLLING
@@ -696,16 +735,9 @@ export default function FriendsList({ username, onJoinGame }) {
   // ============================================================
   useEffect(() => {
     if (showChat) {
-      // 🔥 Limpar feedbacks quando o chat abre
-      setCardFeedback(null);
-      setFeedbackIsClickable(false);
-      setFeedbackClickAction(null);
-      if (cardFeedbackTimerRef.current) {
-        clearTimeout(cardFeedbackTimerRef.current);
-        cardFeedbackTimerRef.current = null;
-      }
+      clearCardFeedback();
     }
-  }, [showChat]);
+  }, [showChat, clearCardFeedback]);
 
   // ============================================================
   // 🔥 useCallback - SELECIONAR/DESELECIONAR AMIGO
@@ -1070,7 +1102,6 @@ export default function FriendsList({ username, onJoinGame }) {
     isChatOpenRef.current = false;
     setChatInput("");
 
-    // 🔥 Verificar se há convites na fila
     if (pendingInviteQueue.length > 0) {
       setTimeout(() => {
         const nextInvite = pendingInviteQueue[0];
@@ -1144,7 +1175,7 @@ export default function FriendsList({ username, onJoinGame }) {
   }, []);
 
   // ============================================================
-  // 🔥 COMPONENTE DE CHAT (useMemo)
+  // 🔥 COMPONENTE DE CHAT
   // ============================================================
   const ChatPanel = useMemo(() => {
     if (!showChat || !selectedChatFriend) return null;
@@ -1302,7 +1333,7 @@ export default function FriendsList({ username, onJoinGame }) {
   };
 
   // ============================================================
-  // 🔥 COMPONENTE DE FEEDBACK NO CARD (CLICÁVEL)
+  // 🔥 COMPONENTE DE FEEDBACK NO CARD
   // ============================================================
   const CardFeedback = () => {
     if (!cardFeedback) return null;
@@ -1324,7 +1355,7 @@ export default function FriendsList({ username, onJoinGame }) {
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
         onClick={handleClick}
-        title={feedbackIsClickable ? "Clique para abrir o chat" : ""}
+        title={feedbackIsClickable ? "Clique para abrir" : ""}
       >
         <span style={cardFeedbackIconStyle(cardFeedback.isError)}>
           {cardFeedback.isError ? "⚠️" : "💬"}
@@ -1336,9 +1367,7 @@ export default function FriendsList({ username, onJoinGame }) {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setCardFeedback(null);
-            setFeedbackIsClickable(false);
-            setFeedbackClickAction(null);
+            clearCardFeedback();
           }}
           style={cardFeedbackCloseStyle()}
         >
@@ -1439,7 +1468,6 @@ export default function FriendsList({ username, onJoinGame }) {
 
   return (
     <>
-      {/* 🔥 CONVITE FLUTUANTE */}
       <AnimatePresence mode="wait">
         <FloatingInvite />
       </AnimatePresence>
@@ -1464,6 +1492,12 @@ export default function FriendsList({ username, onJoinGame }) {
                 ⏳ Aguardando aceitação...
               </span>
             )}
+            {/* 🔥 BADGE DE NOTIFICAÇÃO */}
+            {notificationBadge > 0 && (
+              <span style={notificationBadgeStyle()}>
+                🔔 {notificationBadge}
+              </span>
+            )}
           </div>
           <div style={headerRightStyle()}>
             <button
@@ -1475,7 +1509,12 @@ export default function FriendsList({ username, onJoinGame }) {
           </div>
         </div>
 
-        {/* 🔥 FEEDBACK NO CARD (CLICÁVEL PARA MENSAGENS) */}
+        {/* 🔥 ÚLTIMA NOTIFICAÇÃO */}
+        {lastNotification && notificationBadge > 0 && (
+          <div style={lastNotificationStyle()}>{lastNotification}</div>
+        )}
+
+        {/* 🔥 FEEDBACK NO CARD */}
         <AnimatePresence>
           <CardFeedback />
         </AnimatePresence>
@@ -1537,13 +1576,21 @@ export default function FriendsList({ username, onJoinGame }) {
                       <span style={friendChipsStyle()}>
                         💰 {friend.chips || 0}
                       </span>
+                      {/* 🔥 INDICADOR DE MENSAGEM NÃO LIDA */}
+                      {unreadChats[friend.username] > 0 && (
+                        <span style={unreadChatBadgeStyle()}>
+                          {unreadChats[friend.username]}
+                        </span>
+                      )}
                     </div>
                     <div style={friendActionsStyle()}>
                       {friend.isOnline && (
                         <>
                           <button
                             onClick={() => openChat(friend.username)}
-                            style={chatButtonStyle()}
+                            style={chatButtonStyle(
+                              unreadChats[friend.username] > 0,
+                            )}
                             title="Abrir chat"
                           >
                             💬
@@ -1594,10 +1641,51 @@ export default function FriendsList({ username, onJoinGame }) {
 }
 
 // ============================================================
-// 🎨 ESTILOS
+// 🎨 ESTILOS (NOVOS E MANTIDOS)
 // ============================================================
 
-// 🔥 ESTILOS DO FEEDBACK NO CARD (CLICÁVEL)
+// 🔥 NOVOS ESTILOS DE NOTIFICAÇÃO
+function notificationBadgeStyle() {
+  return {
+    fontSize: "0.6rem",
+    color: "#fff",
+    background: "#f44336",
+    padding: "2px 8px",
+    borderRadius: 12,
+    border: "1px solid rgba(244,67,54,0.3)",
+    whiteSpace: "nowrap",
+    fontWeight: "bold",
+    animation: "pulse 1.5s ease-in-out infinite",
+  };
+}
+
+function lastNotificationStyle() {
+  return {
+    fontSize: "0.75rem",
+    color: "#ffd700",
+    padding: "4px 10px",
+    background: "rgba(255,215,0,0.1)",
+    borderRadius: 8,
+    border: "1px solid rgba(255,215,0,0.2)",
+    marginBottom: "8px",
+    textAlign: "center",
+  };
+}
+
+function unreadChatBadgeStyle() {
+  return {
+    fontSize: "0.5rem",
+    color: "#fff",
+    background: "#f44336",
+    padding: "1px 6px",
+    borderRadius: 10,
+    minWidth: "16px",
+    textAlign: "center",
+    marginLeft: "4px",
+  };
+}
+
+// 🔥 ESTILOS EXISTENTES (MANTIDOS)
 function cardFeedbackStyle(isError) {
   return {
     background: isError ? "rgba(244,67,54,0.12)" : "rgba(255,215,0,0.12)",
@@ -1613,9 +1701,6 @@ function cardFeedbackStyle(isError) {
     backdropFilter: "blur(4px)",
     WebkitBackdropFilter: "blur(4px)",
     transition: "all 0.2s ease",
-    ":hover": {
-      opacity: 0.9,
-    },
   };
 }
 
@@ -1660,7 +1745,6 @@ function cardFeedbackCloseStyle() {
   };
 }
 
-// 🔥 ESTILOS DO CONVITE FLUTUANTE
 function floatingInviteOverlayStyle() {
   return {
     position: "fixed",
@@ -1808,10 +1892,6 @@ function floatingInviteHintStyle() {
     color: "#666",
   };
 }
-
-// ============================================================
-// 🔥 ESTILOS DO PAINEL PRINCIPAL (MANTIDOS)
-// ============================================================
 
 function panelStyle() {
   return {
@@ -2080,6 +2160,41 @@ function friendActionsStyle() {
   };
 }
 
+function chatButtonStyle(hasUnread) {
+  return {
+    background: hasUnread ? "rgba(244,67,54,0.2)" : "rgba(33,150,243,0.15)",
+    border: hasUnread
+      ? "1px solid rgba(244,67,54,0.3)"
+      : "1px solid rgba(33,150,243,0.2)",
+    borderRadius: "50%",
+    width: 28,
+    height: 28,
+    color: hasUnread ? "#f44336" : "#2196f3",
+    cursor: "pointer",
+    fontSize: "0.8rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    transition: "all 0.3s ease",
+  };
+}
+
+function unreadBadgeStyle() {
+  return {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    background: "#f44336",
+    color: "white",
+    fontSize: "0.5rem",
+    borderRadius: "50%",
+    padding: "1px 4px",
+    minWidth: "16px",
+    textAlign: "center",
+  };
+}
+
 function inviteButtonStyle() {
   return {
     background: "rgba(76,175,80,0.15)",
@@ -2107,39 +2222,6 @@ function removeButtonStyle() {
     padding: "4px 8px",
     borderRadius: 5,
     transition: "all 0.3s ease",
-  };
-}
-
-function chatButtonStyle() {
-  return {
-    background: "rgba(33,150,243,0.15)",
-    border: "1px solid rgba(33,150,243,0.2)",
-    borderRadius: "50%",
-    width: 28,
-    height: 28,
-    color: "#2196f3",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-    transition: "all 0.3s ease",
-  };
-}
-
-function unreadBadgeStyle() {
-  return {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    background: "#f44336",
-    color: "white",
-    fontSize: "0.5rem",
-    borderRadius: "50%",
-    padding: "1px 4px",
-    minWidth: "16px",
-    textAlign: "center",
   };
 }
 
@@ -2471,50 +2553,5 @@ function inviteCancelStyle() {
     cursor: "pointer",
     fontWeight: "bold",
     transition: "all 0.3s ease",
-  };
-}
-
-function acceptButtonStyle() {
-  return {
-    background: "rgba(76,175,80,0.2)",
-    border: "1px solid #4caf50",
-    borderRadius: 12,
-    padding: "4px 12px",
-    color: "#4caf50",
-    fontSize: "0.7rem",
-    cursor: "pointer",
-    fontWeight: "bold",
-    transition: "all 0.3s ease",
-    whiteSpace: "nowrap",
-  };
-}
-
-function declineButtonStyle() {
-  return {
-    background: "rgba(244,67,54,0.15)",
-    border: "1px solid #f44336",
-    borderRadius: 12,
-    padding: "4px 12px",
-    color: "#f44336",
-    fontSize: "0.7rem",
-    cursor: "pointer",
-    fontWeight: "bold",
-    transition: "all 0.3s ease",
-    whiteSpace: "nowrap",
-  };
-}
-
-function joinGameButtonStyle() {
-  return {
-    background: "rgba(76,175,80,0.2)",
-    border: "1px solid #4caf50",
-    borderRadius: 12,
-    padding: "6px 16px",
-    color: "#4caf50",
-    fontSize: "0.7rem",
-    cursor: "pointer",
-    fontWeight: "bold",
-    transition: "all 0.3s ease",
-    whiteSpace: "nowrap",
   };
 }
