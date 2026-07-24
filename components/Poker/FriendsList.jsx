@@ -1,4 +1,3 @@
-// components/Poker/FriendsList.jsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -37,10 +36,11 @@ export default function FriendsList({ username, onJoinGame }) {
   const [showFloatingInvite, setShowFloatingInvite] = useState(false);
   const [pendingInviteQueue, setPendingInviteQueue] = useState([]);
 
-  // 🔥 NOTIFICAÇÃO DE CHAT
-  const [chatNotification, setChatNotification] = useState(null);
-  const chatNotifTimeoutRef = useRef(null);
-  const chatNotifQueueRef = useRef([]);
+  // 🔥 NOTIFICAÇÕES FLUTUANTES
+  const [notifications, setNotifications] = useState([]);
+
+  // 🔥 CONTROLE PARA EVITAR DUPLICIDADE DE CONVITES
+  const processedInvitesRef = useRef(new Set());
 
   // 🔥 FEEDBACKS NO CARD
   const [cardFeedback, setCardFeedback] = useState(null);
@@ -78,6 +78,33 @@ export default function FriendsList({ username, onJoinGame }) {
   );
 
   // ============================================================
+  // 🔥 FUNÇÃO PARA ADICIONAR NOTIFICAÇÃO FLUTUANTE
+  // ============================================================
+  const addNotification = useCallback((type, title, message, action = null) => {
+    const id = Date.now() + Math.random();
+    const newNotif = {
+      id,
+      type,
+      title,
+      message,
+      action,
+      timestamp: Date.now(),
+    };
+
+    setNotifications((prev) => [...prev, newNotif]);
+
+    if (type !== "invite_received") {
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+      }, 6000);
+    }
+  }, []);
+
+  const removeNotification = useCallback((id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  // ============================================================
   // 🔥 FUNÇÃO PARA ROLAR CHAT
   // ============================================================
   const scrollChatToBottom = useCallback(() => {
@@ -93,45 +120,6 @@ export default function FriendsList({ username, onJoinGame }) {
         messagesContainerRef.current.scrollHeight;
     }
   }, []);
-
-  // ============================================================
-  // 🔥 FUNÇÃO PARA MOSTRAR NOTIFICAÇÃO DE CHAT
-  // ============================================================
-  const showChatNotification = useCallback(
-    (from, message) => {
-      if (chatNotification) {
-        chatNotifQueueRef.current.push({ from, message });
-        return;
-      }
-
-      setChatNotification({ from, message, timestamp: Date.now() });
-
-      if (chatNotifTimeoutRef.current) {
-        clearTimeout(chatNotifTimeoutRef.current);
-      }
-      chatNotifTimeoutRef.current = setTimeout(() => {
-        setChatNotification(null);
-        chatNotifTimeoutRef.current = null;
-        if (chatNotifQueueRef.current.length > 0) {
-          const next = chatNotifQueueRef.current.shift();
-          showChatNotification(next.from, next.message);
-        }
-      }, 6000);
-    },
-    [chatNotification],
-  );
-
-  const closeChatNotification = useCallback(() => {
-    if (chatNotifTimeoutRef.current) {
-      clearTimeout(chatNotifTimeoutRef.current);
-      chatNotifTimeoutRef.current = null;
-    }
-    setChatNotification(null);
-    if (chatNotifQueueRef.current.length > 0) {
-      const next = chatNotifQueueRef.current.shift();
-      setTimeout(() => showChatNotification(next.from, next.message), 300);
-    }
-  }, [showChatNotification]);
 
   // ============================================================
   // 🔥 FUNÇÃO PARA MOSTRAR FEEDBACK NO CARD
@@ -195,10 +183,23 @@ export default function FriendsList({ username, onJoinGame }) {
   }, []);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA MOSTRAR CONVITE FLUTUANTE
+  // 🔥 FUNÇÃO PARA MOSTRAR CONVITE FLUTUANTE (SOMENTE UMA VEZ)
   // ============================================================
   const showFloatingInviteCard = useCallback(
     (inviteData) => {
+      // 🔥 VERIFICAR SE JÁ FOI PROCESSADO
+      const inviteKey = `${inviteData.inviteId}_${inviteData.from}`;
+      if (processedInvitesRef.current.has(inviteKey)) {
+        console.log("⏳ Convite já processado, ignorando:", inviteKey);
+        return;
+      }
+      processedInvitesRef.current.add(inviteKey);
+
+      // 🔥 Limpar após 30 segundos para permitir reenvio
+      setTimeout(() => {
+        processedInvitesRef.current.delete(inviteKey);
+      }, 30000);
+
       if (isChatOpenRef.current) {
         setPendingInviteQueue((prev) => [...prev, inviteData]);
         showCardFeedback(
@@ -209,10 +210,21 @@ export default function FriendsList({ username, onJoinGame }) {
         return;
       }
 
+      // 🔥 ADICIONAR NOTIFICAÇÃO FLUTUANTE DE CONVITE
+      addNotification(
+        "invite_received",
+        `🎯 Convite de ${inviteData.from}`,
+        `${inviteData.from} quer jogar com você!`,
+        () => {
+          setFloatingInvite(inviteData);
+          setShowFloatingInvite(true);
+        },
+      );
+
       setFloatingInvite(inviteData);
       setShowFloatingInvite(true);
     },
-    [isChatOpenRef, showCardFeedback],
+    [isChatOpenRef, showCardFeedback, addNotification],
   );
 
   const closeFloatingInvite = useCallback(() => {
@@ -244,12 +256,11 @@ export default function FriendsList({ username, onJoinGame }) {
     closeFloatingInvite();
     setPendingInviteQueue([]);
     clearCardFeedback();
-    closeChatNotification();
 
     setTimeout(() => {
       resettingRef.current = false;
     }, 300);
-  }, [username, closeFloatingInvite, clearCardFeedback, closeChatNotification]);
+  }, [username, closeFloatingInvite, clearCardFeedback]);
 
   // ============================================================
   // 🔥 FUNÇÃO PARA ABRIR CHAT
@@ -261,7 +272,12 @@ export default function FriendsList({ username, onJoinGame }) {
       isChatOpenRef.current = true;
 
       clearCardFeedback();
-      closeChatNotification();
+
+      setNotifications((prev) =>
+        prev.filter(
+          (n) => !(n.type === "chat" && n.title.includes(friendUsername)),
+        ),
+      );
 
       setUnreadChats((prev) => {
         const newUnread = { ...prev };
@@ -276,7 +292,7 @@ export default function FriendsList({ username, onJoinGame }) {
         scrollChatToBottom();
       }, 200);
     },
-    [scrollChatToBottom, clearCardFeedback, closeChatNotification],
+    [scrollChatToBottom, clearCardFeedback],
   );
 
   // ============================================================
@@ -287,10 +303,9 @@ export default function FriendsList({ username, onJoinGame }) {
       console.log(`🔄 Detectada saída do multiplayer, resetando estado...`);
       resetLobbyState();
       clearCardFeedback();
-      closeChatNotification();
     }
     previousOnJoinGameRef.current = onJoinGame;
-  }, [onJoinGame, resetLobbyState, clearCardFeedback, closeChatNotification]);
+  }, [onJoinGame, resetLobbyState, clearCardFeedback]);
 
   // ============================================================
   // 🔥 useEffect - CONECTAR AO SOCKET
@@ -359,7 +374,14 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
+    // 🔥 CONVITE RECEBIDO - CORRIGIDO (NÃO DUPLICA)
     socket.on("group-invite", (data) => {
+      // 🔥 VERIFICAR SE É PARA ESTE USUÁRIO
+      if (!data.players?.includes(username)) {
+        console.log("📡 Convite não é para este usuário, ignorando");
+        return;
+      }
+
       if (isProcessingInvite) {
         console.log("📡 Já processando um convite, ignorando...");
         return;
@@ -380,6 +402,27 @@ export default function FriendsList({ username, onJoinGame }) {
         message: data.message || `${data.from} te convidou para uma partida!`,
       };
 
+      // 🔥 VERIFICAR SE JÁ EXISTE UM CONVITE IGUAL PENDENTE
+      const existingInvite = pendingInvites.find(
+        (n) => n.inviteId === data.inviteId || n.from === data.from,
+      );
+      if (existingInvite) {
+        console.log("📡 Convite já existe na lista, ignorando");
+        return;
+      }
+
+      setPendingInvites((prev) => [
+        {
+          ...inviteData,
+          id: `invite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          accepted: [],
+          declined: [],
+          timestamp: new Date(),
+        },
+        ...prev.slice(0, 4),
+      ]);
+
+      // 🔥 MOSTRAR CONVITE (APENAS UMA VEZ)
       if (isChatOpenRef.current) {
         setPendingInviteQueue((prev) => [...prev, inviteData]);
         showCardFeedback(
@@ -392,28 +435,22 @@ export default function FriendsList({ username, onJoinGame }) {
       }
 
       showFloatingInviteCard(inviteData);
-
-      setPendingInvites((prev) => {
-        const exists = prev.some((n) => n.inviteId === data.inviteId);
-        if (exists) return prev;
-        return [
-          {
-            ...inviteData,
-            id: `invite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            accepted: [],
-            declined: [],
-            timestamp: new Date(),
-          },
-          ...prev.slice(0, 4),
-        ];
-      });
     });
 
+    // 🔥 CONVITE ACEITO
     socket.on("invite-accepted", (data) => {
       console.log("📡 Convite aceito:", data);
 
       if (data.from !== username) {
         console.log(`🎯 ${data.from} aceitou o convite!`);
+
+        addNotification(
+          "invite_accepted",
+          `✅ ${data.from} aceitou!`,
+          `${data.from} vai jogar com você!`,
+          null,
+        );
+
         showCardFeedback(`✅ ${data.from} aceitou o convite!`, false, 3000);
 
         const inviteData = pendingInvites.find(
@@ -452,10 +489,18 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
+    // 🔥 CONVITE RECUSADO
     socket.on("invite-declined", (data) => {
       console.log("📡 Convite recusado:", data);
 
       if (data.from !== username) {
+        addNotification(
+          "invite_declined",
+          `❌ ${data.from} recusou`,
+          `${data.from} não pode jogar agora`,
+          null,
+        );
+
         showCardFeedback(`❌ ${data.from} recusou o convite.`, true, 3000);
         setPendingInvites((prev) =>
           prev.filter((n) => n.inviteId !== data.inviteId),
@@ -490,6 +535,7 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
+    // 🔥 MENSAGEM PRIVADA
     socket.on("private-message", (data) => {
       console.log(
         `📡 Mensagem privada recebida de ${data.from}:`,
@@ -518,7 +564,22 @@ export default function FriendsList({ username, onJoinGame }) {
           [data.from]: (prev[data.from] || 0) + 1,
         }));
 
-        showChatNotification(data.from, data.message);
+        addNotification(
+          "chat",
+          `💬 ${data.from}`,
+          data.message.length > 50
+            ? data.message.substring(0, 50) + "..."
+            : data.message,
+          () => openChat(data.from),
+        );
+
+        showCardFeedback(
+          `💬 Nova mensagem de ${data.from} (clique para abrir)`,
+          false,
+          6000,
+          true,
+          () => openChat(data.from),
+        );
       } else {
         setTimeout(() => scrollChatToBottom(), 100);
       }
@@ -613,7 +674,6 @@ export default function FriendsList({ username, onJoinGame }) {
         redirectTimeoutRef.current = null;
       }
       clearCardFeedback();
-      closeChatNotification();
     };
   }, [
     username,
@@ -632,8 +692,7 @@ export default function FriendsList({ username, onJoinGame }) {
     isChatOpenRef,
     cardFeedback,
     clearCardFeedback,
-    closeChatNotification,
-    showChatNotification,
+    addNotification,
   ]);
 
   // ============================================================
@@ -648,9 +707,7 @@ export default function FriendsList({ username, onJoinGame }) {
         setError("");
         const res = await fetch(
           `/api/friends?username=${encodeURIComponent(username)}`,
-          {
-            credentials: "include",
-          },
+          { credentials: "include" },
         );
         const data = await res.json();
 
@@ -676,9 +733,6 @@ export default function FriendsList({ username, onJoinGame }) {
 
           if (!silent) {
             console.info(`✅ ${validFriends.length} amigos carregados`);
-            console.info(
-              `🟢 ${updatedFriends.filter((f) => f.isOnline).length} amigos online`,
-            );
           }
         } else {
           if (!silent)
@@ -713,9 +767,8 @@ export default function FriendsList({ username, onJoinGame }) {
         intervalRef.current = null;
       }
       clearCardFeedback();
-      closeChatNotification();
     };
-  }, [username, fetchFriends, clearCardFeedback, closeChatNotification]);
+  }, [username, fetchFriends, clearCardFeedback]);
 
   // ============================================================
   // 🔥 useEffect - POLLING
@@ -755,9 +808,8 @@ export default function FriendsList({ username, onJoinGame }) {
   useEffect(() => {
     if (showChat) {
       clearCardFeedback();
-      closeChatNotification();
     }
-  }, [showChat, clearCardFeedback, closeChatNotification]);
+  }, [showChat, clearCardFeedback]);
 
   // ============================================================
   // 🔥 useCallback - SELECIONAR/DESELECIONAR AMIGO
@@ -810,6 +862,13 @@ export default function FriendsList({ username, onJoinGame }) {
 
       setIsProcessingInvite(true);
       closeFloatingInvite();
+
+      setNotifications((prev) =>
+        prev.filter(
+          (n) =>
+            n.type !== "invite_received" || !n.title.includes(inviteData.from),
+        ),
+      );
 
       if (isInLobby && currentRoomIdRef.current) {
         console.log(`📤 Saindo da sala atual: ${currentRoomIdRef.current}`);
@@ -864,6 +923,11 @@ export default function FriendsList({ username, onJoinGame }) {
       }
 
       closeFloatingInvite();
+
+      setNotifications((prev) =>
+        prev.filter((n) => n.type !== "invite_received"),
+      );
+
       showCardFeedback(`❌ Convite recusado`, true, 2000);
     },
     [
@@ -1193,6 +1257,210 @@ export default function FriendsList({ username, onJoinGame }) {
   }, []);
 
   // ============================================================
+  // 🔥 COMPONENTE DE NOTIFICAÇÕES FLUTUANTES
+  // ============================================================
+  const NotificationPanel = () => {
+    if (notifications.length === 0) return null;
+
+    return (
+      <div
+        style={{
+          position: "fixed",
+          top: 80,
+          right: 20,
+          zIndex: 9999,
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          maxWidth: "340px",
+          width: "100%",
+          pointerEvents: "none",
+        }}
+      >
+        <AnimatePresence>
+          {notifications.map((notif) => (
+            <motion.div
+              key={notif.id}
+              style={{
+                background: "var(--bg-card)",
+                border:
+                  notif.type === "invite_received"
+                    ? "2px solid gold"
+                    : notif.type === "invite_declined"
+                      ? "1px solid rgba(244,67,54,0.3)"
+                      : "1px solid rgba(76,175,80,0.3)",
+                borderRadius: "16px",
+                padding: "14px 18px",
+                boxShadow: "0 8px 32px var(--shadow-dark)",
+                cursor: notif.action ? "pointer" : "default",
+                backdropFilter: "blur(8px)",
+                transition: "all 0.3s ease",
+                width: "100%",
+                pointerEvents: "auto",
+              }}
+              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 50, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              onClick={() => {
+                if (notif.action) {
+                  notif.action();
+                }
+                removeNotification(notif.id);
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "4px",
+                }}
+              >
+                <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>
+                  {notif.type === "chat" && "💬"}
+                  {notif.type === "invite_accepted" && "✅"}
+                  {notif.type === "invite_declined" && "❌"}
+                  {notif.type === "invite_received" && "🎯"}
+                </span>
+                <span
+                  style={{
+                    flex: 1,
+                    fontWeight: "bold",
+                    color: "var(--text-primary)",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {notif.title}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeNotification(notif.id);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    padding: "2px 4px",
+                    opacity: 0.5,
+                    transition: "opacity 0.3s ease",
+                    flexShrink: 0,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  color: "var(--text-secondary)",
+                  paddingLeft: "32px",
+                }}
+              >
+                {notif.message}
+                {notif.type === "chat" && (
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "0.6rem",
+                      color: "var(--text-muted)",
+                      marginTop: "2px",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    (clique para abrir)
+                  </span>
+                )}
+                {notif.type === "invite_received" && (
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "0.6rem",
+                      color: "gold",
+                      marginTop: "2px",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    (clique para aceitar)
+                  </span>
+                )}
+              </div>
+              {notif.type === "invite_received" && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    marginTop: "8px",
+                    paddingLeft: "32px",
+                  }}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const inviteData = pendingInvites.find(
+                        (n) =>
+                          n.from === notif.title.replace("🎯 Convite de ", ""),
+                      );
+                      if (inviteData) {
+                        acceptGroupInvite(inviteData.inviteId);
+                      }
+                      removeNotification(notif.id);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "4px 12px",
+                      borderRadius: "15px",
+                      border: "none",
+                      background: "linear-gradient(145deg, #4caf50, #388e3c)",
+                      color: "white",
+                      fontWeight: "bold",
+                      fontSize: "0.75rem",
+                      cursor: "pointer",
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    Aceitar
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const inviteData = pendingInvites.find(
+                        (n) =>
+                          n.from === notif.title.replace("🎯 Convite de ", ""),
+                      );
+                      if (inviteData) {
+                        declineGroupInvite(inviteData.inviteId);
+                      }
+                      removeNotification(notif.id);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "4px 12px",
+                      borderRadius: "15px",
+                      border: "none",
+                      background: "linear-gradient(145deg, #f44336, #c62828)",
+                      color: "white",
+                      fontWeight: "bold",
+                      fontSize: "0.75rem",
+                      cursor: "pointer",
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    Recusar
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  // ============================================================
   // 🔥 COMPONENTE DE CHAT
   // ============================================================
   const ChatPanel = useMemo(() => {
@@ -1283,7 +1551,6 @@ export default function FriendsList({ username, onJoinGame }) {
               maxHeight: "350px",
             }}
             ref={messagesContainerRef}
-            id={`chat-messages-${selectedChatFriend}`}
           >
             {messages.length === 0 ? (
               <p
@@ -1401,125 +1668,6 @@ export default function FriendsList({ username, onJoinGame }) {
   ]);
 
   // ============================================================
-  // 🔥 COMPONENTE DE NOTIFICAÇÃO DE CHAT
-  // ============================================================
-  const ChatNotificationCard = () => {
-    if (!chatNotification) return null;
-
-    return (
-      <motion.div
-        style={{
-          position: "fixed",
-          bottom: 20,
-          left: 20,
-          zIndex: 9999,
-          background: "linear-gradient(145deg, #1a3a2a, #0a2a1a)",
-          border: "1px solid rgba(76,175,80,0.3)",
-          borderRadius: 16,
-          padding: "14px 18px",
-          maxWidth: 320,
-          minWidth: 240,
-          boxShadow:
-            "0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(76,175,80,0.05)",
-          cursor: "pointer",
-          backdropFilter: "blur(8px)",
-          transition: "all 0.3s ease",
-        }}
-        initial={{ opacity: 0, x: -50, scale: 0.9 }}
-        animate={{ opacity: 1, x: 0, scale: 1 }}
-        exit={{ opacity: 0, x: -50, scale: 0.9 }}
-        transition={{ type: "spring", stiffness: 400, damping: 30 }}
-        onClick={() => {
-          if (chatNotification.from) {
-            openChat(chatNotification.from);
-          }
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "1.8rem",
-              flexShrink: 0,
-            }}
-          >
-            💬
-          </span>
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-            }}
-          >
-            <div
-              style={{
-                fontWeight: "bold",
-                color: "#4caf50",
-                fontSize: "0.85rem",
-              }}
-            >
-              {chatNotification.from}
-            </div>
-            <div
-              style={{
-                color: "#eee",
-                fontSize: "0.8rem",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {chatNotification.message.length > 40
-                ? chatNotification.message.substring(0, 40) + "..."
-                : chatNotification.message}
-            </div>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              closeChatNotification();
-            }}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#666",
-              cursor: "pointer",
-              fontSize: "0.9rem",
-              padding: "4px",
-              flexShrink: 0,
-              transition: "all 0.3s ease",
-            }}
-          >
-            ✕
-          </button>
-        </div>
-        <div
-          style={{
-            marginTop: "6px",
-            paddingTop: "6px",
-            borderTop: "1px solid rgba(255,255,255,0.05)",
-            textAlign: "right",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "0.55rem",
-              color: "#666",
-            }}
-          >
-            Clique para abrir o chat
-          </span>
-        </div>
-      </motion.div>
-    );
-  };
-
-  // ============================================================
   // 🔥 COMPONENTE DE MODAL DE CONVITE
   // ============================================================
   const InviteModal = () => {
@@ -1635,12 +1783,7 @@ export default function FriendsList({ username, onJoinGame }) {
                     >
                       {friend.username}
                     </span>
-                    <span
-                      style={{
-                        fontSize: "0.7rem",
-                        color: "gold",
-                      }}
-                    >
+                    <span style={{ fontSize: "0.7rem", color: "gold" }}>
                       Nv. {friend.level}
                     </span>
                   </div>
@@ -1663,12 +1806,7 @@ export default function FriendsList({ username, onJoinGame }) {
             <span>Selecionados: {selectedFriends.length}</span>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: "10px",
-            }}
-          >
+          <div style={{ display: "flex", gap: "10px" }}>
             <button
               onClick={sendGroupInvite}
               style={{
@@ -1725,12 +1863,6 @@ export default function FriendsList({ username, onJoinGame }) {
   const CardFeedback = () => {
     if (!cardFeedback) return null;
 
-    const handleClick = () => {
-      if (feedbackIsClickable && feedbackClickAction) {
-        feedbackClickAction();
-      }
-    };
-
     return (
       <motion.div
         style={{
@@ -1747,7 +1879,6 @@ export default function FriendsList({ username, onJoinGame }) {
           alignItems: "center",
           gap: "10px",
           backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
           transition: "all 0.2s ease",
           cursor: feedbackIsClickable ? "pointer" : "default",
         }}
@@ -1755,15 +1886,13 @@ export default function FriendsList({ username, onJoinGame }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
-        onClick={handleClick}
-        title={feedbackIsClickable ? "Clique para abrir" : ""}
+        onClick={() => {
+          if (feedbackIsClickable && feedbackClickAction) {
+            feedbackClickAction();
+          }
+        }}
       >
-        <span
-          style={{
-            fontSize: "1.2rem",
-            flexShrink: 0,
-          }}
-        >
+        <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>
           {cardFeedback.isError ? "⚠️" : "💬"}
         </span>
         <span
@@ -1784,7 +1913,6 @@ export default function FriendsList({ username, onJoinGame }) {
               color: "var(--text-muted)",
               opacity: 0.6,
               flexShrink: 0,
-              animation: "pulse 1.5s ease-in-out infinite",
             }}
           >
             👆
@@ -1831,21 +1959,19 @@ export default function FriendsList({ username, onJoinGame }) {
           zIndex: 9999,
           padding: "20px",
           backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
         }}
         onClick={closeFloatingInvite}
       >
         <motion.div
           style={{
-            background: "linear-gradient(145deg, #1a3a2a, #0a2a1a)",
+            background: "var(--bg-modal)",
             borderRadius: "24px",
             padding: "28px 32px",
             maxWidth: "420px",
             width: "100%",
-            color: "#ffffff",
+            color: "var(--text-primary)",
             border: "2px solid gold",
-            boxShadow:
-              "0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(255,215,0,0.1)",
+            boxShadow: "0 20px 60px var(--shadow-dark)",
             position: "relative",
             overflow: "hidden",
           }}
@@ -1862,7 +1988,7 @@ export default function FriendsList({ username, onJoinGame }) {
               gap: "12px",
               marginBottom: "16px",
               paddingBottom: "12px",
-              borderBottom: "1px solid rgba(255,215,0,0.15)",
+              borderBottom: "1px solid var(--border-light)",
             }}
           >
             <span style={{ fontSize: "2rem" }}>🎯</span>
@@ -1881,7 +2007,7 @@ export default function FriendsList({ username, onJoinGame }) {
               style={{
                 background: "none",
                 border: "none",
-                color: "#888",
+                color: "var(--text-muted)",
                 cursor: "pointer",
                 fontSize: "1.2rem",
                 padding: "4px 8px",
@@ -1900,17 +2026,17 @@ export default function FriendsList({ username, onJoinGame }) {
                 fontSize: "1rem",
                 lineHeight: "1.5",
                 margin: "0 0 8px 0",
-                color: "#eee",
+                color: "var(--text-secondary)",
               }}
             >
-              <strong>{floatingInvite.from}</strong> te convidou para uma
-              partida de poker!
+              <strong style={{ color: "gold" }}>{floatingInvite.from}</strong>{" "}
+              te convidou para uma partida de poker!
             </p>
             {floatingInvite.players && floatingInvite.players.length > 0 && (
               <p
                 style={{
                   fontSize: "0.85rem",
-                  color: "#aaa",
+                  color: "var(--text-muted)",
                   margin: "0",
                 }}
               >
@@ -1919,13 +2045,7 @@ export default function FriendsList({ username, onJoinGame }) {
             )}
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              marginBottom: "12px",
-            }}
-          >
+          <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
             <motion.button
               onClick={() => acceptGroupInvite(floatingInvite.inviteId)}
               style={{
@@ -1972,15 +2092,10 @@ export default function FriendsList({ username, onJoinGame }) {
             style={{
               textAlign: "center",
               paddingTop: "8px",
-              borderTop: "1px solid rgba(255,255,255,0.05)",
+              borderTop: "1px solid var(--border-light)",
             }}
           >
-            <span
-              style={{
-                fontSize: "0.65rem",
-                color: "#666",
-              }}
-            >
+            <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>
               Clique fora para fechar
             </span>
           </div>
@@ -2008,13 +2123,7 @@ export default function FriendsList({ username, onJoinGame }) {
           overflow: "hidden",
         }}
       >
-        <h3
-          style={{
-            color: "gold",
-            margin: "0 0 10px",
-            fontSize: "1rem",
-          }}
-        >
+        <h3 style={{ color: "gold", margin: "0 0 10px", fontSize: "1rem" }}>
           👥 AMIGOS
         </h3>
         <p
@@ -2033,14 +2142,10 @@ export default function FriendsList({ username, onJoinGame }) {
 
   return (
     <>
+      <NotificationPanel />
       <AnimatePresence mode="wait">
         <FloatingInvite />
       </AnimatePresence>
-
-      <AnimatePresence>
-        <ChatNotificationCard />
-      </AnimatePresence>
-
       {ChatPanel}
       <InviteModal />
 
@@ -2074,13 +2179,7 @@ export default function FriendsList({ username, onJoinGame }) {
               flexWrap: "wrap",
             }}
           >
-            <h3
-              style={{
-                color: "gold",
-                margin: "0 0 10px",
-                fontSize: "1rem",
-              }}
-            >
+            <h3 style={{ color: "gold", margin: "0 0 10px", fontSize: "1rem" }}>
               👥 AMIGOS
             </h3>
             {onlineFriends.length > 0 && (
@@ -2145,13 +2244,7 @@ export default function FriendsList({ username, onJoinGame }) {
               </span>
             )}
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <button
               onClick={() => setShowFriends(!showFriends)}
               style={{
@@ -2163,6 +2256,17 @@ export default function FriendsList({ username, onJoinGame }) {
               }}
             >
               {showFriends ? "▲" : "▼"} ({friends.length})
+              {totalUnread > 0 && !showFriends && (
+                <span
+                  style={{
+                    marginLeft: "4px",
+                    fontSize: "0.6rem",
+                    color: "#f44336",
+                  }}
+                >
+                  ●
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -2173,18 +2277,9 @@ export default function FriendsList({ username, onJoinGame }) {
 
         {showFriends && (
           <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "10px",
-            }}
+            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
           >
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-              }}
-            >
+            <div style={{ display: "flex", gap: "8px" }}>
               <input
                 type="text"
                 value={newFriend}
@@ -2351,20 +2446,10 @@ export default function FriendsList({ username, onJoinGame }) {
                         >
                           {friend.isOnline ? "🟢 Online" : "⚫ Offline"}
                         </span>
-                        <span
-                          style={{
-                            color: "gold",
-                            fontSize: "0.65rem",
-                          }}
-                        >
+                        <span style={{ color: "gold", fontSize: "0.65rem" }}>
                           Nv. {friend.level || 1}
                         </span>
-                        <span
-                          style={{
-                            color: "#4caf50",
-                            fontSize: "0.65rem",
-                          }}
-                        >
+                        <span style={{ color: "#4caf50", fontSize: "0.65rem" }}>
                           💰 {friend.chips || 0}
                         </span>
                         {unreadChats[friend.username] > 0 && (

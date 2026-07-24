@@ -1,4 +1,4 @@
-/* app/globals.css - COMPLETO COM TEMA ESCURO/CLARO */
+/* app/globals.css - CORREÇÃO COMPLETA MODO CLARO */
 @import "tailwindcss";
 
 /* ====================== VARIÁVEIS DE TEMA ====================== */
@@ -6,14 +6,14 @@
   /* 🔥 TEMA ESCURO (PADRÃO) */
   --bg-primary: #0a2f1f;
   --bg-secondary: #1a3a2a;
-  --bg-card: #1a2a1ecc;
+  --bg-card: rgba(26, 42, 30, 0.85);
   --bg-table: #1a3a1a;
   --bg-felt: #1a6a3a;
   --bg-modal: #1a3a2a;
-  --bg-header: #2c2e2bdd;
+  --bg-header: rgba(44, 46, 43, 0.87);
   --bg-input: rgba(0,0,0,0.3);
-  --bg-button: #1e1b14cc;
-  --bg-panel: #1a2a1ecc;
+  --bg-button: rgba(30, 27, 20, 0.8);
+  --bg-panel: rgba(26, 42, 30, 0.85);
   
   --text-primary: #ffffff;
   --text-secondary: #ffefb9;
@@ -41,18 +41,18 @@
   --transition-theme: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* 🔥 TEMA CLARO */
+/* 🔥 TEMA CLARO - CORRIGIDO */
 [data-theme="light"] {
   --bg-primary: #f0f7f4;
   --bg-secondary: #e0ebe6;
-  --bg-card: #e8f0ec;
+  --bg-card: rgba(232, 240, 236, 0.92);
   --bg-table: #d0e0d8;
   --bg-felt: #2a8a5a;
   --bg-modal: #e8f0ec;
-  --bg-header: #d5e0da;
+  --bg-header: rgba(213, 224, 218, 0.9);
   --bg-input: rgba(255,255,255,0.6);
-  --bg-button: #c8d8d0;
-  --bg-panel: #e8f0ec;
+  --bg-button: rgba(200, 216, 208, 0.8);
+  --bg-panel: rgba(232, 240, 236, 0.92);
   
   --text-primary: #1a2a1f;
   --text-secondary: #2a3a2f;

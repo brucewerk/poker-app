@@ -1,4 +1,4 @@
-// components/Poker/LevelDisplay.jsx - CORRIGIDO
+// components/Poker/LevelDisplay.jsx - CORREÇÃO DO MODO CLARO
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -47,7 +47,7 @@ export default function LevelDisplay({
     }
   }, [username]);
 
-  // 🔥 BUSCAR DADOS DOS GRAUS (usando query param)
+  // 🔥 BUSCAR DADOS DOS GRAUS
   const fetchRanksData = useCallback(async () => {
     try {
       const res = await fetch(`/api/get-level?ranks=true&t=${Date.now()}`);
@@ -70,7 +70,6 @@ export default function LevelDisplay({
     fetchRanksData();
   }, [fetchLevelData, fetchRanksData]);
 
-  // 🔥 ATUALIZAR QUANDO O MODAL DE RESULTADO FECHAR
   useEffect(() => {
     if (!isResultModalOpen) {
       fetchLevelData();
@@ -104,7 +103,6 @@ export default function LevelDisplay({
   const RanksModal = () => {
     if (!showRanksModal) return null;
 
-    // 🔥 Definir cores por tipo de grau
     const getRankColor = (rankType) => {
       const colors = {
         Comum: "#8a8a8a",
@@ -117,7 +115,6 @@ export default function LevelDisplay({
       return colors[rankType] || "#888";
     };
 
-    // 🔥 Definir ícone por tipo de grau
     const getRankIcon = (rankType) => {
       const icons = {
         Comum: "🟤",
@@ -130,7 +127,6 @@ export default function LevelDisplay({
       return icons[rankType] || "⭐";
     };
 
-    // 🔥 Calcular progresso para o próximo grau
     const getProgressToNextRank = (currentLevel, currentRankIndex) => {
       if (currentRankIndex >= ranksData.length - 1) return 100;
       const nextRank = ranksData[currentRankIndex + 1];
@@ -142,7 +138,6 @@ export default function LevelDisplay({
       return Math.min(100, Math.max(0, progress));
     };
 
-    // 🔥 Encontrar índice do grau atual
     let currentRankIndex = 0;
     for (let i = ranksData.length - 1; i >= 0; i--) {
       if (level >= ranksData[i].minLevel) {
@@ -353,7 +348,7 @@ export default function LevelDisplay({
 }
 
 // ============================================================
-// 🎨 ESTILOS (MANTIDOS IGUAIS)
+// 🎨 ESTILOS - CORRIGIDOS PARA MODO CLARO
 // ============================================================
 
 function containerStyle() {
