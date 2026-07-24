@@ -183,11 +183,10 @@ export default function FriendsList({ username, onJoinGame }) {
   }, []);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA MOSTRAR CONVITE FLUTUANTE (SOMENTE UMA VEZ)
+  // 🔥 FUNÇÃO PARA MOSTRAR CONVITE FLUTUANTE
   // ============================================================
   const showFloatingInviteCard = useCallback(
     (inviteData) => {
-      // 🔥 VERIFICAR SE JÁ FOI PROCESSADO
       const inviteKey = `${inviteData.inviteId}_${inviteData.from}`;
       if (processedInvitesRef.current.has(inviteKey)) {
         console.log("⏳ Convite já processado, ignorando:", inviteKey);
@@ -195,7 +194,6 @@ export default function FriendsList({ username, onJoinGame }) {
       }
       processedInvitesRef.current.add(inviteKey);
 
-      // 🔥 Limpar após 30 segundos para permitir reenvio
       setTimeout(() => {
         processedInvitesRef.current.delete(inviteKey);
       }, 30000);
@@ -210,7 +208,6 @@ export default function FriendsList({ username, onJoinGame }) {
         return;
       }
 
-      // 🔥 ADICIONAR NOTIFICAÇÃO FLUTUANTE DE CONVITE
       addNotification(
         "invite_received",
         `🎯 Convite de ${inviteData.from}`,
@@ -374,9 +371,7 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
-    // 🔥 CONVITE RECEBIDO - CORRIGIDO (NÃO DUPLICA)
     socket.on("group-invite", (data) => {
-      // 🔥 VERIFICAR SE É PARA ESTE USUÁRIO
       if (!data.players?.includes(username)) {
         console.log("📡 Convite não é para este usuário, ignorando");
         return;
@@ -402,7 +397,6 @@ export default function FriendsList({ username, onJoinGame }) {
         message: data.message || `${data.from} te convidou para uma partida!`,
       };
 
-      // 🔥 VERIFICAR SE JÁ EXISTE UM CONVITE IGUAL PENDENTE
       const existingInvite = pendingInvites.find(
         (n) => n.inviteId === data.inviteId || n.from === data.from,
       );
@@ -422,7 +416,6 @@ export default function FriendsList({ username, onJoinGame }) {
         ...prev.slice(0, 4),
       ]);
 
-      // 🔥 MOSTRAR CONVITE (APENAS UMA VEZ)
       if (isChatOpenRef.current) {
         setPendingInviteQueue((prev) => [...prev, inviteData]);
         showCardFeedback(
@@ -437,7 +430,6 @@ export default function FriendsList({ username, onJoinGame }) {
       showFloatingInviteCard(inviteData);
     });
 
-    // 🔥 CONVITE ACEITO
     socket.on("invite-accepted", (data) => {
       console.log("📡 Convite aceito:", data);
 
@@ -489,7 +481,6 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
-    // 🔥 CONVITE RECUSADO
     socket.on("invite-declined", (data) => {
       console.log("📡 Convite recusado:", data);
 
@@ -535,7 +526,6 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
-    // 🔥 MENSAGEM PRIVADA
     socket.on("private-message", (data) => {
       console.log(
         `📡 Mensagem privada recebida de ${data.from}:`,
@@ -1257,7 +1247,7 @@ export default function FriendsList({ username, onJoinGame }) {
   }, []);
 
   // ============================================================
-  // 🔥 COMPONENTE DE NOTIFICAÇÕES FLUTUANTES
+  // 🔥 NOTIFICATION PANEL
   // ============================================================
   const NotificationPanel = () => {
     if (notifications.length === 0) return null;
@@ -1520,7 +1510,7 @@ export default function FriendsList({ username, onJoinGame }) {
           >
             <span>💬 {selectedChatFriend}</span>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ fontSize: "0.6rem", color: "#888" }}>
+              <span style={{ fontSize: "0.6rem", color: "var(--text-muted)" }}>
                 {messages.length} mensagens
               </span>
               <button
@@ -1528,7 +1518,7 @@ export default function FriendsList({ username, onJoinGame }) {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#888",
+                  color: "var(--text-muted)",
                   cursor: "pointer",
                   fontSize: "1.2rem",
                   padding: "4px",
@@ -1556,7 +1546,7 @@ export default function FriendsList({ username, onJoinGame }) {
               <p
                 style={{
                   textAlign: "center",
-                  color: "#666",
+                  color: "var(--text-muted)",
                   padding: "30px 0",
                   fontSize: "0.9rem",
                 }}
@@ -1597,7 +1587,7 @@ export default function FriendsList({ username, onJoinGame }) {
                     <div
                       style={{
                         fontSize: "0.5rem",
-                        color: "#666",
+                        color: "var(--text-muted)",
                         marginTop: "4px",
                         textAlign: msg.isOwn ? "right" : "left",
                       }}
@@ -1668,7 +1658,7 @@ export default function FriendsList({ username, onJoinGame }) {
   ]);
 
   // ============================================================
-  // 🔥 COMPONENTE DE MODAL DE CONVITE
+  // 🔥 MODAL DE CONVITE
   // ============================================================
   const InviteModal = () => {
     if (!showInviteModal) return null;
@@ -1858,7 +1848,7 @@ export default function FriendsList({ username, onJoinGame }) {
   };
 
   // ============================================================
-  // 🔥 COMPONENTE DE FEEDBACK NO CARD
+  // 🔥 CARD FEEDBACK
   // ============================================================
   const CardFeedback = () => {
     if (!cardFeedback) return null;
@@ -1942,7 +1932,7 @@ export default function FriendsList({ username, onJoinGame }) {
   };
 
   // ============================================================
-  // 🔥 COMPONENTE DE CONVITE FLUTUANTE
+  // 🔥 FLOATING INVITE
   // ============================================================
   const FloatingInvite = () => {
     if (!showFloatingInvite || !floatingInvite) return null;
@@ -2385,7 +2375,9 @@ export default function FriendsList({ username, onJoinGame }) {
                   }}
                 >
                   <span>🏆 Ranking entre amigos</span>
-                  <span style={{ fontSize: "0.55rem", color: "#888" }}>
+                  <span
+                    style={{ fontSize: "0.55rem", color: "var(--text-muted)" }}
+                  >
                     {onlineFriends.length} online
                   </span>
                 </div>

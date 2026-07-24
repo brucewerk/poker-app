@@ -1,4 +1,4 @@
-// components/Poker/LevelDisplay.jsx - CORREÇÃO DO MODO CLARO
+// components/Poker/LevelDisplay.jsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -16,7 +16,6 @@ export default function LevelDisplay({
   const [ranksData, setRanksData] = useState([]);
   const [error, setError] = useState(null);
 
-  // 🔥 BUSCAR DADOS DO NÍVEL
   const fetchLevelData = useCallback(async () => {
     if (!username) {
       setLoading(false);
@@ -47,7 +46,6 @@ export default function LevelDisplay({
     }
   }, [username]);
 
-  // 🔥 BUSCAR DADOS DOS GRAUS
   const fetchRanksData = useCallback(async () => {
     try {
       const res = await fetch(`/api/get-level?ranks=true&t=${Date.now()}`);
@@ -99,7 +97,6 @@ export default function LevelDisplay({
   const { level, title, xp, xpToNext, progress, achievements, findings } =
     levelData;
 
-  // 🔥 COMPONENTE MODAL DE GRAUS
   const RanksModal = () => {
     if (!showRanksModal) return null;
 
@@ -348,7 +345,7 @@ export default function LevelDisplay({
 }
 
 // ============================================================
-// 🎨 ESTILOS - CORRIGIDOS PARA MODO CLARO
+// 🎨 ESTILOS - CORRIGIDOS COM VARIÁVEIS CSS
 // ============================================================
 
 function containerStyle() {

@@ -1,4 +1,4 @@
-// components/Poker/MissionsPanel.jsx
+// components/Poker/MissionsPanel.jsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -299,13 +299,14 @@ export default function MissionsPanel({ username, onChipsUpdated }) {
 // ====================== ESTILOS ======================
 function panelStyle() {
   return {
-    background: "#1a2a1ecc",
+    background: "var(--bg-panel)",
     backdropFilter: "blur(4px)",
     borderRadius: 20,
     padding: 15,
     marginTop: 10,
-    color: "white",
-    border: "1px solid rgba(255,215,0,0.2)",
+    color: "var(--text-primary)",
+    border: "1px solid var(--border-gold)",
+    transition: "var(--transition-theme)",
     position: "relative",
   };
 }
@@ -353,7 +354,7 @@ function toggleButtonStyle() {
 function emptyStyle() {
   return {
     textAlign: "center",
-    color: "#888",
+    color: "var(--text-muted)",
     fontSize: "0.85rem",
     padding: "10px 0",
   };
@@ -401,7 +402,7 @@ function missionNameStyle(isCompleted) {
     fontWeight: "bold",
     flex: 1,
     fontSize: "0.9rem",
-    color: isCompleted ? "#4caf50" : "#fff",
+    color: isCompleted ? "#4caf50" : "var(--text-primary)",
   };
 }
 
@@ -415,14 +416,14 @@ function missionStatusStyle(isCompleted, isClaimed) {
   }
   return {
     fontSize: "0.75rem",
-    color: isCompleted ? "#4caf50" : "#888",
+    color: isCompleted ? "#4caf50" : "var(--text-muted)",
   };
 }
 
 function missionDescStyle() {
   return {
     fontSize: "0.75rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
     marginBottom: "5px",
   };
 }
@@ -467,7 +468,7 @@ function rewardBadgeStyle(type) {
   };
   return {
     background: colors[type] || "rgba(255,255,255,0.1)",
-    color: textColors[type] || "#fff",
+    color: textColors[type] || "var(--text-primary)",
     padding: "2px 8px",
     borderRadius: 10,
     fontSize: "0.7rem",

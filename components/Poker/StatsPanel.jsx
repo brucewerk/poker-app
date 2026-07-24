@@ -1,4 +1,4 @@
-// components/Poker/StatsPanel.jsx - VERSÃO COM GRÁFICOS
+// components/Poker/StatsPanel.jsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -67,7 +67,7 @@ export default function StatsPanel({
     }
   };
 
-  // 🔥 COMPONENTE DE GRÁFICO DE BARRAS MINIATURA
+  // MiniBarChart component
   const MiniBarChart = ({
     data,
     colors = ["#4caf50", "#ff9800", "#2196f3"],
@@ -99,7 +99,7 @@ export default function StatsPanel({
     );
   };
 
-  // 🔥 COMPONENTE DE PROGRESSO MENSAL
+  // MonthlyProgress component
   const MonthlyProgress = ({ data }) => {
     if (!data || data.length === 0) return null;
 
@@ -300,7 +300,6 @@ export default function StatsPanel({
             <span style={detailValueStyle()}>{stats.handsTied || 0}</span>
           </div>
 
-          {/* 🔥 MÉTRICAS AVANÇADAS */}
           {advancedStats && (
             <>
               <div style={advancedToggleStyle()}>
@@ -358,7 +357,6 @@ export default function StatsPanel({
                     </div>
                   </div>
 
-                  {/* Distribuição de Mãos */}
                   {advancedStats.handDistribution && (
                     <div style={chartSectionStyle()}>
                       <div style={chartTitleStyle()}>
@@ -368,7 +366,6 @@ export default function StatsPanel({
                     </div>
                   )}
 
-                  {/* Progresso Mensal */}
                   {advancedStats.monthlyProgress && (
                     <div style={chartSectionStyle()}>
                       <div style={chartTitleStyle()}>📈 Progresso Mensal</div>
@@ -407,13 +404,14 @@ export default function StatsPanel({
 // ====================== ESTILOS ======================
 function panelStyle() {
   return {
-    background: "#1a2a1ecc",
+    background: "var(--bg-panel)",
     backdropFilter: "blur(4px)",
     borderRadius: 20,
     padding: 15,
     marginTop: 10,
-    color: "white",
-    border: "1px solid rgba(255,215,0,0.2)",
+    color: "var(--text-primary)",
+    border: "1px solid var(--border-gold)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -447,7 +445,7 @@ function toggleButtonStyle() {
 function textStyle() {
   return {
     textAlign: "center",
-    color: "#ffefb9",
+    color: "var(--text-secondary)",
     padding: "10px 0",
     fontSize: "0.85rem",
   };
@@ -474,7 +472,7 @@ function statLabelStyle() {
   return {
     display: "block",
     fontSize: "0.7rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
     marginBottom: "2px",
   };
 }
@@ -503,7 +501,7 @@ function detailRowStyle() {
     justifyContent: "space-between",
     padding: "4px 0",
     fontSize: "0.85rem",
-    color: "#ddd",
+    color: "var(--text-secondary)",
     borderBottom: "1px solid rgba(255,255,255,0.05)",
   };
 }
@@ -608,7 +606,7 @@ function chartSectionStyle() {
 function chartTitleStyle() {
   return {
     fontSize: "0.7rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
     marginBottom: "6px",
     textAlign: "center",
   };
@@ -735,7 +733,7 @@ function achievementHeaderStyle() {
     justifyContent: "space-between",
     alignItems: "center",
     fontSize: "0.85rem",
-    color: "#ddd",
+    color: "var(--text-secondary)",
   };
 }
 

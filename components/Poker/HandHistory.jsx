@@ -1,4 +1,4 @@
-// components/Poker/HandHistory.jsx
+// components/Poker/HandHistory.jsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -196,13 +196,14 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
 // ====================== ESTILOS ======================
 function panelStyle() {
   return {
-    background: "#1a2a1ecc",
+    background: "var(--bg-panel)",
     backdropFilter: "blur(4px)",
     borderRadius: 20,
     padding: 15,
     marginTop: 10,
-    color: "white",
-    border: "1px solid rgba(255,215,0,0.2)",
+    color: "var(--text-primary)",
+    border: "1px solid var(--border-gold)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -233,7 +234,7 @@ function headerButtonsStyle() {
 function countStyle() {
   return {
     fontSize: "0.7rem",
-    color: "#888",
+    color: "var(--text-muted)",
   };
 }
 
@@ -251,7 +252,7 @@ function toggleButtonStyle() {
 function emptyStyle() {
   return {
     textAlign: "center",
-    color: "#888",
+    color: "var(--text-muted)",
     fontSize: "0.85rem",
     padding: "10px 0",
   };
@@ -303,7 +304,7 @@ function historyResultStyle(color) {
 function historyHandStyle() {
   return {
     fontSize: "0.75rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
   };
 }
 
@@ -312,7 +313,7 @@ function historyDetailStyle() {
     display: "flex",
     gap: "10px",
     fontSize: "0.65rem",
-    color: "#888",
+    color: "var(--text-muted)",
     marginTop: "2px",
     alignItems: "center",
   };
@@ -335,7 +336,7 @@ function loseAmountStyle() {
 function historyTimeStyle() {
   return {
     marginLeft: "auto",
-    color: "#666",
+    color: "var(--text-muted)",
     fontSize: "0.6rem",
   };
 }
@@ -344,7 +345,7 @@ function moreStyle() {
   return {
     textAlign: "center",
     fontSize: "0.65rem",
-    color: "#666",
+    color: "var(--text-muted)",
     padding: "4px",
   };
 }

@@ -1,4 +1,4 @@
-// components/Poker/StatusPanel.jsx
+// components/Poker/StatusPanel.jsx - CORRIGIDO
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,7 +16,6 @@ export default function StatusPanel({
   winnerMsg,
   isTurbo,
 }) {
-  // 🔥 CORREÇÃO: Dados do status com keys únicas
   const statusItems = [
     {
       id: "stage",
@@ -72,7 +71,7 @@ export default function StatusPanel({
       <div style={statusGridStyle()}>
         {statusItems.map((item) => (
           <motion.div
-            key={item.id} // 🔥 CHAVE ÚNICA!
+            key={item.id}
             style={statusItemStyle()}
             whileHover={{ scale: 1.05 }}
             transition={{ type: "spring", stiffness: 300 }}
@@ -159,13 +158,14 @@ export default function StatusPanel({
 // ====================== ESTILOS ======================
 function panelStyle() {
   return {
-    background: "#1a2a1ecc",
+    background: "var(--bg-panel)",
     backdropFilter: "blur(4px)",
     borderRadius: 20,
     padding: 15,
     marginTop: 10,
-    color: "white",
-    border: "1px solid rgba(255,215,0,0.2)",
+    color: "var(--text-primary)",
+    border: "1px solid var(--border-gold)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -199,7 +199,7 @@ function statusLabelStyle() {
   return {
     display: "block",
     fontSize: "0.65rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
     marginBottom: "2px",
   };
 }
@@ -219,7 +219,7 @@ function betsStyle() {
     justifyContent: "space-between",
     marginTop: "8px",
     fontSize: "0.75rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
     flexWrap: "wrap",
     gap: "4px",
   };
@@ -251,6 +251,6 @@ function gameStatusStyle() {
     borderRadius: 10,
     fontSize: "0.8rem",
     textAlign: "center",
-    color: "#ffefb9",
+    color: "var(--text-secondary)",
   };
 }
