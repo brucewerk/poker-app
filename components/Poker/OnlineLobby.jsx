@@ -1,13 +1,12 @@
-// components/Poker/OnlineLobby.jsx - CORRIGIDO COM LISTA DE SALAS FUNCIONAL
+// components/Poker/OnlineLobby.jsx - CORRIGIDO (usando socketClient singleton)
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { io } from "socket.io-client";
+import { socketClient } from "@/lib/socket-client";
 import Chat from "./Chat.jsx";
 
 export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
-  const [roomId, setRoomId] = useState("");
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -18,32 +17,14 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [pendingInvite, setPendingInvite] = useState(null);
   const [currentRoomId, setCurrentRoomId] = useState(null);
-  const socketRef = useRef(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const roomListInterval = useRef(null);
   const isMounted = useRef(true);
+  const fetchTimeoutRef = useRef(null);
 
-  const SOCKET_URL =
-    process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
-
-  // 🔥 ADICIONAR ESTILOS GLOBAIS NO CLIENTE APENAS
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      !document.getElementById("online-lobby-styles")
-    ) {
-      const styleSheet = document.createElement("style");
-      styleSheet.id = "online-lobby-styles";
-      styleSheet.textContent = `
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `;
-      document.head.appendChild(styleSheet);
-    }
-  }, []);
-
-  // ====================== CONECTAR AO SOCKET ======================
+  // ============================================================
+  // 🔥 CONECTAR AO SOCKET (USANDO SINGLETON)
+  // ============================================================
   useEffect(() => {
     isMounted.current = true;
 
@@ -52,217 +33,211 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       return;
     }
 
-    console.log(`🔵 OnlineLobby: Conectando ao Socket.IO para ${currentUser}`);
+    console.log(`🔵 OnlineLobby: Usando socket singleton para ${currentUser}`);
 
-    if (!socketRef.current) {
-      socketRef.current = io(SOCKET_URL, {
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        timeout: 10000,
-        autoConnect: true,
-        reconnection: true,
-      });
-    }
+    socketClient.initialize();
 
-    const socket = socketRef.current;
+    const checkConnection = () => {
+      const connected = socketClient.isConnected();
+      setIsConnected(connected);
+      if (connected) {
+        socketClient.emit("friend-online", { username: currentUser });
+        setTimeout(() => fetchRooms(), 300);
+      }
+    };
 
-    socket.on("connect", () => {
-      console.log(`🟢 OnlineLobby: Socket conectado (${socket.id})`);
+    checkConnection();
+
+    const onConnect = () => {
+      console.log("🟢 OnlineLobby: Socket conectado via singleton");
       setIsConnected(true);
-      socket.emit("friend-online", { username: currentUser });
-      setTimeout(() => {
-        fetchRooms();
-      }, 100);
-    });
+      socketClient.emit("friend-online", { username: currentUser });
+      setTimeout(() => fetchRooms(), 300);
+    };
 
-    socket.on("disconnect", () => {
-      console.log(`🔴 OnlineLobby: Socket desconectado`);
+    const onDisconnect = () => {
+      console.log("🔴 OnlineLobby: Socket desconectado");
       setIsConnected(false);
-    });
+    };
 
-    socket.on("connect_error", (err) => {
-      console.error(`❌ OnlineLobby: Erro de conexão:`, err.message);
+    const onConnectError = (err) => {
+      console.error("❌ OnlineLobby: Erro de conexão:", err.message);
       setIsConnected(false);
       setError("❌ Erro de conexão com o servidor");
-    });
+    };
 
-    // 🔥 RECEBER LISTA DE SALAS - CORRIGIDO: MOSTRA TODAS AS SALAS
-    socket.on("room-list", (roomList) => {
+    const onRoomList = (roomList) => {
       console.log(
         "📡 Lista de salas recebida:",
         roomList?.length || 0,
         "salas",
       );
-      console.log("📡 Detalhes das salas:", JSON.stringify(roomList, null, 2));
-
       if (isMounted.current) {
         if (roomList && Array.isArray(roomList)) {
-          // 🔥 FILTRAR SALAS VÁLIDAS - INCLUIR TODAS AS SALAS COM JOGADORES
           const validRooms = roomList.filter((room) => {
             const hasValidId = room.roomId && room.roomId.length > 0;
             const hasPlayers = room.players && room.players.length > 0;
-            // 🔥 NÃO FILTRAR POR PREFIXO - MOSTRAR TODAS AS SALAS
             return hasValidId && hasPlayers;
           });
-
           console.log("📡 Salas válidas:", validRooms.length);
           setRooms(validRooms);
+          setRefreshKey((prev) => prev + 1);
         } else {
           setRooms([]);
         }
         setLoading(false);
       }
-    });
+    };
 
-    // 🔥 CONVITE EM GRUPO - REDIRECIONAR PARA A SALA
-    socket.on("group-invite", (data) => {
-      console.log("📡 Convite recebido no lobby:", data);
-
-      if (data.players?.includes(currentUser)) {
-        setPendingInvite(data);
-        setSuccess(`🎯 ${data.from} te convidou para uma partida!`);
-
-        setTimeout(() => {
-          handleAcceptInvite(data);
-        }, 1000);
-      }
-    });
-
-    // 🔥 CONVITE ACEITO
-    socket.on("invite-accepted", (data) => {
-      console.log("📡 Convite aceito no lobby:", data);
-      if (data.from === currentUser) {
-        setSuccess(`✅ Convite aceito! Entrando na sala...`);
-
-        const inviteData = pendingInvite;
-        if (inviteData && onJoinGame) {
-          const roomId = inviteData.roomId || `room_${inviteData.inviteId}`;
-          socket.emit("join-room", {
-            roomId: roomId,
-            playerName: currentUser,
-          });
-
-          onJoinGame({
-            roomId: roomId,
-            playerName: currentUser,
-            socket: socket,
-            invitedPlayers: inviteData.players || [],
-            isInviteAccepted: true,
-          });
-        }
-      }
-    });
-
-    // 🔥 SALA CRIADA
-    socket.on("room-created", (data) => {
+    const onRoomCreated = (data) => {
       console.log("✅ Sala criada:", data);
       setCreating(false);
       setCurrentRoomId(data.roomId);
       setSuccess(`✅ Sala ${data.roomId} criada com sucesso!`);
 
-      setTimeout(() => {
-        fetchRooms();
-      }, 500);
+      fetchRooms();
+      setTimeout(() => fetchRooms(), 500);
+      setTimeout(() => fetchRooms(), 1500);
 
       setTimeout(() => {
         if (onJoinGame && isMounted.current) {
           onJoinGame({
             roomId: data.roomId,
             playerName: currentUser,
-            socket: socket,
+            socket: socketClient.socket,
             isInviteCreator: true,
           });
         }
-      }, 500);
-    });
+      }, 800);
+    };
 
-    // 🔥 ATUALIZAÇÃO DA SALA
-    socket.on("room-update", (data) => {
-      console.log("📡 Atualização da sala recebida");
-      fetchRooms();
-    });
+    const onRoomUpdate = (data) => {
+      console.log("📡 Atualização da sala recebida:", data);
+      setTimeout(() => fetchRooms(), 300);
+    };
 
-    // 🔥 MENSAGEM DE ERRO
-    socket.on("error", (data) => {
+    const onGroupInvite = (data) => {
+      console.log("📡 Convite recebido no lobby:", data);
+      if (data.players?.includes(currentUser)) {
+        setPendingInvite(data);
+        setSuccess(`🎯 ${data.from} te convidou para uma partida!`);
+        setTimeout(() => {
+          handleAcceptInvite(data);
+        }, 1000);
+      }
+    };
+
+    const onInviteAccepted = (data) => {
+      console.log("📡 Convite aceito no lobby:", data);
+      if (data.from === currentUser) {
+        setSuccess(`✅ Convite aceito! Entrando na sala...`);
+        const inviteData = pendingInvite;
+        if (inviteData && onJoinGame) {
+          const roomId = inviteData.roomId || `room_${inviteData.inviteId}`;
+          socketClient.emit("join-room", {
+            roomId: roomId,
+            playerName: currentUser,
+          });
+          onJoinGame({
+            roomId: roomId,
+            playerName: currentUser,
+            socket: socketClient.socket,
+            invitedPlayers: inviteData.players || [],
+            isInviteAccepted: true,
+          });
+        }
+      }
+    };
+
+    const onError = (data) => {
       console.error("❌ Erro do servidor:", data);
-      setError(`❌ ${data.message || "Erro desconhecido"}`);
+      if (data && data.message) {
+        setError(`❌ ${data.message}`);
+      } else {
+        setError("❌ Erro desconhecido");
+      }
       setTimeout(() => setError(""), 5000);
-    });
+    };
 
-    // 🔥 Buscar salas periodicamente
+    socketClient.on("connect", onConnect);
+    socketClient.on("disconnect", onDisconnect);
+    socketClient.on("connect_error", onConnectError);
+    socketClient.on("room-list", onRoomList);
+    socketClient.on("room-created", onRoomCreated);
+    socketClient.on("room-update", onRoomUpdate);
+    socketClient.on("group-invite", onGroupInvite);
+    socketClient.on("invite-accepted", onInviteAccepted);
+    socketClient.on("error", onError);
+
     roomListInterval.current = setInterval(() => {
       if (isConnected && isMounted.current) {
         fetchRooms();
       }
-    }, 10000);
+    }, 3000);
 
     return () => {
       isMounted.current = false;
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("connect_error");
-      socket.off("room-list");
-      socket.off("group-invite");
-      socket.off("invite-accepted");
-      socket.off("room-created");
-      socket.off("room-update");
-      socket.off("error");
-
+      socketClient.off("connect");
+      socketClient.off("disconnect");
+      socketClient.off("connect_error");
+      socketClient.off("room-list");
+      socketClient.off("room-created");
+      socketClient.off("room-update");
+      socketClient.off("group-invite");
+      socketClient.off("invite-accepted");
+      socketClient.off("error");
       if (roomListInterval.current) {
-        clearInterval(roomListInterval.current);
+        clearTimeout(roomListInterval.current);
         roomListInterval.current = null;
+      }
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
       }
     };
   }, [currentUser, onJoinGame]);
 
-  // ====================== BUSCAR SALAS ======================
   const fetchRooms = useCallback(() => {
-    if (!socketRef.current || !isConnected) {
-      console.log("⚠️ Socket não conectado, não é possível buscar salas");
+    if (!socketClient.isConnected()) {
+      console.log("⚠️ Socket não conectado");
       return;
     }
     console.log("📡 Solicitando lista de salas...");
-    socketRef.current.emit("list-rooms");
-  }, [isConnected]);
+    socketClient.emit("list-rooms");
+  }, []);
 
-  // ====================== CRIAR SALA - CORRIGIDO ======================
   const createRoom = useCallback(() => {
-    if (!socketRef.current || !isConnected) {
+    if (!socketClient.isConnected()) {
       setError("❌ Não conectado ao servidor");
       return;
     }
-
     if (!currentUser) {
       setError("❌ Você precisa estar logado");
       return;
     }
-
     setCreating(true);
     setError("");
     setSuccess("");
-
-    // 🔥 NÃO ENVIAR roomId PERSONALIZADO - DEIXAR O SERVIDOR GERAR
-    socketRef.current.emit("create-room", {
+    console.log(
+      `📤 Criando sala para ${currentUser} com ${maxPlayers} jogadores...`,
+    );
+    socketClient.emit("create-room", {
       playerName: currentUser,
       maxPlayers: maxPlayers,
     });
-  }, [currentUser, maxPlayers, isConnected]);
+  }, [currentUser, maxPlayers]);
 
-  // ====================== ENTRAR NA SALA ======================
   const joinRoom = useCallback(
     (roomIdToJoin) => {
-      if (!socketRef.current || !isConnected) {
+      if (!socketClient.isConnected()) {
         setError("❌ Não conectado ao servidor");
         return;
       }
-
       if (!currentUser) {
         setError("❌ Você precisa estar logado");
         return;
       }
-
       const normalizedRoomId = roomIdToJoin.toUpperCase();
-
       const room = rooms.find((r) => r.roomId === normalizedRoomId);
       if (room) {
         const playerInRoom = room.players?.some((p) => p.name === currentUser);
@@ -270,19 +245,17 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
           setError(`❌ Você já está na sala ${normalizedRoomId}`);
           return;
         }
-
         if (room.playerCount >= room.maxPlayers) {
           setError(`❌ Sala ${normalizedRoomId} está lotada!`);
           return;
         }
       }
-
       setJoining(true);
       setError("");
       setSuccess("");
       setCurrentRoomId(normalizedRoomId);
-
-      socketRef.current.emit("join-room", {
+      console.log(`📤 Entrando na sala ${normalizedRoomId}...`);
+      socketClient.emit("join-room", {
         roomId: normalizedRoomId,
         playerName: currentUser,
       });
@@ -293,7 +266,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
           onJoinGame({
             roomId: normalizedRoomId,
             playerName: currentUser,
-            socket: socketRef.current,
+            socket: socketClient.socket,
           });
         }
       }, 3000);
@@ -306,81 +279,71 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
             onJoinGame({
               roomId: normalizedRoomId,
               playerName: currentUser,
-              socket: socketRef.current,
+              socket: socketClient.socket,
             });
           }
-          socketRef.current.off("room-update", handleRoomUpdate);
+          socketClient.off("room-update", handleRoomUpdate);
         }
       };
-
-      socketRef.current.on("room-update", handleRoomUpdate);
-
+      socketClient.on("room-update", handleRoomUpdate);
       return () => {
         clearTimeout(joinTimeout);
-        socketRef.current?.off("room-update", handleRoomUpdate);
+        socketClient.off("room-update", handleRoomUpdate);
       };
     },
-    [currentUser, isConnected, onJoinGame, rooms],
+    [currentUser, onJoinGame, rooms],
   );
 
-  // ====================== ACEITAR CONVITE ======================
   const handleAcceptInvite = useCallback(
     (inviteData) => {
-      if (!socketRef.current || !isConnected) {
+      if (!socketClient.isConnected()) {
         setError("❌ Não conectado ao servidor");
         return;
       }
-
       console.log("✅ Aceitando convite:", inviteData);
-
       const roomId = inviteData.roomId || `room_${inviteData.inviteId}`;
       setCurrentRoomId(roomId);
-
-      socketRef.current.emit("join-room", {
+      socketClient.emit("join-room", {
         roomId: roomId,
         playerName: currentUser,
       });
-
-      socketRef.current.emit("accept-invite", {
+      socketClient.emit("accept-invite", {
         inviteId: inviteData.inviteId,
         from: currentUser,
       });
-
       setTimeout(() => {
         if (onJoinGame && isMounted.current) {
           onJoinGame({
             roomId: roomId,
             playerName: currentUser,
-            socket: socketRef.current,
+            socket: socketClient.socket,
             invitedPlayers: inviteData.players || [],
             isInviteAccepted: true,
           });
         }
       }, 500);
-
       setPendingInvite(null);
     },
-    [currentUser, isConnected, onJoinGame],
+    [currentUser, onJoinGame],
   );
 
-  // ====================== RECUSAR CONVITE ======================
   const handleDeclineInvite = useCallback(
     (inviteData) => {
-      if (!socketRef.current || !isConnected) return;
-
-      socketRef.current.emit("decline-invite", {
+      if (!socketClient.isConnected()) return;
+      socketClient.emit("decline-invite", {
         inviteId: inviteData.inviteId,
         from: currentUser,
       });
-
       setPendingInvite(null);
       setError(`❌ Convite recusado`);
       setTimeout(() => setError(""), 3000);
     },
-    [currentUser, isConnected],
+    [currentUser],
   );
 
-  // ====================== RENDER ======================
+  // ============================================================
+  // 🔥 RENDER
+  // ============================================================
   return (
     <motion.div
       style={overlayStyle()}
@@ -428,14 +391,8 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
           </div>
         )}
 
-        {/* 🔥 CONVITE PENDENTE */}
         {pendingInvite && (
-          <motion.div
-            style={inviteBannerStyle()}
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
+          <div style={inviteBannerStyle()}>
             <div style={inviteContentStyle()}>
               <span style={inviteIconStyle()}>🎯</span>
               <div>
@@ -461,7 +418,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
                 Recusar
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
 
         <div style={createSectionStyle()}>
@@ -491,8 +448,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
                 <span
                   style={{ display: "flex", alignItems: "center", gap: "8px" }}
                 >
-                  <span style={spinnerStyle()} />
-                  Criando...
+                  <span style={spinnerStyle()} /> Criando...
                 </span>
               ) : (
                 "🚀 Criar Sala"
@@ -515,8 +471,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
 
           {loading ? (
             <div style={loadingStyle()}>
-              <span style={spinnerStyle()} />
-              Carregando salas...
+              <span style={spinnerStyle()} /> Carregando salas...
             </div>
           ) : rooms.length === 0 ? (
             <div style={emptyStyle()}>
@@ -524,12 +479,11 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
               <p style={emptySubStyle()}>Crie uma sala para começar!</p>
             </div>
           ) : (
-            <div style={roomsListStyle()}>
+            <div style={roomsListStyle()} key={refreshKey}>
               {rooms.map((room) => {
                 const isFull = room.playerCount >= room.maxPlayers;
                 const playerNames = room.players?.map((p) => p.name) || [];
                 const isInRoom = playerNames.includes(currentUser);
-
                 return (
                   <motion.div
                     key={room.roomId}
@@ -566,7 +520,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
                             onJoinGame({
                               roomId: room.roomId,
                               playerName: currentUser,
-                              socket: socketRef.current,
+                              socket: socketClient.socket,
                             });
                           }
                         } else {
@@ -585,11 +539,10 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
           )}
         </div>
 
-        {/* 🔥 CHAT DO LOBBY */}
-        {currentRoomId && socketRef.current && (
+        {currentRoomId && socketClient.socket && (
           <div style={chatWrapperStyle()}>
             <Chat
-              socket={socketRef.current}
+              socket={socketClient.socket}
               roomId={currentRoomId}
               playerName={currentUser}
             />
@@ -606,7 +559,9 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
   );
 }
 
-// ====================== ESTILOS ======================
+// ============================================================
+// 🎨 ESTILOS
+// ============================================================
 
 function overlayStyle() {
   return {

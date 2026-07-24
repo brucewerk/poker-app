@@ -1,4 +1,4 @@
-// components/Poker/FriendsList.jsx - CORRIGIDO: FEEDBACK FECHA SOZINHO
+// components/Poker/FriendsList.jsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -37,7 +37,12 @@ export default function FriendsList({ username, onJoinGame }) {
   const [showFloatingInvite, setShowFloatingInvite] = useState(false);
   const [pendingInviteQueue, setPendingInviteQueue] = useState([]);
 
-  // 🔥 FEEDBACKS NO CARD - CORRIGIDO
+  // 🔥 NOTIFICAÇÃO DE CHAT
+  const [chatNotification, setChatNotification] = useState(null);
+  const chatNotifTimeoutRef = useRef(null);
+  const chatNotifQueueRef = useRef([]);
+
+  // 🔥 FEEDBACKS NO CARD
   const [cardFeedback, setCardFeedback] = useState(null);
   const [feedbackIsClickable, setFeedbackIsClickable] = useState(false);
   const [feedbackClickAction, setFeedbackClickAction] = useState(null);
@@ -90,7 +95,46 @@ export default function FriendsList({ username, onJoinGame }) {
   }, []);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA MOSTRAR FEEDBACK NO CARD (CORRIGIDA - FECHA SOZINHA)
+  // 🔥 FUNÇÃO PARA MOSTRAR NOTIFICAÇÃO DE CHAT
+  // ============================================================
+  const showChatNotification = useCallback(
+    (from, message) => {
+      if (chatNotification) {
+        chatNotifQueueRef.current.push({ from, message });
+        return;
+      }
+
+      setChatNotification({ from, message, timestamp: Date.now() });
+
+      if (chatNotifTimeoutRef.current) {
+        clearTimeout(chatNotifTimeoutRef.current);
+      }
+      chatNotifTimeoutRef.current = setTimeout(() => {
+        setChatNotification(null);
+        chatNotifTimeoutRef.current = null;
+        if (chatNotifQueueRef.current.length > 0) {
+          const next = chatNotifQueueRef.current.shift();
+          showChatNotification(next.from, next.message);
+        }
+      }, 6000);
+    },
+    [chatNotification],
+  );
+
+  const closeChatNotification = useCallback(() => {
+    if (chatNotifTimeoutRef.current) {
+      clearTimeout(chatNotifTimeoutRef.current);
+      chatNotifTimeoutRef.current = null;
+    }
+    setChatNotification(null);
+    if (chatNotifQueueRef.current.length > 0) {
+      const next = chatNotifQueueRef.current.shift();
+      setTimeout(() => showChatNotification(next.from, next.message), 300);
+    }
+  }, [showChatNotification]);
+
+  // ============================================================
+  // 🔥 FUNÇÃO PARA MOSTRAR FEEDBACK NO CARD
   // ============================================================
   const showCardFeedback = useCallback(
     (
@@ -100,7 +144,6 @@ export default function FriendsList({ username, onJoinGame }) {
       clickable = false,
       onClick = null,
     ) => {
-      // 🔥 LIMPAR TIMERS ANTERIORES
       if (cardFeedbackTimerRef.current) {
         clearTimeout(cardFeedbackTimerRef.current);
         cardFeedbackTimerRef.current = null;
@@ -110,7 +153,6 @@ export default function FriendsList({ username, onJoinGame }) {
         feedbackTimeoutRef.current = null;
       }
 
-      // 🔥 SE FOR A MESMA MENSAGEM, NÃO REINICIAR
       if (
         cardFeedback?.message === message &&
         cardFeedback?.isError === isError
@@ -128,7 +170,6 @@ export default function FriendsList({ username, onJoinGame }) {
       setFeedbackIsClickable(clickable);
       setFeedbackClickAction(() => onClick);
 
-      // 🔥 TIMER PARA FECHAR AUTOMATICAMENTE
       cardFeedbackTimerRef.current = setTimeout(() => {
         setCardFeedback(null);
         setFeedbackIsClickable(false);
@@ -139,9 +180,6 @@ export default function FriendsList({ username, onJoinGame }) {
     [cardFeedback],
   );
 
-  // ============================================================
-  // 🔥 FUNÇÃO PARA LIMPAR FEEDBACK FORÇADAMENTE
-  // ============================================================
   const clearCardFeedback = useCallback(() => {
     if (cardFeedbackTimerRef.current) {
       clearTimeout(cardFeedbackTimerRef.current);
@@ -162,7 +200,6 @@ export default function FriendsList({ username, onJoinGame }) {
   const showFloatingInviteCard = useCallback(
     (inviteData) => {
       if (isChatOpenRef.current) {
-        console.log("📥 Chat aberto, convite adicionado à fila");
         setPendingInviteQueue((prev) => [...prev, inviteData]);
         showCardFeedback(
           `🎯 Novo convite de ${inviteData.from} (aguardando...)`,
@@ -195,11 +232,7 @@ export default function FriendsList({ username, onJoinGame }) {
   // 🔥 FUNÇÃO PARA RESETAR ESTADO DO LOBBY
   // ============================================================
   const resetLobbyState = useCallback(() => {
-    if (resettingRef.current) {
-      console.log("🔄 Reset já em andamento, ignorando...");
-      return;
-    }
-
+    if (resettingRef.current) return;
     resettingRef.current = true;
     console.log(`🔄 Resetando estado do lobby para ${username}`);
 
@@ -210,14 +243,13 @@ export default function FriendsList({ username, onJoinGame }) {
     currentRoomIdRef.current = null;
     closeFloatingInvite();
     setPendingInviteQueue([]);
-
-    // 🔥 LIMPAR FEEDBACK AO RESETAR
     clearCardFeedback();
+    closeChatNotification();
 
     setTimeout(() => {
       resettingRef.current = false;
     }, 300);
-  }, [username, closeFloatingInvite, clearCardFeedback]);
+  }, [username, closeFloatingInvite, clearCardFeedback, closeChatNotification]);
 
   // ============================================================
   // 🔥 FUNÇÃO PARA ABRIR CHAT
@@ -228,10 +260,9 @@ export default function FriendsList({ username, onJoinGame }) {
       setShowChat(true);
       isChatOpenRef.current = true;
 
-      // 🔥 Limpar feedbacks
       clearCardFeedback();
+      closeChatNotification();
 
-      // 🔥 Limpar não lidas
       setUnreadChats((prev) => {
         const newUnread = { ...prev };
         delete newUnread[friendUsername];
@@ -245,7 +276,7 @@ export default function FriendsList({ username, onJoinGame }) {
         scrollChatToBottom();
       }, 200);
     },
-    [scrollChatToBottom, clearCardFeedback],
+    [scrollChatToBottom, clearCardFeedback, closeChatNotification],
   );
 
   // ============================================================
@@ -255,11 +286,11 @@ export default function FriendsList({ username, onJoinGame }) {
     if (previousOnJoinGameRef.current !== null && onJoinGame === null) {
       console.log(`🔄 Detectada saída do multiplayer, resetando estado...`);
       resetLobbyState();
-      // 🔥 LIMPAR FEEDBACK AO SAIR DO MULTIPLAYER
       clearCardFeedback();
+      closeChatNotification();
     }
     previousOnJoinGameRef.current = onJoinGame;
-  }, [onJoinGame, resetLobbyState, clearCardFeedback]);
+  }, [onJoinGame, resetLobbyState, clearCardFeedback, closeChatNotification]);
 
   // ============================================================
   // 🔥 useEffect - CONECTAR AO SOCKET
@@ -319,7 +350,6 @@ export default function FriendsList({ username, onJoinGame }) {
     socket.on("room-created", (data) => {
       console.log("📡 Sala criada com sucesso:", data);
       setIsCreatingRoom(false);
-      console.log(`✅ Sala ${data.roomId} criada!`);
       currentRoomIdRef.current = data.roomId;
       showCardFeedback(`✅ Sala ${data.roomId} criada!`, false, 3000);
 
@@ -488,13 +518,7 @@ export default function FriendsList({ username, onJoinGame }) {
           [data.from]: (prev[data.from] || 0) + 1,
         }));
 
-        showCardFeedback(
-          `💬 Nova mensagem de ${data.from} (clique para abrir)`,
-          false,
-          6000,
-          true,
-          () => openChat(data.from),
-        );
+        showChatNotification(data.from, data.message);
       } else {
         setTimeout(() => scrollChatToBottom(), 100);
       }
@@ -589,6 +613,7 @@ export default function FriendsList({ username, onJoinGame }) {
         redirectTimeoutRef.current = null;
       }
       clearCardFeedback();
+      closeChatNotification();
     };
   }, [
     username,
@@ -607,6 +632,8 @@ export default function FriendsList({ username, onJoinGame }) {
     isChatOpenRef,
     cardFeedback,
     clearCardFeedback,
+    closeChatNotification,
+    showChatNotification,
   ]);
 
   // ============================================================
@@ -686,8 +713,9 @@ export default function FriendsList({ username, onJoinGame }) {
         intervalRef.current = null;
       }
       clearCardFeedback();
+      closeChatNotification();
     };
-  }, [username, fetchFriends, clearCardFeedback]);
+  }, [username, fetchFriends, clearCardFeedback, closeChatNotification]);
 
   // ============================================================
   // 🔥 useEffect - POLLING
@@ -727,8 +755,9 @@ export default function FriendsList({ username, onJoinGame }) {
   useEffect(() => {
     if (showChat) {
       clearCardFeedback();
+      closeChatNotification();
     }
-  }, [showChat, clearCardFeedback]);
+  }, [showChat, clearCardFeedback, closeChatNotification]);
 
   // ============================================================
   // 🔥 useCallback - SELECIONAR/DESELECIONAR AMIGO
@@ -847,7 +876,9 @@ export default function FriendsList({ username, onJoinGame }) {
     ],
   );
 
+  // ============================================================
   // 🔥 FUNÇÃO AUXILIAR PARA ENTRAR NA NOVA SALA
+  // ============================================================
   const enterNewRoom = useCallback(
     (roomId, inviteData) => {
       console.log(`📤 Entrando na nova sala ${roomId}...`);
@@ -991,9 +1022,7 @@ export default function FriendsList({ username, onJoinGame }) {
     try {
       const res = await fetch("/api/friends", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           friendUsername: friendName,
@@ -1050,9 +1079,7 @@ export default function FriendsList({ username, onJoinGame }) {
       try {
         const res = await fetch("/api/friends", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
             friendUsername,
@@ -1175,48 +1202,139 @@ export default function FriendsList({ username, onJoinGame }) {
 
     return (
       <motion.div
-        style={chatOverlayStyle()}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.3)",
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "flex-end",
+          zIndex: 2000,
+          padding: "20px",
+        }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={closeChat}
       >
         <motion.div
-          style={chatPanelStyle()}
+          style={{
+            width: "350px",
+            maxWidth: "90vw",
+            height: "450px",
+            maxHeight: "80vh",
+            background: "var(--bg-card)",
+            borderRadius: 16,
+            border: "2px solid var(--border-gold)",
+            boxShadow: "0 8px 40px var(--shadow-dark)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
           initial={{ opacity: 0, x: 300 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 300 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div style={chatHeaderStyle()}>
+          <div
+            style={{
+              padding: "12px 16px",
+              background: "rgba(255,215,0,0.1)",
+              borderBottom: "1px solid var(--border-light)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              color: "gold",
+              fontWeight: "bold",
+              fontSize: "1rem",
+            }}
+          >
             <span>💬 {selectedChatFriend}</span>
-            <div style={chatHeaderRightStyle()}>
-              <span style={chatMessageCountStyle()}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "0.6rem", color: "#888" }}>
                 {messages.length} mensagens
               </span>
-              <button onClick={closeChat} style={closeChatStyle()}>
+              <button
+                onClick={closeChat}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#888",
+                  cursor: "pointer",
+                  fontSize: "1.2rem",
+                  padding: "4px",
+                }}
+              >
                 ✕
               </button>
             </div>
           </div>
 
           <div
-            style={chatMessagesStyle()}
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              overflowX: "hidden",
+              padding: "12px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px",
+              maxHeight: "350px",
+            }}
             ref={messagesContainerRef}
             id={`chat-messages-${selectedChatFriend}`}
           >
             {messages.length === 0 ? (
-              <p style={emptyChatStyle()}>Nenhuma mensagem ainda</p>
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#666",
+                  padding: "30px 0",
+                  fontSize: "0.9rem",
+                }}
+              >
+                Nenhuma mensagem ainda
+              </p>
             ) : (
               messages.map((msg, index) => (
                 <div
                   key={`chat_msg_${index}_${msg.timestamp}`}
-                  style={chatMessageStyle(msg.isOwn)}
+                  style={{
+                    display: "flex",
+                    justifyContent: msg.isOwn ? "flex-end" : "flex-start",
+                  }}
                 >
-                  <div style={chatMessageBubbleStyle(msg.isOwn)}>
-                    <div style={chatMessageTextStyle()}>{msg.message}</div>
-                    <div style={chatMessageTimeStyle(msg.isOwn)}>
+                  <div
+                    style={{
+                      maxWidth: "80%",
+                      padding: "8px 14px",
+                      borderRadius: 12,
+                      background: msg.isOwn
+                        ? "rgba(255,215,0,0.15)"
+                        : "rgba(255,255,255,0.05)",
+                      border: msg.isOwn
+                        ? "1px solid rgba(255,215,0,0.2)"
+                        : "1px solid var(--border-light)",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {msg.message}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "0.5rem",
+                        color: "#666",
+                        marginTop: "4px",
+                        textAlign: msg.isOwn ? "right" : "left",
+                      }}
+                    >
                       {msg.timestamp?.toLocaleTimeString?.() || ""}
                     </div>
                   </div>
@@ -1226,17 +1344,47 @@ export default function FriendsList({ username, onJoinGame }) {
             <div ref={chatEndRef} />
           </div>
 
-          <form onSubmit={sendChatMessage} style={chatInputFormStyle()}>
+          <form
+            onSubmit={sendChatMessage}
+            style={{
+              display: "flex",
+              padding: "10px",
+              borderTop: "1px solid var(--border-light)",
+              gap: "8px",
+            }}
+          >
             <input
               ref={chatInputRef}
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder="Digite uma mensagem..."
-              style={chatInputStyle()}
+              style={{
+                flex: 1,
+                padding: "8px 14px",
+                borderRadius: 20,
+                border: "1px solid var(--border-input)",
+                background: "var(--bg-input)",
+                color: "var(--text-primary)",
+                fontSize: "0.85rem",
+                outline: "none",
+              }}
               maxLength={500}
             />
-            <button type="submit" style={chatSendButtonStyle()}>
+            <button
+              type="submit"
+              style={{
+                padding: "8px 18px",
+                borderRadius: 20,
+                border: "none",
+                background: "radial-gradient(#f7d97c,#d6a12e)",
+                color: "#2e241f",
+                fontWeight: "bold",
+                cursor: "pointer",
+                fontSize: "0.8rem",
+                whiteSpace: "nowrap",
+              }}
+            >
               Enviar
             </button>
           </form>
@@ -1253,28 +1401,202 @@ export default function FriendsList({ username, onJoinGame }) {
   ]);
 
   // ============================================================
+  // 🔥 COMPONENTE DE NOTIFICAÇÃO DE CHAT
+  // ============================================================
+  const ChatNotificationCard = () => {
+    if (!chatNotification) return null;
+
+    return (
+      <motion.div
+        style={{
+          position: "fixed",
+          bottom: 20,
+          left: 20,
+          zIndex: 9999,
+          background: "linear-gradient(145deg, #1a3a2a, #0a2a1a)",
+          border: "1px solid rgba(76,175,80,0.3)",
+          borderRadius: 16,
+          padding: "14px 18px",
+          maxWidth: 320,
+          minWidth: 240,
+          boxShadow:
+            "0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(76,175,80,0.05)",
+          cursor: "pointer",
+          backdropFilter: "blur(8px)",
+          transition: "all 0.3s ease",
+        }}
+        initial={{ opacity: 0, x: -50, scale: 0.9 }}
+        animate={{ opacity: 1, x: 0, scale: 1 }}
+        exit={{ opacity: 0, x: -50, scale: 0.9 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        onClick={() => {
+          if (chatNotification.from) {
+            openChat(chatNotification.from);
+          }
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "1.8rem",
+              flexShrink: 0,
+            }}
+          >
+            💬
+          </span>
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            <div
+              style={{
+                fontWeight: "bold",
+                color: "#4caf50",
+                fontSize: "0.85rem",
+              }}
+            >
+              {chatNotification.from}
+            </div>
+            <div
+              style={{
+                color: "#eee",
+                fontSize: "0.8rem",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {chatNotification.message.length > 40
+                ? chatNotification.message.substring(0, 40) + "..."
+                : chatNotification.message}
+            </div>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              closeChatNotification();
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#666",
+              cursor: "pointer",
+              fontSize: "0.9rem",
+              padding: "4px",
+              flexShrink: 0,
+              transition: "all 0.3s ease",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+        <div
+          style={{
+            marginTop: "6px",
+            paddingTop: "6px",
+            borderTop: "1px solid rgba(255,255,255,0.05)",
+            textAlign: "right",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "0.55rem",
+              color: "#666",
+            }}
+          >
+            Clique para abrir o chat
+          </span>
+        </div>
+      </motion.div>
+    );
+  };
+
+  // ============================================================
   // 🔥 COMPONENTE DE MODAL DE CONVITE
   // ============================================================
   const InviteModal = () => {
     if (!showInviteModal) return null;
 
     return (
-      <div style={inviteOverlayStyle()} onClick={closeInviteModal}>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.7)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 3000,
+          padding: "20px",
+        }}
+        onClick={closeInviteModal}
+      >
         <motion.div
-          style={inviteModalStyle()}
+          style={{
+            background: "var(--bg-modal)",
+            padding: "25px 30px",
+            borderRadius: 25,
+            maxWidth: "450px",
+            width: "100%",
+            color: "var(--text-primary)",
+            border: "2px solid gold",
+            boxShadow: "0 20px 60px var(--shadow-dark)",
+            maxHeight: "90vh",
+            overflowY: "auto",
+          }}
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <h3 style={inviteTitleStyle()}>🎯 Convidar Amigos</h3>
-          <p style={inviteTextStyle()}>
+          <h3
+            style={{
+              textAlign: "center",
+              color: "gold",
+              margin: "0 0 15px",
+              fontSize: "1.4rem",
+            }}
+          >
+            🎯 Convidar Amigos
+          </h3>
+          <p
+            style={{
+              textAlign: "center",
+              fontSize: "1rem",
+              marginBottom: "20px",
+              color: "var(--text-secondary)",
+            }}
+          >
             Selecione os amigos que deseja convidar:
           </p>
 
-          <div style={friendSelectionStyle()}>
+          <div
+            style={{
+              maxHeight: "200px",
+              overflowY: "auto",
+              marginBottom: "15px",
+              border: "1px solid var(--border-light)",
+              borderRadius: 10,
+              padding: "5px",
+            }}
+          >
             {friends.filter((f) => f.isOnline).length === 0 ? (
-              <p style={emptySelectionStyle()}>
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                  padding: "20px 0",
+                  fontSize: "0.9rem",
+                }}
+              >
                 Nenhum amigo online no momento.
               </p>
             ) : (
@@ -1283,16 +1605,42 @@ export default function FriendsList({ username, onJoinGame }) {
                 .map((friend) => (
                   <div
                     key={`select_${friend.username}`}
-                    style={friendSelectItemStyle(friend.selected)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      background: friend.selected
+                        ? "rgba(76,175,80,0.1)"
+                        : "transparent",
+                      border: friend.selected
+                        ? "1px solid rgba(76,175,80,0.3)"
+                        : "1px solid transparent",
+                      transition: "all 0.3s ease",
+                    }}
                     onClick={() => toggleFriendSelection(friend.username)}
                   >
-                    <span style={friendSelectCheckStyle()}>
+                    <span style={{ fontSize: "1.1rem" }}>
                       {friend.selected ? "☑️" : "⬜"}
                     </span>
-                    <span style={friendSelectNameStyle()}>
+                    <span
+                      style={{
+                        flex: 1,
+                        fontWeight: "bold",
+                        color: "var(--text-primary)",
+                        fontSize: "0.9rem",
+                      }}
+                    >
                       {friend.username}
                     </span>
-                    <span style={friendSelectLevelStyle()}>
+                    <span
+                      style={{
+                        fontSize: "0.7rem",
+                        color: "gold",
+                      }}
+                    >
                       Nv. {friend.level}
                     </span>
                   </div>
@@ -1300,21 +1648,69 @@ export default function FriendsList({ username, onJoinGame }) {
             )}
           </div>
 
-          <div style={inviteStatsStyle()}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              fontSize: "0.8rem",
+              color: "var(--text-muted)",
+              marginBottom: "15px",
+              padding: "4px",
+              background: "rgba(255,255,255,0.03)",
+              borderRadius: 8,
+            }}
+          >
             <span>Selecionados: {selectedFriends.length}</span>
           </div>
 
-          <div style={inviteButtonsStyle()}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+            }}
+          >
             <button
               onClick={sendGroupInvite}
-              style={inviteSendStyle(
-                selectedFriends.length > 0 && !isCreatingRoom,
-              )}
+              style={{
+                flex: 1,
+                background:
+                  selectedFriends.length > 0 && !isCreatingRoom
+                    ? "radial-gradient(#f7d97c,#d6a12e)"
+                    : "#444",
+                border: "none",
+                fontWeight: "bold",
+                padding: "10px",
+                borderRadius: 30,
+                color:
+                  selectedFriends.length > 0 && !isCreatingRoom
+                    ? "#2e241f"
+                    : "#888",
+                cursor:
+                  selectedFriends.length > 0 && !isCreatingRoom
+                    ? "pointer"
+                    : "not-allowed",
+                opacity:
+                  selectedFriends.length > 0 && !isCreatingRoom ? 1 : 0.5,
+                transition: "all 0.3s ease",
+              }}
               disabled={selectedFriends.length === 0 || isCreatingRoom}
             >
               {isCreatingRoom ? "⏳ Criando sala..." : "📤 Enviar Convites"}
             </button>
-            <button onClick={closeInviteModal} style={inviteCancelStyle()}>
+            <button
+              onClick={closeInviteModal}
+              style={{
+                flex: 1,
+                background: "rgba(244,67,54,0.15)",
+                border: "1px solid #f44336",
+                borderRadius: 30,
+                padding: "10px",
+                color: "#f44336",
+                cursor: "pointer",
+                fontWeight: "bold",
+                transition: "all 0.3s ease",
+              }}
+            >
               ❌ Cancelar
             </button>
           </div>
@@ -1324,7 +1720,7 @@ export default function FriendsList({ username, onJoinGame }) {
   };
 
   // ============================================================
-  // 🔥 COMPONENTE DE FEEDBACK NO CARD (CORRIGIDO - FECHA SOZINHO)
+  // 🔥 COMPONENTE DE FEEDBACK NO CARD
   // ============================================================
   const CardFeedback = () => {
     if (!cardFeedback) return null;
@@ -1338,7 +1734,21 @@ export default function FriendsList({ username, onJoinGame }) {
     return (
       <motion.div
         style={{
-          ...cardFeedbackStyle(cardFeedback.isError),
+          background: cardFeedback.isError
+            ? "rgba(244,67,54,0.12)"
+            : "rgba(255,215,0,0.12)",
+          border: cardFeedback.isError
+            ? "1px solid rgba(244,67,54,0.3)"
+            : "1px solid rgba(255,215,0,0.3)",
+          borderRadius: "12px",
+          padding: "10px 14px",
+          marginBottom: "8px",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
+          transition: "all 0.2s ease",
           cursor: feedbackIsClickable ? "pointer" : "default",
         }}
         initial={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1346,21 +1756,56 @@ export default function FriendsList({ username, onJoinGame }) {
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
         onClick={handleClick}
-        title={feedbackIsClickable ? "Clique para abrir o chat" : ""}
+        title={feedbackIsClickable ? "Clique para abrir" : ""}
       >
-        <span style={cardFeedbackIconStyle(cardFeedback.isError)}>
+        <span
+          style={{
+            fontSize: "1.2rem",
+            flexShrink: 0,
+          }}
+        >
           {cardFeedback.isError ? "⚠️" : "💬"}
         </span>
-        <span style={cardFeedbackTextStyle()}>{cardFeedback.message}</span>
+        <span
+          style={{
+            flex: 1,
+            fontSize: "0.85rem",
+            color: "var(--text-primary)",
+            fontWeight: "500",
+            wordBreak: "break-word",
+          }}
+        >
+          {cardFeedback.message}
+        </span>
         {feedbackIsClickable && (
-          <span style={cardFeedbackClickHintStyle()}>👆</span>
+          <span
+            style={{
+              fontSize: "0.9rem",
+              color: "var(--text-muted)",
+              opacity: 0.6,
+              flexShrink: 0,
+              animation: "pulse 1.5s ease-in-out infinite",
+            }}
+          >
+            👆
+          </span>
         )}
         <button
           onClick={(e) => {
             e.stopPropagation();
             clearCardFeedback();
           }}
-          style={cardFeedbackCloseStyle()}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            fontSize: "0.9rem",
+            padding: "2px 6px",
+            opacity: 0.5,
+            transition: "opacity 0.3s ease",
+            flexShrink: 0,
+          }}
         >
           ✕
         </button>
@@ -1375,50 +1820,127 @@ export default function FriendsList({ username, onJoinGame }) {
     if (!showFloatingInvite || !floatingInvite) return null;
 
     return (
-      <motion.div
-        style={floatingInviteOverlayStyle()}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.6)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 9999,
+          padding: "20px",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
+        }}
         onClick={closeFloatingInvite}
       >
         <motion.div
-          style={floatingInviteCardStyle()}
+          style={{
+            background: "linear-gradient(145deg, #1a3a2a, #0a2a1a)",
+            borderRadius: "24px",
+            padding: "28px 32px",
+            maxWidth: "420px",
+            width: "100%",
+            color: "#ffffff",
+            border: "2px solid gold",
+            boxShadow:
+              "0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(255,215,0,0.1)",
+            position: "relative",
+            overflow: "hidden",
+          }}
           initial={{ scale: 0.85, opacity: 0, y: 30 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.85, opacity: 0, y: 30 }}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div style={floatingInviteHeaderStyle()}>
-            <span style={floatingInviteIconStyle()}>🎯</span>
-            <span style={floatingInviteTitleStyle()}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginBottom: "16px",
+              paddingBottom: "12px",
+              borderBottom: "1px solid rgba(255,215,0,0.15)",
+            }}
+          >
+            <span style={{ fontSize: "2rem" }}>🎯</span>
+            <span
+              style={{
+                flex: 1,
+                fontSize: "1.2rem",
+                fontWeight: "bold",
+                color: "gold",
+              }}
+            >
               Convite para Partida!
             </span>
             <button
               onClick={closeFloatingInvite}
-              style={floatingInviteCloseStyle()}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#888",
+                cursor: "pointer",
+                fontSize: "1.2rem",
+                padding: "4px 8px",
+                borderRadius: "50%",
+                transition: "all 0.3s ease",
+                flexShrink: 0,
+              }}
             >
               ✕
             </button>
           </div>
 
-          <div style={floatingInviteBodyStyle()}>
-            <p style={floatingInviteFromStyle()}>
+          <div style={{ marginBottom: "20px" }}>
+            <p
+              style={{
+                fontSize: "1rem",
+                lineHeight: "1.5",
+                margin: "0 0 8px 0",
+                color: "#eee",
+              }}
+            >
               <strong>{floatingInvite.from}</strong> te convidou para uma
               partida de poker!
             </p>
             {floatingInvite.players && floatingInvite.players.length > 0 && (
-              <p style={floatingInvitePlayersStyle()}>
+              <p
+                style={{
+                  fontSize: "0.85rem",
+                  color: "#aaa",
+                  margin: "0",
+                }}
+              >
                 👥 Jogadores: {floatingInvite.players.join(", ")}
               </p>
             )}
           </div>
 
-          <div style={floatingInviteActionsStyle()}>
+          <div
+            style={{
+              display: "flex",
+              gap: "12px",
+              marginBottom: "12px",
+            }}
+          >
             <motion.button
               onClick={() => acceptGroupInvite(floatingInvite.inviteId)}
-              style={floatingInviteAcceptStyle()}
+              style={{
+                flex: 1,
+                padding: "10px 20px",
+                borderRadius: "30px",
+                border: "none",
+                background: "linear-gradient(145deg, #4caf50, #388e3c)",
+                color: "white",
+                fontWeight: "bold",
+                fontSize: "0.95rem",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                boxShadow: "0 4px 15px rgba(76,175,80,0.3)",
+              }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
@@ -1426,7 +1948,19 @@ export default function FriendsList({ username, onJoinGame }) {
             </motion.button>
             <motion.button
               onClick={() => declineGroupInvite(floatingInvite.inviteId)}
-              style={floatingInviteDeclineStyle()}
+              style={{
+                flex: 1,
+                padding: "10px 20px",
+                borderRadius: "30px",
+                border: "none",
+                background: "linear-gradient(145deg, #f44336, #c62828)",
+                color: "white",
+                fontWeight: "bold",
+                fontSize: "0.95rem",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                boxShadow: "0 4px 15px rgba(244,67,54,0.3)",
+              }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
@@ -1434,13 +1968,24 @@ export default function FriendsList({ username, onJoinGame }) {
             </motion.button>
           </div>
 
-          <div style={floatingInviteFooterStyle()}>
-            <span style={floatingInviteHintStyle()}>
+          <div
+            style={{
+              textAlign: "center",
+              paddingTop: "8px",
+              borderTop: "1px solid rgba(255,255,255,0.05)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "0.65rem",
+                color: "#666",
+              }}
+            >
               Clique fora para fechar
             </span>
           </div>
         </motion.div>
-      </motion.div>
+      </div>
     );
   };
 
@@ -1450,9 +1995,38 @@ export default function FriendsList({ username, onJoinGame }) {
 
   if (loading) {
     return (
-      <div style={panelStyle()}>
-        <h3 style={titleStyle()}>👥 AMIGOS</h3>
-        <p style={emptyStyle()}>Carregando...</p>
+      <div
+        style={{
+          background: "var(--bg-panel)",
+          backdropFilter: "blur(4px)",
+          borderRadius: 20,
+          padding: 15,
+          marginTop: 10,
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-gold)",
+          transition: "var(--transition-theme)",
+          overflow: "hidden",
+        }}
+      >
+        <h3
+          style={{
+            color: "gold",
+            margin: "0 0 10px",
+            fontSize: "1rem",
+          }}
+        >
+          👥 AMIGOS
+        </h3>
+        <p
+          style={{
+            textAlign: "center",
+            color: "var(--text-muted)",
+            fontSize: "0.85rem",
+            padding: "10px 0",
+          }}
+        >
+          Carregando...
+        </p>
       </div>
     );
   }
@@ -1463,144 +2037,473 @@ export default function FriendsList({ username, onJoinGame }) {
         <FloatingInvite />
       </AnimatePresence>
 
+      <AnimatePresence>
+        <ChatNotificationCard />
+      </AnimatePresence>
+
       {ChatPanel}
       <InviteModal />
 
-      <div style={panelStyle()}>
-        <div style={headerStyle()}>
-          <div style={headerLeftStyle()}>
-            <h3 style={titleStyle()}>👥 AMIGOS</h3>
+      <div
+        style={{
+          background: "var(--bg-panel)",
+          backdropFilter: "blur(4px)",
+          borderRadius: 20,
+          padding: 15,
+          marginTop: 10,
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-gold)",
+          transition: "var(--transition-theme)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "8px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
+            <h3
+              style={{
+                color: "gold",
+                margin: "0 0 10px",
+                fontSize: "1rem",
+              }}
+            >
+              👥 AMIGOS
+            </h3>
             {onlineFriends.length > 0 && (
-              <span style={onlineBadgeStyle()}>
+              <span
+                style={{
+                  fontSize: "0.6rem",
+                  color: "#4caf50",
+                  background: "rgba(76,175,80,0.15)",
+                  padding: "2px 10px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(76,175,80,0.2)",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 🟢 {onlineFriends.length} online
               </span>
             )}
             {!isConnected && (
-              <span style={disconnectedBadgeStyle()}>⚫ Desconectado</span>
+              <span
+                style={{
+                  fontSize: "0.6rem",
+                  color: "#f44336",
+                  background: "rgba(244,67,54,0.15)",
+                  padding: "2px 10px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(244,67,54,0.2)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ⚫ Desconectado
+              </span>
             )}
             {isWaitingForAccept && (
-              <span style={waitingBadgeStyle()}>
+              <span
+                style={{
+                  fontSize: "0.6rem",
+                  color: "#ff9800",
+                  background: "rgba(255,152,0,0.15)",
+                  padding: "2px 10px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,152,0,0.2)",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 ⏳ Aguardando aceitação...
               </span>
             )}
+            {totalUnread > 0 && (
+              <span
+                style={{
+                  fontSize: "0.6rem",
+                  color: "#fff",
+                  background: "#f44336",
+                  padding: "2px 10px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(244,67,54,0.3)",
+                  whiteSpace: "nowrap",
+                  fontWeight: "bold",
+                }}
+              >
+                🔔 {totalUnread} não lidas
+              </span>
+            )}
           </div>
-          <div style={headerRightStyle()}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
             <button
               onClick={() => setShowFriends(!showFriends)}
-              style={toggleButtonStyle()}
+              style={{
+                background: "none",
+                border: "none",
+                color: "gold",
+                fontSize: "1rem",
+                cursor: "pointer",
+              }}
             >
               {showFriends ? "▲" : "▼"} ({friends.length})
             </button>
           </div>
         </div>
 
-        {/* 🔥 FEEDBACK NO CARD */}
         <AnimatePresence>
           <CardFeedback />
         </AnimatePresence>
 
         {showFriends && (
-          <div style={contentStyle()}>
-            <div style={addFriendStyle()}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+              }}
+            >
               <input
                 type="text"
                 value={newFriend}
                 onChange={(e) => setNewFriend(e.target.value)}
                 placeholder="Digite o nome do amigo"
-                style={inputStyle()}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: 15,
+                  border: "1px solid var(--border-input)",
+                  background: "var(--bg-input)",
+                  color: "var(--text-primary)",
+                  fontSize: "0.85rem",
+                  outline: "none",
+                  transition: "var(--transition-theme)",
+                  minWidth: "60px",
+                }}
                 onKeyPress={(e) => e.key === "Enter" && addFriend()}
                 disabled={refreshing}
               />
               <button
                 onClick={addFriend}
-                style={addButtonStyle()}
+                style={{
+                  background: "rgba(255,215,0,0.2)",
+                  border: "1px solid rgba(255,215,0,0.3)",
+                  borderRadius: 15,
+                  padding: "8px 15px",
+                  color: "gold",
+                  cursor: "pointer",
+                  fontSize: "0.8rem",
+                  transition: "all 0.3s ease",
+                  whiteSpace: "nowrap",
+                }}
                 disabled={refreshing || !newFriend.trim()}
               >
                 {refreshing ? "⏳" : "➕ Adicionar"}
               </button>
             </div>
 
-            {error && <div style={errorStyle()}>{error}</div>}
-            {success && <div style={successStyle()}>{success}</div>}
+            {error && (
+              <div
+                style={{
+                  color: "#f44336",
+                  fontSize: "0.8rem",
+                  textAlign: "center",
+                  padding: "5px",
+                  background: "rgba(244,67,54,0.1)",
+                  borderRadius: 10,
+                }}
+              >
+                {error}
+              </div>
+            )}
+            {success && (
+              <div
+                style={{
+                  color: "#4caf50",
+                  fontSize: "0.8rem",
+                  textAlign: "center",
+                  padding: "5px",
+                  background: "rgba(76,175,80,0.1)",
+                  borderRadius: 10,
+                }}
+              >
+                {success}
+              </div>
+            )}
 
             {friends.length === 0 ? (
-              <p style={emptyStyle()}>
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                  fontSize: "0.85rem",
+                  padding: "10px 0",
+                }}
+              >
                 {username
                   ? "Nenhum amigo adicionado ainda. Digite um nome acima e clique em Adicionar."
                   : "Faça login para ver seus amigos."}
               </p>
             ) : (
-              <div style={friendsListStyle()}>
-                <div style={rankingHeaderStyle()}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px",
+                  maxHeight: "250px",
+                  overflowY: "auto",
+                  overflowX: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "0.7rem",
+                    color: "var(--text-muted)",
+                    padding: "4px 8px",
+                    borderBottom: "1px solid var(--border-light)",
+                    marginBottom: "4px",
+                  }}
+                >
                   <span>🏆 Ranking entre amigos</span>
                   <span style={{ fontSize: "0.55rem", color: "#888" }}>
                     {onlineFriends.length} online
                   </span>
                 </div>
-                {sortedFriends.map((friend, index) => (
-                  <div
-                    key={`friend_${index}_${friend.username}`}
-                    style={friendItemStyle(friend.isOnline)}
-                  >
-                    <div style={friendInfoStyle()}>
-                      <span style={friendRankStyle(index)}>#{index + 1}</span>
-                      <span style={friendNameStyle()}>
-                        {friend.username || "Desconhecido"}
-                      </span>
-                      <span style={friendStatusStyle(friend.isOnline)}>
-                        {friend.isOnline ? "🟢 Online" : "⚫ Offline"}
-                      </span>
-                      <span style={friendLevelStyle()}>
-                        Nv. {friend.level || 1}
-                      </span>
-                      <span style={friendChipsStyle()}>
-                        💰 {friend.chips || 0}
-                      </span>
-                    </div>
-                    <div style={friendActionsStyle()}>
-                      {friend.isOnline && (
-                        <>
-                          <button
-                            onClick={() => openChat(friend.username)}
-                            style={chatButtonStyle()}
-                            title="Abrir chat"
-                          >
-                            💬
-                            {unreadChats[friend.username] > 0 && (
-                              <span style={unreadBadgeStyle()}>
-                                {unreadChats[friend.username]}
-                              </span>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => {
-                              toggleFriendSelection(friend.username);
-                              setShowInviteModal(true);
-                            }}
-                            style={inviteButtonStyle()}
-                            title="Convidar para partida"
-                          >
-                            🎯
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => removeFriend(friend.username)}
-                        style={removeButtonStyle()}
-                        title="Remover amigo"
+                {sortedFriends.map((friend, index) => {
+                  const colors = ["#ffd700", "#c0c0c0", "#cd7f32", "#888"];
+                  return (
+                    <div
+                      key={`friend_${index}_${friend.username}`}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "8px 12px",
+                        background: friend.isOnline
+                          ? "rgba(76,175,80,0.05)"
+                          : "rgba(255,255,255,0.02)",
+                        borderRadius: 10,
+                        border: friend.isOnline
+                          ? "1px solid rgba(76,175,80,0.15)"
+                          : "1px solid var(--border-light)",
+                        transition: "var(--transition-theme)",
+                        flexWrap: "wrap",
+                        gap: "4px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "10px",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
                       >
-                        ✕
-                      </button>
+                        <span
+                          style={{
+                            fontSize: "0.6rem",
+                            fontWeight: "bold",
+                            color: colors[index] || "#666",
+                            minWidth: "24px",
+                          }}
+                        >
+                          #{index + 1}
+                        </span>
+                        <span
+                          style={{
+                            fontWeight: "bold",
+                            color: "var(--text-primary)",
+                            fontSize: "0.85rem",
+                          }}
+                        >
+                          {friend.username || "Desconhecido"}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.6rem",
+                            color: friend.isOnline ? "#4caf50" : "#666",
+                          }}
+                        >
+                          {friend.isOnline ? "🟢 Online" : "⚫ Offline"}
+                        </span>
+                        <span
+                          style={{
+                            color: "gold",
+                            fontSize: "0.65rem",
+                          }}
+                        >
+                          Nv. {friend.level || 1}
+                        </span>
+                        <span
+                          style={{
+                            color: "#4caf50",
+                            fontSize: "0.65rem",
+                          }}
+                        >
+                          💰 {friend.chips || 0}
+                        </span>
+                        {unreadChats[friend.username] > 0 && (
+                          <span
+                            style={{
+                              fontSize: "0.5rem",
+                              color: "#fff",
+                              background: "#f44336",
+                              padding: "1px 6px",
+                              borderRadius: 10,
+                              minWidth: "16px",
+                              textAlign: "center",
+                              marginLeft: "4px",
+                            }}
+                          >
+                            {unreadChats[friend.username]}
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "4px",
+                          alignItems: "center",
+                        }}
+                      >
+                        {friend.isOnline && (
+                          <>
+                            <button
+                              onClick={() => openChat(friend.username)}
+                              style={{
+                                background:
+                                  unreadChats[friend.username] > 0
+                                    ? "rgba(244,67,54,0.2)"
+                                    : "rgba(33,150,243,0.15)",
+                                border:
+                                  unreadChats[friend.username] > 0
+                                    ? "1px solid rgba(244,67,54,0.3)"
+                                    : "1px solid rgba(33,150,243,0.2)",
+                                borderRadius: "50%",
+                                width: 28,
+                                height: 28,
+                                color:
+                                  unreadChats[friend.username] > 0
+                                    ? "#f44336"
+                                    : "#2196f3",
+                                cursor: "pointer",
+                                fontSize: "0.8rem",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                position: "relative",
+                                transition: "all 0.3s ease",
+                              }}
+                              title="Abrir chat"
+                            >
+                              💬
+                              {unreadChats[friend.username] > 0 && (
+                                <span
+                                  style={{
+                                    position: "absolute",
+                                    top: -4,
+                                    right: -4,
+                                    background: "#f44336",
+                                    color: "white",
+                                    fontSize: "0.5rem",
+                                    borderRadius: "50%",
+                                    padding: "1px 4px",
+                                    minWidth: "16px",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  {unreadChats[friend.username]}
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => {
+                                toggleFriendSelection(friend.username);
+                                setShowInviteModal(true);
+                              }}
+                              style={{
+                                background: "rgba(76,175,80,0.15)",
+                                border: "1px solid rgba(76,175,80,0.2)",
+                                borderRadius: "50%",
+                                width: 28,
+                                height: 28,
+                                color: "#4caf50",
+                                cursor: "pointer",
+                                fontSize: "0.8rem",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                transition: "all 0.3s ease",
+                              }}
+                              title="Convidar para partida"
+                            >
+                              🎯
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => removeFriend(friend.username)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "#f44336",
+                            cursor: "pointer",
+                            fontSize: "0.8rem",
+                            padding: "4px 8px",
+                            borderRadius: 5,
+                            transition: "all 0.3s ease",
+                          }}
+                          title="Remover amigo"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
             {onlineFriends.length > 0 && (
               <button
                 onClick={() => setShowInviteModal(true)}
-                style={multiInviteButtonStyle()}
+                style={{
+                  width: "100%",
+                  background: "rgba(76,175,80,0.15)",
+                  border: "1px solid rgba(76,175,80,0.3)",
+                  borderRadius: 15,
+                  padding: "8px",
+                  color: "#4caf50",
+                  fontSize: "0.8rem",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                  marginTop: "8px",
+                }}
               >
                 🎯 Convidar Múltiplos Amigos
               </button>
@@ -1610,921 +2513,4 @@ export default function FriendsList({ username, onJoinGame }) {
       </div>
     </>
   );
-}
-
-// ============================================================
-// 🎨 ESTILOS
-// ============================================================
-
-function cardFeedbackStyle(isError) {
-  return {
-    background: isError ? "rgba(244,67,54,0.12)" : "rgba(255,215,0,0.12)",
-    border: isError
-      ? "1px solid rgba(244,67,54,0.3)"
-      : "1px solid rgba(255,215,0,0.3)",
-    borderRadius: "12px",
-    padding: "10px 14px",
-    marginBottom: "8px",
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    backdropFilter: "blur(4px)",
-    WebkitBackdropFilter: "blur(4px)",
-    transition: "all 0.2s ease",
-  };
-}
-
-function cardFeedbackIconStyle(isError) {
-  return {
-    fontSize: "1.2rem",
-    flexShrink: 0,
-  };
-}
-
-function cardFeedbackTextStyle() {
-  return {
-    flex: 1,
-    fontSize: "0.85rem",
-    color: "var(--text-primary)",
-    fontWeight: "500",
-    wordBreak: "break-word",
-  };
-}
-
-function cardFeedbackClickHintStyle() {
-  return {
-    fontSize: "0.9rem",
-    color: "var(--text-muted)",
-    opacity: 0.6,
-    flexShrink: 0,
-    animation: "pulse 1.5s ease-in-out infinite",
-  };
-}
-
-function cardFeedbackCloseStyle() {
-  return {
-    background: "none",
-    border: "none",
-    color: "var(--text-muted)",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    padding: "2px 6px",
-    opacity: 0.5,
-    transition: "opacity 0.3s ease",
-    flexShrink: 0,
-  };
-}
-
-function floatingInviteOverlayStyle() {
-  return {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.6)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 9999,
-    padding: "20px",
-    backdropFilter: "blur(4px)",
-    WebkitBackdropFilter: "blur(4px)",
-  };
-}
-
-function floatingInviteCardStyle() {
-  return {
-    background: "linear-gradient(145deg, #1a3a2a, #0a2a1a)",
-    borderRadius: "24px",
-    padding: "28px 32px",
-    maxWidth: "420px",
-    width: "100%",
-    color: "#ffffff",
-    border: "2px solid gold",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(255,215,0,0.1)",
-    position: "relative",
-    overflow: "hidden",
-  };
-}
-
-function floatingInviteHeaderStyle() {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "16px",
-    paddingBottom: "12px",
-    borderBottom: "1px solid rgba(255,215,0,0.15)",
-  };
-}
-
-function floatingInviteIconStyle() {
-  return {
-    fontSize: "2rem",
-  };
-}
-
-function floatingInviteTitleStyle() {
-  return {
-    flex: 1,
-    fontSize: "1.2rem",
-    fontWeight: "bold",
-    color: "gold",
-  };
-}
-
-function floatingInviteCloseStyle() {
-  return {
-    background: "none",
-    border: "none",
-    color: "#888",
-    cursor: "pointer",
-    fontSize: "1.2rem",
-    padding: "4px 8px",
-    borderRadius: "50%",
-    transition: "all 0.3s ease",
-    flexShrink: 0,
-  };
-}
-
-function floatingInviteBodyStyle() {
-  return {
-    marginBottom: "20px",
-  };
-}
-
-function floatingInviteFromStyle() {
-  return {
-    fontSize: "1rem",
-    lineHeight: "1.5",
-    margin: "0 0 8px 0",
-    color: "#eee",
-  };
-}
-
-function floatingInvitePlayersStyle() {
-  return {
-    fontSize: "0.85rem",
-    color: "#aaa",
-    margin: "0",
-  };
-}
-
-function floatingInviteActionsStyle() {
-  return {
-    display: "flex",
-    gap: "12px",
-    marginBottom: "12px",
-  };
-}
-
-function floatingInviteAcceptStyle() {
-  return {
-    flex: 1,
-    padding: "10px 20px",
-    borderRadius: "30px",
-    border: "none",
-    background: "linear-gradient(145deg, #4caf50, #388e3c)",
-    color: "white",
-    fontWeight: "bold",
-    fontSize: "0.95rem",
-    cursor: "pointer",
-    transition: "all 0.3s ease",
-    boxShadow: "0 4px 15px rgba(76,175,80,0.3)",
-  };
-}
-
-function floatingInviteDeclineStyle() {
-  return {
-    flex: 1,
-    padding: "10px 20px",
-    borderRadius: "30px",
-    border: "none",
-    background: "linear-gradient(145deg, #f44336, #c62828)",
-    color: "white",
-    fontWeight: "bold",
-    fontSize: "0.95rem",
-    cursor: "pointer",
-    transition: "all 0.3s ease",
-    boxShadow: "0 4px 15px rgba(244,67,54,0.3)",
-  };
-}
-
-function floatingInviteFooterStyle() {
-  return {
-    textAlign: "center",
-    paddingTop: "8px",
-    borderTop: "1px solid rgba(255,255,255,0.05)",
-  };
-}
-
-function floatingInviteHintStyle() {
-  return {
-    fontSize: "0.65rem",
-    color: "#666",
-  };
-}
-
-function panelStyle() {
-  return {
-    background: "var(--bg-panel)",
-    backdropFilter: "blur(4px)",
-    borderRadius: 20,
-    padding: 15,
-    marginTop: 10,
-    color: "var(--text-primary)",
-    border: "1px solid var(--border-gold)",
-    transition: "var(--transition-theme)",
-    overflow: "hidden",
-  };
-}
-
-function headerStyle() {
-  return {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "8px",
-  };
-}
-
-function headerLeftStyle() {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    flexWrap: "wrap",
-  };
-}
-
-function headerRightStyle() {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  };
-}
-
-function titleStyle() {
-  return {
-    color: "gold",
-    margin: "0 0 10px",
-    fontSize: "1rem",
-  };
-}
-
-function onlineBadgeStyle() {
-  return {
-    fontSize: "0.6rem",
-    color: "#4caf50",
-    background: "rgba(76,175,80,0.15)",
-    padding: "2px 10px",
-    borderRadius: 12,
-    border: "1px solid rgba(76,175,80,0.2)",
-    whiteSpace: "nowrap",
-  };
-}
-
-function disconnectedBadgeStyle() {
-  return {
-    fontSize: "0.6rem",
-    color: "#f44336",
-    background: "rgba(244,67,54,0.15)",
-    padding: "2px 10px",
-    borderRadius: 12,
-    border: "1px solid rgba(244,67,54,0.2)",
-    whiteSpace: "nowrap",
-  };
-}
-
-function waitingBadgeStyle() {
-  return {
-    fontSize: "0.6rem",
-    color: "#ff9800",
-    background: "rgba(255,152,0,0.15)",
-    padding: "2px 10px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,152,0,0.2)",
-    whiteSpace: "nowrap",
-  };
-}
-
-function toggleButtonStyle() {
-  return {
-    background: "none",
-    border: "none",
-    color: "gold",
-    fontSize: "1rem",
-    cursor: "pointer",
-  };
-}
-
-function contentStyle() {
-  return {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-  };
-}
-
-function addFriendStyle() {
-  return {
-    display: "flex",
-    gap: "8px",
-  };
-}
-
-function inputStyle() {
-  return {
-    flex: 1,
-    padding: "8px 12px",
-    borderRadius: 15,
-    border: "1px solid var(--border-input)",
-    background: "var(--bg-input)",
-    color: "var(--text-primary)",
-    fontSize: "0.85rem",
-    outline: "none",
-    transition: "var(--transition-theme)",
-    minWidth: "60px",
-  };
-}
-
-function addButtonStyle() {
-  return {
-    background: "rgba(255,215,0,0.2)",
-    border: "1px solid rgba(255,215,0,0.3)",
-    borderRadius: 15,
-    padding: "8px 15px",
-    color: "gold",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-    transition: "all 0.3s ease",
-    whiteSpace: "nowrap",
-  };
-}
-
-function errorStyle() {
-  return {
-    color: "#f44336",
-    fontSize: "0.8rem",
-    textAlign: "center",
-    padding: "5px",
-    background: "rgba(244,67,54,0.1)",
-    borderRadius: 10,
-  };
-}
-
-function successStyle() {
-  return {
-    color: "#4caf50",
-    fontSize: "0.8rem",
-    textAlign: "center",
-    padding: "5px",
-    background: "rgba(76,175,80,0.1)",
-    borderRadius: 10,
-  };
-}
-
-function emptyStyle() {
-  return {
-    textAlign: "center",
-    color: "var(--text-muted)",
-    fontSize: "0.85rem",
-    padding: "10px 0",
-  };
-}
-
-function friendsListStyle() {
-  return {
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-    maxHeight: "250px",
-    overflowY: "auto",
-    overflowX: "hidden",
-  };
-}
-
-function rankingHeaderStyle() {
-  return {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    fontSize: "0.7rem",
-    color: "var(--text-muted)",
-    padding: "4px 8px",
-    borderBottom: "1px solid var(--border-light)",
-    marginBottom: "4px",
-  };
-}
-
-function friendItemStyle(isOnline) {
-  return {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "8px 12px",
-    background: isOnline ? "rgba(76,175,80,0.05)" : "rgba(255,255,255,0.02)",
-    borderRadius: 10,
-    border: isOnline
-      ? "1px solid rgba(76,175,80,0.15)"
-      : "1px solid var(--border-light)",
-    transition: "var(--transition-theme)",
-    flexWrap: "wrap",
-    gap: "4px",
-  };
-}
-
-function friendInfoStyle() {
-  return {
-    display: "flex",
-    gap: "10px",
-    alignItems: "center",
-    flexWrap: "wrap",
-  };
-}
-
-function friendRankStyle(index) {
-  const colors = ["#ffd700", "#c0c0c0", "#cd7f32", "#888"];
-  return {
-    fontSize: "0.6rem",
-    fontWeight: "bold",
-    color: colors[index] || "#666",
-    minWidth: "24px",
-  };
-}
-
-function friendNameStyle() {
-  return {
-    fontWeight: "bold",
-    color: "var(--text-primary)",
-    fontSize: "0.85rem",
-  };
-}
-
-function friendStatusStyle(isOnline) {
-  return {
-    fontSize: "0.6rem",
-    color: isOnline ? "#4caf50" : "#666",
-  };
-}
-
-function friendLevelStyle() {
-  return {
-    color: "gold",
-    fontSize: "0.65rem",
-  };
-}
-
-function friendChipsStyle() {
-  return {
-    color: "#4caf50",
-    fontSize: "0.65rem",
-  };
-}
-
-function friendActionsStyle() {
-  return {
-    display: "flex",
-    gap: "4px",
-    alignItems: "center",
-  };
-}
-
-function inviteButtonStyle() {
-  return {
-    background: "rgba(76,175,80,0.15)",
-    border: "1px solid rgba(76,175,80,0.2)",
-    borderRadius: "50%",
-    width: 28,
-    height: 28,
-    color: "#4caf50",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.3s ease",
-  };
-}
-
-function removeButtonStyle() {
-  return {
-    background: "none",
-    border: "none",
-    color: "#f44336",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-    padding: "4px 8px",
-    borderRadius: 5,
-    transition: "all 0.3s ease",
-  };
-}
-
-function chatButtonStyle() {
-  return {
-    background: "rgba(33,150,243,0.15)",
-    border: "1px solid rgba(33,150,243,0.2)",
-    borderRadius: "50%",
-    width: 28,
-    height: 28,
-    color: "#2196f3",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-    transition: "all 0.3s ease",
-  };
-}
-
-function unreadBadgeStyle() {
-  return {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    background: "#f44336",
-    color: "white",
-    fontSize: "0.5rem",
-    borderRadius: "50%",
-    padding: "1px 4px",
-    minWidth: "16px",
-    textAlign: "center",
-  };
-}
-
-function multiInviteButtonStyle() {
-  return {
-    width: "100%",
-    background: "rgba(76,175,80,0.15)",
-    border: "1px solid rgba(76,175,80,0.3)",
-    borderRadius: 15,
-    padding: "8px",
-    color: "#4caf50",
-    fontSize: "0.8rem",
-    cursor: "pointer",
-    transition: "all 0.3s ease",
-    marginTop: "8px",
-  };
-}
-
-function chatOverlayStyle() {
-  return {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.3)",
-    display: "flex",
-    justifyContent: "flex-end",
-    alignItems: "flex-end",
-    zIndex: 2000,
-    padding: "20px",
-  };
-}
-
-function chatPanelStyle() {
-  return {
-    width: "350px",
-    maxWidth: "90vw",
-    height: "450px",
-    maxHeight: "80vh",
-    background: "var(--bg-card)",
-    borderRadius: 16,
-    border: "2px solid var(--border-gold)",
-    boxShadow: "0 8px 40px var(--shadow-dark)",
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden",
-  };
-}
-
-function chatHeaderStyle() {
-  return {
-    padding: "12px 16px",
-    background: "rgba(255,215,0,0.1)",
-    borderBottom: "1px solid var(--border-light)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    color: "gold",
-    fontWeight: "bold",
-    fontSize: "1rem",
-  };
-}
-
-function chatHeaderRightStyle() {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  };
-}
-
-function chatMessageCountStyle() {
-  return {
-    fontSize: "0.6rem",
-    color: "#888",
-  };
-}
-
-function closeChatStyle() {
-  return {
-    background: "none",
-    border: "none",
-    color: "#888",
-    cursor: "pointer",
-    fontSize: "1.2rem",
-    padding: "4px",
-  };
-}
-
-function chatMessagesStyle() {
-  return {
-    flex: 1,
-    overflowY: "auto",
-    overflowX: "hidden",
-    padding: "12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-    maxHeight: "350px",
-  };
-}
-
-function emptyChatStyle() {
-  return {
-    textAlign: "center",
-    color: "#666",
-    padding: "30px 0",
-    fontSize: "0.9rem",
-  };
-}
-
-function chatMessageStyle(isOwn) {
-  return {
-    display: "flex",
-    justifyContent: isOwn ? "flex-end" : "flex-start",
-  };
-}
-
-function chatMessageBubbleStyle(isOwn) {
-  return {
-    maxWidth: "80%",
-    padding: "8px 14px",
-    borderRadius: 12,
-    background: isOwn ? "rgba(255,215,0,0.15)" : "rgba(255,255,255,0.05)",
-    border: isOwn
-      ? "1px solid rgba(255,215,0,0.2)"
-      : "1px solid var(--border-light)",
-    wordBreak: "break-word",
-  };
-}
-
-function chatMessageTextStyle() {
-  return {
-    fontSize: "0.85rem",
-    color: "var(--text-primary)",
-  };
-}
-
-function chatMessageTimeStyle(isOwn) {
-  return {
-    fontSize: "0.5rem",
-    color: "#666",
-    marginTop: "4px",
-    textAlign: isOwn ? "right" : "left",
-  };
-}
-
-function chatInputFormStyle() {
-  return {
-    display: "flex",
-    padding: "10px",
-    borderTop: "1px solid var(--border-light)",
-    gap: "8px",
-  };
-}
-
-function chatInputStyle() {
-  return {
-    flex: 1,
-    padding: "8px 14px",
-    borderRadius: 20,
-    border: "1px solid var(--border-input)",
-    background: "var(--bg-input)",
-    color: "var(--text-primary)",
-    fontSize: "0.85rem",
-    outline: "none",
-  };
-}
-
-function chatSendButtonStyle() {
-  return {
-    padding: "8px 18px",
-    borderRadius: 20,
-    border: "none",
-    background: "radial-gradient(#f7d97c,#d6a12e)",
-    color: "#2e241f",
-    fontWeight: "bold",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-    whiteSpace: "nowrap",
-  };
-}
-
-function inviteOverlayStyle() {
-  return {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.7)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 3000,
-    padding: "20px",
-  };
-}
-
-function inviteModalStyle() {
-  return {
-    background: "var(--bg-modal)",
-    padding: "25px 30px",
-    borderRadius: 25,
-    maxWidth: "450px",
-    width: "100%",
-    color: "var(--text-primary)",
-    border: "2px solid gold",
-    boxShadow: "0 20px 60px var(--shadow-dark)",
-    maxHeight: "90vh",
-    overflowY: "auto",
-  };
-}
-
-function inviteTitleStyle() {
-  return {
-    textAlign: "center",
-    color: "gold",
-    margin: "0 0 15px",
-    fontSize: "1.4rem",
-  };
-}
-
-function inviteTextStyle() {
-  return {
-    textAlign: "center",
-    fontSize: "1rem",
-    marginBottom: "20px",
-    color: "var(--text-secondary)",
-  };
-}
-
-function friendSelectionStyle() {
-  return {
-    maxHeight: "200px",
-    overflowY: "auto",
-    marginBottom: "15px",
-    border: "1px solid var(--border-light)",
-    borderRadius: 10,
-    padding: "5px",
-  };
-}
-
-function friendSelectItemStyle(selected) {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "8px 12px",
-    borderRadius: 8,
-    cursor: "pointer",
-    background: selected ? "rgba(76,175,80,0.1)" : "transparent",
-    border: selected
-      ? "1px solid rgba(76,175,80,0.3)"
-      : "1px solid transparent",
-    transition: "all 0.3s ease",
-  };
-}
-
-function friendSelectCheckStyle() {
-  return {
-    fontSize: "1.1rem",
-  };
-}
-
-function friendSelectNameStyle() {
-  return {
-    flex: 1,
-    fontWeight: "bold",
-    color: "var(--text-primary)",
-    fontSize: "0.9rem",
-  };
-}
-
-function friendSelectLevelStyle() {
-  return {
-    fontSize: "0.7rem",
-    color: "gold",
-  };
-}
-
-function emptySelectionStyle() {
-  return {
-    textAlign: "center",
-    color: "var(--text-muted)",
-    padding: "20px 0",
-    fontSize: "0.9rem",
-  };
-}
-
-function inviteStatsStyle() {
-  return {
-    display: "flex",
-    justifyContent: "center",
-    fontSize: "0.8rem",
-    color: "var(--text-muted)",
-    marginBottom: "15px",
-    padding: "4px",
-    background: "rgba(255,255,255,0.03)",
-    borderRadius: 8,
-  };
-}
-
-function inviteButtonsStyle() {
-  return {
-    display: "flex",
-    gap: "10px",
-  };
-}
-
-function inviteSendStyle(enabled) {
-  return {
-    flex: 1,
-    background: enabled ? "radial-gradient(#f7d97c,#d6a12e)" : "#444",
-    border: "none",
-    fontWeight: "bold",
-    padding: "10px",
-    borderRadius: 30,
-    color: enabled ? "#2e241f" : "#888",
-    cursor: enabled ? "pointer" : "not-allowed",
-    opacity: enabled ? 1 : 0.5,
-    transition: "all 0.3s ease",
-  };
-}
-
-function inviteCancelStyle() {
-  return {
-    flex: 1,
-    background: "rgba(244,67,54,0.15)",
-    border: "1px solid #f44336",
-    borderRadius: 30,
-    padding: "10px",
-    color: "#f44336",
-    cursor: "pointer",
-    fontWeight: "bold",
-    transition: "all 0.3s ease",
-  };
-}
-
-function acceptButtonStyle() {
-  return {
-    background: "rgba(76,175,80,0.2)",
-    border: "1px solid #4caf50",
-    borderRadius: 12,
-    padding: "4px 12px",
-    color: "#4caf50",
-    fontSize: "0.7rem",
-    cursor: "pointer",
-    fontWeight: "bold",
-    transition: "all 0.3s ease",
-    whiteSpace: "nowrap",
-  };
-}
-
-function declineButtonStyle() {
-  return {
-    background: "rgba(244,67,54,0.15)",
-    border: "1px solid #f44336",
-    borderRadius: 12,
-    padding: "4px 12px",
-    color: "#f44336",
-    fontSize: "0.7rem",
-    cursor: "pointer",
-    fontWeight: "bold",
-    transition: "all 0.3s ease",
-    whiteSpace: "nowrap",
-  };
-}
-
-function joinGameButtonStyle() {
-  return {
-    background: "rgba(76,175,80,0.2)",
-    border: "1px solid #4caf50",
-    borderRadius: 12,
-    padding: "6px 16px",
-    color: "#4caf50",
-    fontSize: "0.7rem",
-    cursor: "pointer",
-    fontWeight: "bold",
-    transition: "all 0.3s ease",
-    whiteSpace: "nowrap",
-  };
 }

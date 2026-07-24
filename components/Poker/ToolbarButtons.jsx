@@ -1,4 +1,4 @@
-// components/Poker/ToolbarButtons.jsx - COM TEMA E TORNEIOS
+// components/Poker/ToolbarButtons.jsx - CORRIGIDO
 "use client";
 
 import SoundToggle from "./SoundToggle.jsx";
@@ -18,70 +18,50 @@ export default function ToolbarButtons({
   onTournamentClick,
 }) {
   return (
-    <div style={toolbarContainerStyle()}>
-      {/* 🔥 SOUND TOGGLE */}
-      <SoundToggle />
-
-      {/* 🔥 TEMA TOGGLE */}
+    <div
+      style={{
+        position: "fixed",
+        top: 70,
+        right: 10,
+        zIndex: 100,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "8px",
+      }}
+    >
       <ThemeToggle />
-
-      {/* 🔥 TURBO TOGGLE */}
+      <SoundToggle />
       <TurboButton onToggle={onTurboToggle} isTurbo={isTurbo} />
-
-      {/* 🔥 FULLSCREEN */}
       <FullscreenButton />
-
-      {/* 🔥 MULTIPLAYER */}
       <MultiplayerButton
         onClick={onMultiplayerClick}
         isActive={isMultiplayerActive}
       />
-
-      {/* 🔥 ONLINE */}
       <OnlineButton onClick={onOnlineClick} isActive={isOnlineActive} />
-
-      {/* 🔥 TORNEIOS */}
       <button
         onClick={onTournamentClick}
-        style={tournamentButtonStyle()}
+        style={{
+          width: 44,
+          height: 44,
+          background: "rgba(255,215,0,0.15)",
+          border: "1px solid rgba(255,215,0,0.3)",
+          borderRadius: "50%",
+          color: "gold",
+          fontSize: "1.2rem",
+          cursor: "pointer",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          transition: "all 0.3s ease",
+          position: "relative",
+          fontFamily: "inherit",
+        }}
         title="Torneios"
       >
         🏅
       </button>
     </div>
   );
-}
-
-// ====================== ESTILOS ======================
-function toolbarContainerStyle() {
-  return {
-    position: "fixed",
-    top: 70,
-    right: 10,
-    zIndex: 100,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "8px",
-  };
-}
-
-function tournamentButtonStyle() {
-  return {
-    width: 44,
-    height: 44,
-    background: "rgba(255,215,0,0.15)",
-    border: "1px solid rgba(255,215,0,0.3)",
-    borderRadius: "50%",
-    color: "gold",
-    fontSize: "1.2rem",
-    cursor: "pointer",
-    backdropFilter: "blur(4px)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    transition: "all 0.3s ease",
-    position: "relative",
-    fontFamily: "inherit",
-  };
 }

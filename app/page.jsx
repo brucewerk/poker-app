@@ -1,4 +1,4 @@
-// app/page.jsx - COMPLETO COM TEMA ESCURO/CLARO E TOAST
+// app/page.jsx - CORRIGIDO (sem duplicatas)
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -36,7 +36,6 @@ import PlayerSelector from "@/components/Poker/PlayerSelector.jsx";
 import ToolbarButtons from "@/components/Poker/ToolbarButtons.jsx";
 import GameTable from "@/components/Poker/GameTable.jsx";
 import TournamentLobby from "@/components/Poker/TournamentLobby.jsx";
-import ThemeToggle from "@/components/Poker/ThemeToggle.jsx";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -2281,22 +2280,6 @@ export default function PokerGame() {
     showdown: "Showdown",
   };
 
-  const tournamentButtonStyle = {
-    background: "rgba(255,215,0,0.15)",
-    border: "1px solid rgba(255,215,0,0.3)",
-    borderRadius: 20,
-    padding: "8px 16px",
-    color: "gold",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: "0.85rem",
-    transition: "all 0.3s ease",
-    backdropFilter: "blur(4px)",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-  };
-
   if (isLoading && status === "loading") {
     return (
       <div
@@ -2375,29 +2358,6 @@ export default function PokerGame() {
           transition: "var(--transition-theme)",
         }}
       >
-        {/* 🔥 BOTÃO DE TEMA E TORNEIOS - LADO ESQUERDO (MANTIDO) */}
-        <div
-          style={{
-            position: "fixed",
-            top: 10,
-            left: 10,
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          <ThemeToggle />
-          <motion.button
-            onClick={() => setShowTournamentLobby(true)}
-            style={tournamentButtonStyle}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            🏅 Torneios
-          </motion.button>
-        </div>
-
         {/* 🔥 BOTÃO DE SAIR - LADO DIREITO (SEM THEME TOGGLE DUPLICADO) */}
         {currentUser && (
           <div
@@ -2432,6 +2392,7 @@ export default function PokerGame() {
           </div>
         )}
 
+        {/* 🔥 TOOLBAR - BOTÕES À DIREITA (INCLUI TEMA E TORNEIOS) */}
         <ToolbarButtons
           isTurbo={isTurbo}
           onTurboToggle={handleTurboToggle}
@@ -2439,6 +2400,7 @@ export default function PokerGame() {
           isMultiplayerActive={multiplayerModeActive}
           onOnlineClick={() => setShowOnline(true)}
           isOnlineActive={!!onlineGame}
+          onTournamentClick={() => setShowTournamentLobby(true)}
         />
 
         {showMultiplayerModal && (
