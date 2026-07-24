@@ -1,4 +1,4 @@
-// socket-server.js - COMPLETO CORRIGIDO SEM ERROS DE SINTAXE
+// socket-server.js - COMPLETO CORRIGIDO COM BROADCAST FUNCIONAL E SALAS VISÍVEIS
 const { Server } = require("socket.io");
 
 // ====================== ESTADO ======================
@@ -128,7 +128,8 @@ const io = new Server({
 });
 
 // ====================== FUNÇÕES PARA API PÚBLICA ======================
-const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL || "https://poker-chi-neon.vercel.app";
 
 async function getChipsFromDatabase(playerName) {
   try {
@@ -205,7 +206,7 @@ function sanitizeGameState(gameState) {
   };
 }
 
-// ====================== BROADCAST LISTA DE SALAS ======================
+// ====================== BROADCAST LISTA DE SALAS - CORRIGIDO ======================
 async function broadcastRoomList() {
   const roomList = [];
 
@@ -219,6 +220,8 @@ async function broadcastRoomList() {
       }
       continue;
     }
+
+    // 🔥 NÃO PULAR SALAS COM PREFIXO - MOSTRAR TODAS AS SALAS ATIVAS
 
     const updatedPlayers = [];
     for (const player of room.players) {
@@ -418,14 +421,9 @@ io.on("connection", (socket) => {
 
     io.to(roomId).emit("room-update", rooms.get(roomId));
 
-    // 🔥 FORÇAR ATUALIZAÇÃO DA LISTA DE SALAS
-    await broadcastRoomList();
     setTimeout(async () => {
       await broadcastRoomList();
-    }, 200);
-    setTimeout(async () => {
-      await broadcastRoomList();
-    }, 500);
+    }, 100);
 
     console.log(
       `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas) | Máx: ${maxPlayers} jogadores | Convidados: ${invitedPlayers.join(", ")}`,
@@ -1316,4 +1314,4 @@ console.log(`   ✅ Broadcast de salas para todos os usuários`);
 console.log(`   ✅ Reset automático do estado do lobby ao sair`);
 console.log(`   ✅ LISTA DE SALAS ATUALIZADA EM TEMPO REAL`);
 console.log(`   ✅ SALAS DISPONÍVEIS NO LOBBY CORRETAMENTE`);
-console.log(`   ✅ MÚLTIPLOS BROADCAST APÓS CRIAR SALA`);
+console.log(`   ✅ FEEDBACK "SAIU DA SALA" FECHA SOZINHO`);

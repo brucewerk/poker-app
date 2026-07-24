@@ -1,16 +1,7 @@
-// app/page.jsx - COMPLETO OTIMIZADO COM FLUXO MULTIPLAYER CORRIGIDO
+// app/page.jsx - COMPLETO COM TEMA ESCURO/CLARO E TOAST
 "use client";
 
-import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-  lazy,
-  Suspense,
-  memo,
-} from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,48 +13,30 @@ import {
 } from "@/lib/poker/evaluation.js";
 import { calculateHandStrength } from "@/lib/poker/strength.js";
 import { getCpuDecision } from "@/lib/poker/cpu.js";
-import { soundManager } from "@/lib/sound.js";
-import { useGame, useGameActions } from "@/lib/context/GameContext";
-
-// ====================== IMPORTS DE COMPONENTES ======================
 import Card from "@/components/Poker/Card.jsx";
 import ActionButtons from "@/components/Poker/ActionButtons.jsx";
 import StatusPanel from "@/components/Poker/StatusPanel.jsx";
 import StatsPanel from "@/components/Poker/StatsPanel.jsx";
+import AchievementsModal from "@/components/Poker/AchievementsModal.jsx";
 import HandHistory from "@/components/Poker/HandHistory.jsx";
 import LevelDisplay from "@/components/Poker/LevelDisplay.jsx";
+import FindingsModal from "@/components/Poker/FindingsModal.jsx";
 import FriendsList from "@/components/Poker/FriendsList.jsx";
 import MissionsPanel from "@/components/Poker/MissionsPanel.jsx";
-import GameTable from "@/components/Poker/GameTable.jsx";
+import OnlineButton from "@/components/Poker/OnlineButton.jsx";
+import OnlineLobby from "@/components/Poker/OnlineLobby.jsx";
+import OnlineGame from "@/components/Poker/OnlineGame.jsx";
+import { soundManager } from "@/lib/sound.js";
+import SoundToggle from "@/components/Poker/SoundToggle.jsx";
+import FullscreenButton from "@/components/Poker/FullscreenButton.jsx";
+import TurboButton from "@/components/Poker/TurboButton.jsx";
+import MultiplayerButton from "@/components/Poker/MultiplayerButton.jsx";
+import MultiplayerModal from "@/components/Poker/MultiplayerModal.jsx";
 import PlayerSelector from "@/components/Poker/PlayerSelector.jsx";
 import ToolbarButtons from "@/components/Poker/ToolbarButtons.jsx";
-import MultiplayerModal from "@/components/Poker/MultiplayerModal.jsx";
-
-// 🔥 LAZY LOADING PARA COMPONENTES PESADOS
-const AchievementsModal = lazy(
-  () => import("@/components/Poker/AchievementsModal.jsx"),
-);
-const FindingsModal = lazy(
-  () => import("@/components/Poker/FindingsModal.jsx"),
-);
-const TournamentLobby = lazy(
-  () => import("@/components/Poker/TournamentLobby.jsx"),
-);
-const OnlineLobby = lazy(() => import("@/components/Poker/OnlineLobby.jsx"));
-const OnlineGame = lazy(() => import("@/components/Poker/OnlineGame.jsx"));
-
-// 🔥 MEMOIZAR COMPONENTES
-const MemoizedGameTable = memo(GameTable);
-const MemoizedActionButtons = memo(ActionButtons);
-const MemoizedStatusPanel = memo(StatusPanel);
-const MemoizedStatsPanel = memo(StatsPanel);
-const MemoizedLevelDisplay = memo(LevelDisplay);
-const MemoizedFriendsList = memo(FriendsList);
-const MemoizedMissionsPanel = memo(MissionsPanel);
-const MemoizedHandHistory = memo(HandHistory);
-const MemoizedToolbarButtons = memo(ToolbarButtons);
-const MemoizedPlayerSelector = memo(PlayerSelector);
-const MemoizedMultiplayerModal = memo(MultiplayerModal);
+import GameTable from "@/components/Poker/GameTable.jsx";
+import TournamentLobby from "@/components/Poker/TournamentLobby.jsx";
+import ThemeToggle from "@/components/Poker/ThemeToggle.jsx";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -97,12 +70,7 @@ const INITIAL_GAME = {
 export default function PokerGame() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
-
-  // 🔥 USAR O CONTEXT
-  const { state, setGame, setLoading, updateChips } = useGame();
-  const game = state.game || INITIAL_GAME;
-
-  // ====================== ESTADOS LOCAIS ======================
+  const [game, setGame] = useState(INITIAL_GAME);
   const [notification, setNotification] = useState({
     msg: "",
     isError: false,
@@ -131,16 +99,14 @@ export default function PokerGame() {
   const [resultModalLock, setResultModalLock] = useState(false);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [pendingInviteJoin, setPendingInviteJoin] = useState(null);
-  const [showOnlineLobby, setShowOnlineLobby] = useState(false);
 
-  // 🔥 TOAST
+  // 🔥 TOAST APENAS PARA EVENTOS IMPORTANTES
   const [toastMessage, setToastMessage] = useState(null);
-  const [isToastVisible, setIsToastVisible] = useState(false);
+  const [showToast, setShowToast] = useState(false);
   const [toastType, setToastType] = useState("info");
   const toastTimerRef = useRef(null);
   const toastClosingRef = useRef(false);
 
-  // ====================== REFS ======================
   const cpuTimerRef = useRef(null);
   const pendingSaveRef = useRef(false);
   const gameInitialized = useRef(false);
@@ -158,13 +124,12 @@ export default function PokerGame() {
   const chipsToSaveRef = useRef(null);
   const saveHandHistoryRef = useRef(false);
   const isProcessingAction = useRef(false);
-  const onlineGameRef = useRef(null);
 
   const currentUser = session?.user?.username || null;
   const userChips = session?.user?.chips || 0;
 
   // ============================================================
-  // 🔥 TOAST PADRONIZADO
+  // 🔥 TOAST PADRONIZADO (APENAS EVENTOS IMPORTANTES)
   // ============================================================
 
   const showToastMessage = useCallback(
@@ -176,7 +141,7 @@ export default function PokerGame() {
 
       if (toastMessage && toastMessage === message) {
         toastTimerRef.current = setTimeout(() => {
-          setIsToastVisible(false);
+          setShowToast(false);
           toastTimerRef.current = null;
           setTimeout(() => setToastMessage(null), 400);
         }, duration);
@@ -185,10 +150,10 @@ export default function PokerGame() {
 
       setToastMessage(message);
       setToastType(type);
-      setIsToastVisible(true);
+      setShowToast(true);
 
       toastTimerRef.current = setTimeout(() => {
-        setIsToastVisible(false);
+        setShowToast(false);
         toastTimerRef.current = null;
         setTimeout(() => setToastMessage(null), 400);
       }, duration);
@@ -205,7 +170,7 @@ export default function PokerGame() {
       toastTimerRef.current = null;
     }
 
-    setIsToastVisible(false);
+    setShowToast(false);
 
     setTimeout(() => {
       setToastMessage(null);
@@ -216,8 +181,8 @@ export default function PokerGame() {
   // ============================================================
   // 🔥 TOAST COMPONENTE
   // ============================================================
-  const ToastNotification = useCallback(() => {
-    if (!isToastVisible || !toastMessage) return null;
+  const ToastNotification = () => {
+    if (!showToast || !toastMessage) return null;
 
     const isError = toastType === "error" || toastMessage.includes("❌");
     const isLevelUp =
@@ -252,7 +217,7 @@ export default function PokerGame() {
         </button>
       </motion.div>
     );
-  }, [isToastVisible, toastMessage, toastType, closeToast]);
+  };
 
   // ============================================================
   // 🔥 ESTILOS DO TOAST
@@ -339,7 +304,7 @@ export default function PokerGame() {
     };
   }
 
-  // ====================== BUSCAR FICHAS ======================
+  // ====================== BUSCAR FICHAS DIRETAMENTE DO BANCO ======================
   const fetchChipsFromDB = useCallback(async () => {
     if (!currentUser) return null;
     try {
@@ -359,7 +324,7 @@ export default function PokerGame() {
     }
   }, [currentUser]);
 
-  // ====================== ATUALIZAR FICHAS ======================
+  // ====================== ATUALIZAR FICHAS DO USUÁRIO ======================
   const refreshUserChips = useCallback(async () => {
     if (updateLockRef.current || isRefreshingChips || isUpdatingRef.current) {
       return;
@@ -378,14 +343,12 @@ export default function PokerGame() {
       const chips = await fetchChipsFromDB();
       if (chips !== null && chips !== currentChips) {
         setCurrentChips(chips);
-        updateChips(chips);
         if (!isCpuGamePaused) {
           setGame((prev) => {
-            const currentGame = prev || INITIAL_GAME;
-            if (!currentGame.handActive || currentGame.playerMoney !== chips) {
-              return { ...currentGame, playerMoney: chips };
+            if (!prev.handActive || prev.playerMoney !== chips) {
+              return { ...prev, playerMoney: chips };
             }
-            return currentGame;
+            return prev;
           });
         }
         if (Math.abs(chips - (session?.user?.chips || 0)) > 50) {
@@ -411,8 +374,6 @@ export default function PokerGame() {
     isCpuGamePaused,
     currentChips,
     session,
-    updateChips,
-    setGame,
   ]);
 
   // ====================== SALVAR FICHAS ======================
@@ -441,12 +402,8 @@ export default function PokerGame() {
 
         if (data.success) {
           setCurrentChips(chips);
-          updateChips(chips);
           if (!isCpuGamePaused) {
-            setGame((prev) => {
-              const currentGame = prev || INITIAL_GAME;
-              return { ...currentGame, playerMoney: chips };
-            });
+            setGame((prev) => ({ ...prev, playerMoney: chips }));
           }
 
           if (Math.abs(chips - (session?.user?.chips || 0)) > 10) {
@@ -473,8 +430,6 @@ export default function PokerGame() {
       currentChips,
       session,
       refreshUserChips,
-      updateChips,
-      setGame,
     ],
   );
 
@@ -540,37 +495,31 @@ export default function PokerGame() {
     }
   }, [isCpuGamePaused, game, saveGameState]);
 
-  // ====================== FORÇAR RESTAURAÇÃO ======================
+  // ====================== FORÇAR RESTAURAÇÃO DO JOGO CPU ======================
   const restoreCpuGame = useCallback(async () => {
     const chips = await fetchChipsFromDB();
     const finalChips = chips || currentChips || session?.user?.chips || 1000;
 
     setCurrentChips(finalChips);
-    updateChips(finalChips);
     setIsCpuGamePaused(false);
 
-    setGame({
+    setGame((prev) => ({
+      ...prev,
       ...INITIAL_GAME,
       playerMoney: finalChips,
       cpuMoney: 1000,
-    });
+      handActive: false,
+      gameOver: false,
+    }));
 
     setTimeout(() => {
       startNewHand(currentUser, finalChips);
     }, 300);
 
     await update();
-  }, [
-    fetchChipsFromDB,
-    currentChips,
-    session,
-    currentUser,
-    update,
-    updateChips,
-    setGame,
-  ]);
+  }, [fetchChipsFromDB, currentChips, session, currentUser, update]);
 
-  // ====================== useEffectS ======================
+  // ====================== ATUALIZAR AO INICIAR ======================
   useEffect(() => {
     if (status === "authenticated" && currentUser && !chipsSyncedRef.current) {
       chipsSyncedRef.current = true;
@@ -578,6 +527,7 @@ export default function PokerGame() {
     }
   }, [status, currentUser, refreshUserChips]);
 
+  // ====================== FORÇAR ATUALIZAÇÃO AO VOLTAR DO MULTIPLAYER ======================
   useEffect(() => {
     if (!onlineGame && !showOnline && currentUser && hasLeftOnlineRef.current) {
       hasLeftOnlineRef.current = false;
@@ -585,17 +535,14 @@ export default function PokerGame() {
     }
   }, [onlineGame, showOnline, currentUser, restoreCpuGame]);
 
+  // ====================== FORÇAR SINCRONIZAÇÃO DE FICHAS ======================
   useEffect(() => {
     if (status === "authenticated" && currentUser) {
       const syncChips = async () => {
         const chips = await fetchChipsFromDB();
         if (chips !== null && chips !== currentChips) {
           setCurrentChips(chips);
-          updateChips(chips);
-          setGame((prev) => {
-            const currentGame = prev || INITIAL_GAME;
-            return { ...currentGame, playerMoney: chips };
-          });
+          setGame((prev) => ({ ...prev, playerMoney: chips }));
         }
       };
 
@@ -615,14 +562,7 @@ export default function PokerGame() {
         );
       };
     }
-  }, [
-    status,
-    currentUser,
-    fetchChipsFromDB,
-    currentChips,
-    updateChips,
-    setGame,
-  ]);
+  }, [status, currentUser, fetchChipsFromDB, currentChips]);
 
   // ====================== CONFIGURAÇÕES DE DELAY ======================
   const getDelays = useCallback(() => {
@@ -650,7 +590,7 @@ export default function PokerGame() {
     };
   }, [isTurbo]);
 
-  // ====================== REDIRECIONAR ======================
+  // ====================== REDIRECIONAR SE NÃO AUTENTICADO ======================
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
@@ -673,12 +613,14 @@ export default function PokerGame() {
   }, []);
 
   // ============================================================
-  // 🔥 NOTIFICAÇÃO
+  // 🔥 NOTIFICAÇÃO - MANTIDA NO STATUS PANEL (DENTRO DO CARD)
   // ============================================================
   const showNotification = useCallback(
     (msg, isError = false) => {
+      // 🔥 Notificação para o StatusPanel (dentro do card)
       setNotification({ msg, isError, visible: true });
 
+      // 🔥 Toast apenas para eventos importantes (subiu de nível, conquistas)
       const isImportant =
         msg.includes("🎊 Subiu para Nível") ||
         msg.includes("🎉 Conquista") ||
@@ -690,6 +632,7 @@ export default function PokerGame() {
         showToastMessage(msg, type, duration);
       }
 
+      // 🔥 Sons
       try {
         if (!isError && msg.includes("VENCEU")) {
           if (msg.includes("ALL-IN")) {
@@ -746,7 +689,6 @@ export default function PokerGame() {
     if (status === "authenticated" && currentUser && !gameInitialized.current) {
       const loadGameState = async () => {
         setIsLoading(true);
-        setLoading(true);
         try {
           const res = await fetch("/api/get-game-state");
           const data = await res.json();
@@ -766,7 +708,6 @@ export default function PokerGame() {
             gameInitialized.current = true;
             showNotification("🔄 Jogo restaurado!", false);
             setIsLoading(false);
-            setLoading(false);
             return;
           }
         } catch (error) {
@@ -777,20 +718,11 @@ export default function PokerGame() {
         startNewHand(currentUser, chips);
         gameInitialized.current = true;
         setIsLoading(false);
-        setLoading(false);
       };
 
       loadGameState();
     }
-  }, [
-    status,
-    currentUser,
-    userChips,
-    currentChips,
-    setGame,
-    setLoading,
-    showNotification,
-  ]);
+  }, [status, currentUser, userChips, currentChips]);
 
   // ====================== ATUALIZAR ESTATÍSTICAS ======================
   const updateStats = useCallback(
@@ -854,9 +786,13 @@ export default function PokerGame() {
   // ====================== SALVAR HISTÓRICO ======================
   const saveHandHistory = useCallback(
     async (handData) => {
-      if (!currentUser) return;
+      if (!currentUser) {
+        return;
+      }
 
-      if (saveHandHistoryRef.current) return;
+      if (saveHandHistoryRef.current) {
+        return;
+      }
 
       saveHandHistoryRef.current = true;
 
@@ -1285,16 +1221,12 @@ export default function PokerGame() {
     }
 
     setGame((prev) => {
-      const currentGame = prev || INITIAL_GAME;
       let playerMoney =
         initialMoney !== undefined
           ? initialMoney
-          : currentChips ||
-            session?.user?.chips ||
-            currentGame.playerMoney ||
-            1000;
+          : currentChips || session?.user?.chips || prev.playerMoney || 1000;
 
-      let cpuMoney = currentGame.cpuMoney <= 0 ? 1000 : currentGame.cpuMoney;
+      let cpuMoney = prev.cpuMoney <= 0 ? 1000 : prev.cpuMoney;
 
       if (playerMoney <= 0 && !isAllInRef.current) {
         if (hasLostAllRef.current || playerMoney === 0) {
@@ -1302,7 +1234,7 @@ export default function PokerGame() {
             `💔 Você está sem fichas! Clique em RENOVAR FICHAS para recarregar.`,
             true,
           );
-          return { ...currentGame, handActive: false };
+          return { ...prev, handActive: false };
         }
       }
 
@@ -1311,7 +1243,7 @@ export default function PokerGame() {
           `❌ Você não tem fichas para jogar! Clique em RENOVAR FICHAS.`,
           true,
         );
-        return { ...currentGame, handActive: false };
+        return { ...prev, handActive: false };
       }
 
       const deck = createDeck();
@@ -1411,20 +1343,19 @@ export default function PokerGame() {
 
     cpuTimerRef.current = setTimeout(() => {
       setGame((prev) => {
-        const currentGame = prev || INITIAL_GAME;
         if (
-          !currentGame.handActive ||
-          currentGame.waitingPlayer ||
+          !prev.handActive ||
+          prev.waitingPlayer ||
           isProcessingAction.current
         )
-          return currentGame;
+          return prev;
 
-        if (currentGame.playerAllin) {
-          const toCall = currentGame.currentBet - currentGame.cpuBet;
+        if (prev.playerAllin) {
+          const toCall = prev.currentBet - prev.cpuBet;
 
-          if (toCall >= currentGame.cpuMoney) {
-            const cpuAllInAmount = currentGame.cpuMoney;
-            let state = { ...currentGame };
+          if (toCall >= prev.cpuMoney) {
+            const cpuAllInAmount = prev.cpuMoney;
+            let state = { ...prev };
             state.cpuMoney = 0;
             state.cpuBet += cpuAllInAmount;
             state.pot += cpuAllInAmount;
@@ -1441,11 +1372,8 @@ export default function PokerGame() {
             return fastForwardToShowdown(state, user);
           }
 
-          const strength = calculateHandStrength(
-            currentGame.cpuCards,
-            currentGame.community,
-          );
-          const potOdds = toCall / (currentGame.pot + toCall);
+          const strength = calculateHandStrength(prev.cpuCards, prev.community);
+          const potOdds = toCall / (prev.pot + toCall);
           const adjustedStrength = strength * 0.7 + (1 - potOdds) * 0.3;
           const willCall =
             adjustedStrength > 0.35 ||
@@ -1453,9 +1381,9 @@ export default function PokerGame() {
             (strength > 0.4 && toCall <= 150) ||
             strength > 0.65;
 
-          if (willCall && currentGame.cpuMoney > 0) {
-            const callAmount = Math.min(toCall, currentGame.cpuMoney);
-            let state = { ...currentGame };
+          if (willCall && prev.cpuMoney > 0) {
+            const callAmount = Math.min(toCall, prev.cpuMoney);
+            let state = { ...prev };
             state.cpuMoney -= callAmount;
             state.cpuBet += callAmount;
             state.pot += callAmount;
@@ -1475,7 +1403,7 @@ export default function PokerGame() {
             }
             return { ...state, waitingPlayer: true };
           } else {
-            let state = { ...currentGame };
+            let state = { ...prev };
             state.handActive = false;
             state.playerMoney += state.pot;
             state.winnerMsg = "🤖 CPU DESISTIU! Você vence!";
@@ -1495,7 +1423,7 @@ export default function PokerGame() {
         }
 
         const result = getCpuDecision(
-          currentGame,
+          prev,
           advanceStage,
           showNotification,
           user,
@@ -1534,17 +1462,11 @@ export default function PokerGame() {
 
     if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
     setGame((prev) => {
-      const currentGame = prev || INITIAL_GAME;
-      if (
-        !currentGame.handActive ||
-        !currentGame.waitingPlayer ||
-        currentGame.gameOver
-      )
-        return currentGame;
+      if (!prev.handActive || !prev.waitingPlayer || prev.gameOver) return prev;
       const state = {
-        ...currentGame,
+        ...prev,
         handActive: false,
-        cpuMoney: currentGame.cpuMoney + currentGame.pot,
+        cpuMoney: prev.cpuMoney + prev.pot,
         winnerMsg: `❌ ${isMultiplayer && multiplayerModeActive ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador" : "Jogador"} desistiu! CPU vence.`,
         gameStatus: "Você desistiu",
         cpuThought: "🤖 CPU: 'Boa, ele desistiu!'",
@@ -1555,7 +1477,7 @@ export default function PokerGame() {
           ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador"
           : "Jogador";
       showNotification(
-        `❌ ${playerName} desistiu! Perdeu ${currentGame.pot} fichas.`,
+        `❌ ${playerName} desistiu! Perdeu ${prev.pot} fichas.`,
         true,
       );
       saveChips(currentUser, state.playerMoney);
@@ -1586,14 +1508,8 @@ export default function PokerGame() {
     if (isProcessingAction.current) return;
 
     setGame((prev) => {
-      const currentGame = prev || INITIAL_GAME;
-      if (
-        !currentGame.handActive ||
-        !currentGame.waitingPlayer ||
-        currentGame.gameOver
-      )
-        return currentGame;
-      let state = { ...currentGame };
+      if (!prev.handActive || !prev.waitingPlayer || prev.gameOver) return prev;
+      let state = { ...prev };
       let toCall = state.currentBet - state.playerBet;
 
       if (toCall <= 0) {
@@ -1629,24 +1545,22 @@ export default function PokerGame() {
     if (isProcessingAction.current) return;
 
     setGame((prev) => {
-      const currentGame = prev || INITIAL_GAME;
       if (
-        !currentGame.handActive ||
-        !currentGame.waitingPlayer ||
-        currentGame.gameOver ||
-        currentGame.playerAllin
+        !prev.handActive ||
+        !prev.waitingPlayer ||
+        prev.gameOver ||
+        prev.playerAllin
       )
-        return currentGame;
-      const raiseAmount = 50 + currentGame.raiseCounter * 50;
-      const needed =
-        currentGame.currentBet - currentGame.playerBet + raiseAmount;
+        return prev;
+      const raiseAmount = 50 + prev.raiseCounter * 50;
+      const needed = prev.currentBet - prev.playerBet + raiseAmount;
 
-      if (needed > currentGame.playerMoney) {
+      if (needed > prev.playerMoney) {
         showNotification("❌ Fichas insuficientes!", true);
-        return currentGame;
+        return prev;
       }
 
-      let state = { ...currentGame };
+      let state = { ...prev };
       state.playerMoney -= needed;
       state.playerBet += needed;
       state.pot += needed;
@@ -1669,21 +1583,20 @@ export default function PokerGame() {
 
     if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
     setGame((prev) => {
-      const currentGame = prev || INITIAL_GAME;
       if (
-        !currentGame.handActive ||
-        !currentGame.waitingPlayer ||
-        currentGame.gameOver ||
-        currentGame.playerAllin
+        !prev.handActive ||
+        !prev.waitingPlayer ||
+        prev.gameOver ||
+        prev.playerAllin
       )
-        return currentGame;
+        return prev;
 
-      let state = { ...currentGame };
+      let state = { ...prev };
       const amount = state.playerMoney;
 
       if (amount <= 0) {
         showNotification("❌ Você não tem fichas para all-in!", true);
-        return currentGame;
+        return prev;
       }
 
       let cpuCallAmount = state.currentBet - state.cpuBet;
@@ -1769,7 +1682,6 @@ export default function PokerGame() {
     } catch (e) {}
 
     setGame((prev) => {
-      const currentGame = prev || INITIAL_GAME;
       const money = 1000;
       const playerName =
         isMultiplayer && multiplayerModeActive
@@ -1785,7 +1697,7 @@ export default function PokerGame() {
       setTimeout(() => saveChips(currentUser, 1000), 100);
 
       return {
-        ...currentGame,
+        ...prev,
         playerMoney: money,
         cpuMoney: 1000,
         gameOver: false,
@@ -1843,55 +1755,40 @@ export default function PokerGame() {
           setPendingInviteJoin(null);
         }
 
-        // 🔥 RESETAR O JOGO CPU ANTES DE ENTRAR NO MULTIPLAYER
-        if (!isCpuGamePaused) {
-          pauseCpuGame();
-        }
-
         setOnlineGame(data);
         setShowOnline(false);
-        setShowOnlineLobby(false);
+        pauseCpuGame();
         hasLeftOnlineRef.current = false;
-        onlineGameRef.current = data;
         showNotification(`🌐 Entrou na sala ${data.roomId}!`, false);
       } else if (data === null) {
         console.log("👋 Saindo do multiplayer, resetando estado...");
-        handleLeaveOnlineGame(true);
+        setOnlineGame(null);
+        setShowOnline(false);
+        hasLeftOnlineRef.current = true;
+        restoreCpuGame();
       }
     },
-    [showNotification, pauseCpuGame, isCpuGamePaused],
+    [showNotification, pauseCpuGame, restoreCpuGame],
   );
 
   const handleLeaveOnlineGame = useCallback(
     async (shouldReset = false) => {
-      console.log("👋 handleLeaveOnlineGame chamado:", { shouldReset });
-
       setOnlineGame(null);
-      onlineGameRef.current = null;
-      setShowOnlineLobby(false);
-
-      if (shouldReset) {
-        showNotification("👋 Saiu do jogo online", false);
-      }
+      showNotification("👋 Saiu do jogo online", false);
 
       hasLeftOnlineRef.current = true;
 
-      // 🔥 NOTIFICAR FRIENDSLIST
       if (handleJoinOnlineGame) {
         handleJoinOnlineGame(null);
       }
 
-      // 🔥 RESTAURAR O JOGO CPU
-      await restoreCpuGame();
-
-      // 🔥 FORÇAR ATUALIZAÇÃO DE FICHAS
       await refreshUserChips();
     },
-    [showNotification, refreshUserChips, handleJoinOnlineGame, restoreCpuGame],
+    [showNotification, refreshUserChips, handleJoinOnlineGame],
   );
 
   // ====================== SUGESTÃO DO JOGADOR ======================
-  const getPlayerSuggestion = useCallback((g) => {
+  function getPlayerSuggestion(g) {
     if (!g || !g.playerCards || !g.playerCards.length) return "";
 
     if (g.stage === "preflop") {
@@ -1906,7 +1803,7 @@ export default function PokerGame() {
       return `📊 ${getHandName(score)}`;
     }
     return "";
-  }, []);
+  }
 
   // ====================== FUNÇÃO PARA CALCULAR CARTAS VAZIAS ======================
   const getEmptyCardCount = useCallback(() => {
@@ -1920,11 +1817,7 @@ export default function PokerGame() {
     const handleChipsUpdate = (event) => {
       if (event.detail?.chips !== undefined) {
         setCurrentChips(event.detail.chips);
-        updateChips(event.detail.chips);
-        setGame((prev) => {
-          const currentGame = prev || INITIAL_GAME;
-          return { ...currentGame, playerMoney: event.detail.chips };
-        });
+        setGame((prev) => ({ ...prev, playerMoney: event.detail.chips }));
       }
     };
     window.addEventListener("chips-updated", handleChipsUpdate);
@@ -1932,7 +1825,7 @@ export default function PokerGame() {
     return () => {
       window.removeEventListener("chips-updated", handleChipsUpdate);
     };
-  }, [updateChips, setGame]);
+  }, []);
 
   // ====================== ESCUTAR NOVAS CONQUISTAS ======================
   useEffect(() => {
@@ -1952,18 +1845,417 @@ export default function PokerGame() {
     };
   }, []);
 
-  // ============================================================
-  // 🔥 MODAL DE RESULTADO (MANTIDO IGUAL - MUITO GRANDE PARA REPETIR)
-  // ============================================================
-  // [O ResultModal permanece o mesmo do seu arquivo original]
-  // ... (mantenha o ResultModal exatamente como estava)
+  // ====================== MODAL DE RESULTADO ======================
+  function ResultModal({ data, onClose }) {
+    if (!data) return null;
 
-  // ============================================================
-  // 🔥 ESTILOS DO MODAL (MANTIDOS IGUAIS)
-  // ============================================================
-  // [Os estilos permanecem os mesmos do seu arquivo original]
+    const isWin = data.winner === "player";
+    const isTie = data.winner === "tie";
+    const [isClosing, setIsClosing] = useState(false);
+    const [showContent, setShowContent] = useState(false);
 
-  // ====================== RENDER PRINCIPAL ======================
+    useEffect(() => {
+      document.body.style.overflow = "hidden";
+      setIsResultModalOpen(true);
+
+      const timer = setTimeout(() => setShowContent(true), 50);
+
+      return () => {
+        document.body.style.overflow = "";
+        setIsResultModalOpen(false);
+        clearTimeout(timer);
+      };
+    }, []);
+
+    const handleClose = () => {
+      if (isClosing) return;
+      setIsClosing(true);
+      setShowContent(false);
+      setTimeout(() => onClose(), 300);
+    };
+
+    const renderCard = useCallback((card, index, isFlipped = false) => {
+      if (!card) return null;
+      const isRed = card.suit === "♥" || card.suit === "♦";
+      return (
+        <div
+          key={`modal-card-${index}-${card.rank}${card.suit}`}
+          style={{
+            ...cardBaseStyle(isFlipped),
+            ...(isFlipped ? cardBackStyle() : cardFrontStyle(isRed)),
+          }}
+        >
+          {!isFlipped && (
+            <>
+              <span style={cardRankStyle(isRed)}>
+                {card.rank === 14
+                  ? "A"
+                  : card.rank === 13
+                    ? "K"
+                    : card.rank === 12
+                      ? "Q"
+                      : card.rank === 11
+                        ? "J"
+                        : card.rank === 10
+                          ? "10"
+                          : card.rank}
+              </span>
+              <span style={cardSuitStyle(isRed)}>{card.suit}</span>
+            </>
+          )}
+        </div>
+      );
+    }, []);
+
+    const communityCards = useMemo(
+      () => data.communityCards || [],
+      [data.communityCards],
+    );
+    const playerCards = useMemo(
+      () => data.playerCards || [],
+      [data.playerCards],
+    );
+    const cpuCards = useMemo(() => data.cpuCards || [], [data.cpuCards]);
+
+    const resultConfig = {
+      win: {
+        bg: "linear-gradient(145deg, #0d3b1e, #1a6a3a)",
+        border: "2px solid #4caf50",
+        glow: "0 0 60px rgba(76, 175, 80, 0.3)",
+        accent: "#4caf50",
+        icon: "🏆",
+        title: "VITÓRIA!",
+        titleColor: "#4caf50",
+      },
+      loss: {
+        bg: "linear-gradient(145deg, #3b0d0d, #6a1a1a)",
+        border: "2px solid #f44336",
+        glow: "0 0 60px rgba(244, 67, 54, 0.3)",
+        accent: "#f44336",
+        icon: "💔",
+        title: "DERROTA!",
+        titleColor: "#f44336",
+      },
+      tie: {
+        bg: "linear-gradient(145deg, #3b3a0d, #6a6a1a)",
+        border: "2px solid #ffc107",
+        glow: "0 0 60px rgba(255, 193, 7, 0.3)",
+        accent: "#ffc107",
+        icon: "🤝",
+        title: "EMPATE!",
+        titleColor: "#ffc107",
+      },
+    };
+
+    const config = isWin
+      ? resultConfig.win
+      : isTie
+        ? resultConfig.tie
+        : resultConfig.loss;
+
+    const AnimatedSection = ({ children, delay = 0, className = "" }) => (
+      <div
+        style={{
+          opacity: showContent ? 1 : 0,
+          transform: showContent ? "translateY(0)" : "translateY(20px)",
+          transition: `all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms`,
+          willChange: "transform, opacity",
+        }}
+      >
+        {children}
+      </div>
+    );
+
+    return (
+      <div
+        style={{
+          ...modalOverlayStyle(),
+          opacity: isClosing ? 0 : 1,
+          transition: "opacity 0.3s ease-out",
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) handleClose();
+        }}
+      >
+        <div
+          style={{
+            ...modalContentStyle(config),
+            transform: isClosing
+              ? "scale(0.95) rotate(-2deg)"
+              : "scale(1) rotate(0deg)",
+            transition:
+              "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out",
+            willChange: "transform, opacity",
+          }}
+        >
+          <button
+            onClick={handleClose}
+            style={closeButtonStyle()}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+              e.currentTarget.style.transform = "rotate(90deg)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+              e.currentTarget.style.transform = "rotate(0deg)";
+            }}
+          >
+            ✕
+          </button>
+
+          <AnimatedSection delay={0}>
+            <div style={modalHeaderStyle()}>
+              <div
+                style={{
+                  ...iconContainerStyle(),
+                  border: `2px solid ${config.accent}`,
+                  boxShadow: `0 0 40px ${config.accent}33`,
+                }}
+              >
+                <span style={modalIconStyle()}>{config.icon}</span>
+              </div>
+              <h2 style={modalTitleStyle(config)}>{config.title}</h2>
+            </div>
+          </AnimatedSection>
+
+          <AnimatedSection delay={100}>
+            <div style={modalMessageStyle()}>
+              <p style={modalWinnerStyle(config)}>{data.winnerMsg}</p>
+            </div>
+          </AnimatedSection>
+
+          {communityCards.length > 0 ||
+            playerCards.length > 0 ||
+            (cpuCards.length > 0 && (
+              <AnimatedSection delay={150}>
+                <div style={modalCardsContainerStyle(config)}>
+                  {communityCards.length > 0 && (
+                    <div style={modalCommunityStyle()}>
+                      <div style={modalCommunityLabelStyle()}>🔥 MESA</div>
+                      <div style={modalCardsRowStyle()}>
+                        {communityCards.map((card, i) => (
+                          <div
+                            key={`community-${i}`}
+                            style={{
+                              opacity: showContent ? 1 : 0,
+                              transform: showContent
+                                ? "translateY(0)"
+                                : "translateY(30px)",
+                              transition: `all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${200 + i * 80}ms`,
+                              willChange: "transform, opacity",
+                            }}
+                          >
+                            {renderCard(card, i, false)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={modalComparisonStyle()}>
+                    <div style={modalPlayerStyle(true)}>
+                      <div style={modalPlayerNameStyle(true)}>
+                        <span
+                          style={{ fontSize: "1.2rem", marginRight: "4px" }}
+                        >
+                          🃏
+                        </span>
+                        {data.playerName || "Você"}
+                        {isWin && (
+                          <span
+                            style={{
+                              marginLeft: "8px",
+                              fontSize: "0.6rem",
+                              background: "#4caf50",
+                              color: "white",
+                              padding: "1px 8px",
+                              borderRadius: 10,
+                            }}
+                          >
+                            VENCEDOR
+                          </span>
+                        )}
+                      </div>
+                      <div style={modalCardsRowStyle()}>
+                        {playerCards.length > 0 ? (
+                          playerCards.map((card, i) => (
+                            <div
+                              key={`player-${i}`}
+                              style={{
+                                opacity: showContent ? 1 : 0,
+                                transform: showContent
+                                  ? "translateY(0)"
+                                  : "translateY(30px)",
+                                transition: `all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${300 + i * 100}ms`,
+                                willChange: "transform, opacity",
+                              }}
+                            >
+                              {renderCard(card, i, false)}
+                            </div>
+                          ))
+                        ) : (
+                          <span style={{ color: "#aaa", fontSize: "0.65rem" }}>
+                            Sem cartas
+                          </span>
+                        )}
+                      </div>
+                      <div style={modalHandStyle(true, config)}>
+                        {data.playerHand}
+                      </div>
+                      {isWin && (
+                        <div style={winnerBadgeStyle()}>
+                          <span>🏆</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={modalVersusStyle()}>
+                      <span>⚡</span>
+                    </div>
+
+                    <div style={modalPlayerStyle(false)}>
+                      <div style={modalPlayerNameStyle(false)}>
+                        <span
+                          style={{ fontSize: "1.2rem", marginRight: "4px" }}
+                        >
+                          🤖
+                        </span>
+                        CPU
+                        {!isWin && !isTie && (
+                          <span
+                            style={{
+                              marginLeft: "8px",
+                              fontSize: "0.6rem",
+                              background: "#f44336",
+                              color: "white",
+                              padding: "1px 8px",
+                              borderRadius: 10,
+                            }}
+                          >
+                            VENCEDOR
+                          </span>
+                        )}
+                      </div>
+                      <div style={modalCardsRowStyle()}>
+                        {cpuCards.length > 0 ? (
+                          cpuCards.map((card, i) => (
+                            <div
+                              key={`cpu-${i}`}
+                              style={{
+                                opacity: showContent ? 1 : 0,
+                                transform: showContent
+                                  ? "translateY(0)"
+                                  : "translateY(30px)",
+                                transition: `all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${350 + i * 100}ms`,
+                                willChange: "transform, opacity",
+                              }}
+                            >
+                              {renderCard(card, i, false)}
+                            </div>
+                          ))
+                        ) : (
+                          <span style={{ color: "#aaa", fontSize: "0.65rem" }}>
+                            Sem cartas
+                          </span>
+                        )}
+                      </div>
+                      <div style={modalHandStyle(false, config)}>
+                        {data.cpuHand}
+                      </div>
+                      {!isWin && !isTie && (
+                        <div style={loserBadgeStyle()}>
+                          <span>💔</span>
+                        </div>
+                      )}
+                      {isTie && (
+                        <div style={tieBadgeStyle()}>
+                          <span>🤝</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </AnimatedSection>
+            ))}
+
+          <AnimatedSection delay={200}>
+            <div style={modalPotStyle(config)}>
+              <span style={{ fontSize: "1rem", fontWeight: "bold" }}>
+                💰 Pote: <span style={{ color: "#ffd700" }}>{data.pot}</span>{" "}
+                fichas
+              </span>
+              <div style={modalResultAmountStyle(isWin, isTie, data)}>
+                {isWin && (
+                  <span style={winAmountStyle()}>
+                    <span style={{ fontSize: "0.8rem" }}>+</span>
+                    {data.chipsWon}
+                  </span>
+                )}
+                {!isWin && !isTie && (
+                  <span style={loseAmountStyle()}>
+                    <span style={{ fontSize: "0.8rem" }}>-</span>
+                    {data.chipsLost}
+                  </span>
+                )}
+                {isTie && (
+                  <span style={tieAmountStyle()}>
+                    <span style={{ fontSize: "0.8rem" }}>+</span>
+                    {data.split}
+                  </span>
+                )}
+              </div>
+            </div>
+          </AnimatedSection>
+
+          <AnimatedSection delay={250}>
+            <div style={modalCpuThoughtStyle(config)}>
+              <span style={{ opacity: 0.5 }}>💭</span> {data.cpuThought}
+            </div>
+          </AnimatedSection>
+
+          <AnimatedSection delay={300}>
+            <button
+              onClick={handleClose}
+              style={{
+                ...modalCloseButtonStyle(config),
+                opacity: isClosing ? 0.5 : 1,
+                cursor: isClosing ? "not-allowed" : "pointer",
+              }}
+              disabled={isClosing}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.02)";
+                e.currentTarget.style.boxShadow = `0 6px 20px ${config.accent}44`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.boxShadow = `0 4px 0 #7a4c1a`;
+              }}
+            >
+              {isClosing ? (
+                <span
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  <span style={{ animation: "spin 0.8s linear infinite" }}>
+                    ⏳
+                  </span>
+                  FECHANDO...
+                </span>
+              ) : (
+                <span
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  <span>▶</span>
+                  CONTINUAR
+                </span>
+              )}
+            </button>
+          </AnimatedSection>
+        </div>
+      </div>
+    );
+  }
+
+  // ====================== RENDER ======================
   const g = game;
   const suggestion = getPlayerSuggestion(g);
   const showCpuCards = !g.handActive || g.stage === "showdown";
@@ -1987,6 +2279,22 @@ export default function PokerGame() {
     turn: "Turn",
     river: "River",
     showdown: "Showdown",
+  };
+
+  const tournamentButtonStyle = {
+    background: "rgba(255,215,0,0.15)",
+    border: "1px solid rgba(255,215,0,0.3)",
+    borderRadius: 20,
+    padding: "8px 16px",
+    color: "gold",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "0.85rem",
+    transition: "all 0.3s ease",
+    backdropFilter: "blur(4px)",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
   };
 
   if (isLoading && status === "loading") {
@@ -2047,7 +2355,7 @@ export default function PokerGame() {
 
   return (
     <>
-      {/* 🔥 TOAST */}
+      {/* 🔥 TOAST APENAS PARA EVENTOS IMPORTANTES */}
       <AnimatePresence mode="wait">
         <ToastNotification />
       </AnimatePresence>
@@ -2067,7 +2375,30 @@ export default function PokerGame() {
           transition: "var(--transition-theme)",
         }}
       >
-        {/* 🔥 BOTÃO DE SAIR */}
+        {/* 🔥 BOTÃO DE TEMA E TORNEIOS - LADO ESQUERDO (MANTIDO) */}
+        <div
+          style={{
+            position: "fixed",
+            top: 10,
+            left: 10,
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <ThemeToggle />
+          <motion.button
+            onClick={() => setShowTournamentLobby(true)}
+            style={tournamentButtonStyle}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            🏅 Torneios
+          </motion.button>
+        </div>
+
+        {/* 🔥 BOTÃO DE SAIR - LADO DIREITO (SEM THEME TOGGLE DUPLICADO) */}
         {currentUser && (
           <div
             style={{
@@ -2101,121 +2432,36 @@ export default function PokerGame() {
           </div>
         )}
 
-        {/* 🔥 TOOLBAR */}
-        <MemoizedToolbarButtons
+        <ToolbarButtons
           isTurbo={isTurbo}
           onTurboToggle={handleTurboToggle}
           onMultiplayerClick={() => setShowMultiplayerModal(true)}
           isMultiplayerActive={multiplayerModeActive}
-          onOnlineClick={() => {
-            if (onlineGame) {
-              // Se já estiver em um jogo, volta ao lobby
-              handleLeaveOnlineGame(true);
-            } else {
-              setShowOnline(true);
-              setShowOnlineLobby(true);
-            }
-          }}
+          onOnlineClick={() => setShowOnline(true)}
           isOnlineActive={!!onlineGame}
-          onTournamentClick={() => setShowTournamentLobby(true)}
         />
 
-        {/* 🔥 MODAIS COM LAZY LOADING */}
-        <Suspense
-          fallback={
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              Carregando...
-            </div>
-          }
-        >
-          {showAchievementsModal && (
-            <AchievementsModal
-              onClose={() => {
-                setShowAchievementsModal(false);
-                setNewAchievements([]);
-              }}
-              newAchievements={newAchievements}
-              username={currentUser}
-            />
-          )}
-        </Suspense>
-
-        <Suspense
-          fallback={
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              Carregando...
-            </div>
-          }
-        >
-          {showFindingsModal && (
-            <FindingsModal
-              onClose={() => {
-                setShowFindingsModal(false);
-                setNewFindings([]);
-              }}
-              newFindings={newFindings}
-            />
-          )}
-        </Suspense>
-
-        <Suspense
-          fallback={
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              Carregando...
-            </div>
-          }
-        >
-          {showTournamentLobby && (
-            <TournamentLobby
-              onClose={() => setShowTournamentLobby(false)}
-              username={currentUser}
-            />
-          )}
-        </Suspense>
-
-        <Suspense
-          fallback={
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              Carregando...
-            </div>
-          }
-        >
-          {showOnline && !onlineGame && (
-            <OnlineLobby
-              onJoinGame={handleJoinOnlineGame}
-              onCancel={() => {
-                setShowOnline(false);
-                setShowOnlineLobby(false);
-              }}
-              currentUser={currentUser}
-            />
-          )}
-        </Suspense>
-
-        <Suspense
-          fallback={
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              Carregando...
-            </div>
-          }
-        >
-          {onlineGame && (
-            <OnlineGame
-              roomId={onlineGame.roomId}
-              playerName={onlineGame.playerName}
-              socket={onlineGame.socket}
-              onLeave={(shouldReset) => {
-                console.log("📤 OnlineGame onLeave chamado:", { shouldReset });
-                handleLeaveOnlineGame(shouldReset !== false);
-              }}
-            />
-          )}
-        </Suspense>
-
         {showMultiplayerModal && (
-          <MemoizedMultiplayerModal
+          <MultiplayerModal
             onStart={handleMultiplayerStart}
             onClose={() => setShowMultiplayerModal(false)}
+          />
+        )}
+
+        {showOnline && !onlineGame && (
+          <OnlineLobby
+            onJoinGame={handleJoinOnlineGame}
+            onCancel={() => setShowOnline(false)}
+            currentUser={currentUser}
+          />
+        )}
+
+        {onlineGame && (
+          <OnlineGame
+            roomId={onlineGame.roomId}
+            playerName={onlineGame.playerName}
+            socket={onlineGame.socket}
+            onLeave={handleLeaveOnlineGame}
           />
         )}
 
@@ -2223,7 +2469,34 @@ export default function PokerGame() {
           <ResultModal data={resultData} onClose={closeResultModal} />
         )}
 
-        {/* 🔥 JOGO PRINCIPAL */}
+        {showAchievementsModal && (
+          <AchievementsModal
+            onClose={() => {
+              setShowAchievementsModal(false);
+              setNewAchievements([]);
+            }}
+            newAchievements={newAchievements}
+            username={currentUser}
+          />
+        )}
+
+        {showFindingsModal && (
+          <FindingsModal
+            onClose={() => {
+              setShowFindingsModal(false);
+              setNewFindings([]);
+            }}
+            newFindings={newFindings}
+          />
+        )}
+
+        {showTournamentLobby && (
+          <TournamentLobby
+            onClose={() => setShowTournamentLobby(false)}
+            username={currentUser}
+          />
+        )}
+
         <motion.div
           style={{
             background:
@@ -2247,7 +2520,6 @@ export default function PokerGame() {
               padding: 15,
             }}
           >
-            {/* 🔥 HEADER */}
             <div
               style={{
                 display: "flex",
@@ -2311,22 +2583,19 @@ export default function PokerGame() {
               ))}
             </div>
 
-            {/* 🔥 PLAYER SELECTOR */}
             {isMultiplayer &&
               multiplayerModeActive &&
               multiplayerPlayers.length > 0 && (
-                <MemoizedPlayerSelector
+                <PlayerSelector
                   players={multiplayerPlayers}
                   currentPlayer={currentPlayerIndex}
                   onSelectPlayer={handleSwitchPlayer}
                 />
               )}
 
-            {/* 🔥 CONTEÚDO PRINCIPAL */}
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
               <div style={{ flex: 3, minWidth: 280 }}>
-                {/* 🔥 GAME TABLE */}
-                <MemoizedGameTable
+                <GameTable
                   communityCards={g.community || []}
                   playerCards={g.playerCards || []}
                   cpuCards={g.cpuCards || []}
@@ -2347,8 +2616,7 @@ export default function PokerGame() {
                   currentUser={currentUser}
                 />
 
-                {/* 🔥 ACTION BUTTONS */}
-                <MemoizedActionButtons
+                <ActionButtons
                   disabled={disable}
                   canRaise={canRaise}
                   toCall={toCall}
@@ -2360,7 +2628,6 @@ export default function PokerGame() {
                   onReset={resetSession}
                 />
 
-                {/* 🔥 WINNER MESSAGE */}
                 {g.winnerMsg && (
                   <motion.div
                     style={{
@@ -2381,7 +2648,6 @@ export default function PokerGame() {
                     {g.winnerMsg}
                   </motion.div>
                 )}
-
                 <div
                   style={{
                     textAlign: "center",
@@ -2396,7 +2662,6 @@ export default function PokerGame() {
                 </div>
               </div>
 
-              {/* 🔥 PAINEL LATERAL */}
               <div
                 style={{
                   flex: 1,
@@ -2406,7 +2671,7 @@ export default function PokerGame() {
                   gap: 10,
                 }}
               >
-                <MemoizedStatusPanel
+                <StatusPanel
                   stage={g.stage}
                   pot={g.pot}
                   currentBet={g.currentBet}
@@ -2420,38 +2685,33 @@ export default function PokerGame() {
                   isTurbo={isTurbo}
                 />
 
-                <MemoizedStatsPanel
+                <StatsPanel
                   username={currentUser}
                   onShowAchievements={() => setShowAchievementsModal(true)}
                   isResultModalOpen={isResultModalOpen}
                 />
 
-                <MemoizedLevelDisplay
+                <LevelDisplay
                   username={currentUser}
                   isResultModalOpen={isResultModalOpen}
                   onShowAchievements={() => setShowAchievementsModal(true)}
                   onShowFindings={() => setShowFindingsModal(true)}
                 />
 
-                <MemoizedFriendsList
+                <FriendsList
                   username={currentUser}
                   onJoinGame={handleJoinOnlineGame}
                 />
 
-                <MemoizedMissionsPanel
+                <MissionsPanel
                   username={currentUser}
                   onChipsUpdated={(newChips) => {
                     setCurrentChips(newChips);
-                    updateChips(newChips);
-                    setGame((prev) => {
-                      const currentGame = prev || INITIAL_GAME;
-                      return { ...currentGame, playerMoney: newChips };
-                    });
+                    setGame((prev) => ({ ...prev, playerMoney: newChips }));
                   }}
                   isResultModalOpen={isResultModalOpen}
                 />
-
-                <MemoizedHandHistory
+                <HandHistory
                   username={currentUser}
                   isResultModalOpen={isResultModalOpen}
                 />
@@ -2462,4 +2722,390 @@ export default function PokerGame() {
       </div>
     </>
   );
+}
+
+// ====================== ESTILOS PREMIUM DO MODAL ======================
+
+function modalOverlayStyle() {
+  return {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.88)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2000,
+    padding: 20,
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+  };
+}
+
+function modalContentStyle(config) {
+  return {
+    background: config.bg,
+    padding: "24px 28px",
+    borderRadius: 24,
+    maxWidth: 520,
+    width: "100%",
+    color: "white",
+    border: config.border,
+    boxShadow: `0 20px 60px rgba(0,0,0,0.6), ${config.glow}`,
+    maxHeight: "90vh",
+    overflowY: "auto",
+    position: "relative",
+    scrollbarWidth: "thin",
+    scrollbarColor: "rgba(255,255,255,0.1) transparent",
+  };
+}
+
+function closeButtonStyle() {
+  return {
+    position: "absolute",
+    top: 12,
+    right: 16,
+    background: "rgba(255,255,255,0.05)",
+    border: "none",
+    color: "#fff",
+    fontSize: "1.1rem",
+    cursor: "pointer",
+    zIndex: 10,
+    width: 32,
+    height: 32,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.3s ease",
+    opacity: 0.6,
+  };
+}
+
+function iconContainerStyle() {
+  return {
+    width: 60,
+    height: 60,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(0,0,0,0.2)",
+    backdropFilter: "blur(4px)",
+  };
+}
+
+function modalIconStyle() {
+  return {
+    fontSize: "2.8rem",
+    lineHeight: 1,
+  };
+}
+
+function modalTitleStyle(config) {
+  return {
+    margin: 0,
+    fontSize: "1.6rem",
+    fontWeight: "800",
+    color: config.titleColor,
+    textShadow: `0 0 30px ${config.accent}44`,
+    letterSpacing: "1px",
+  };
+}
+
+function modalHeaderStyle() {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "16px",
+    marginBottom: "8px",
+  };
+}
+
+function modalMessageStyle() {
+  return {
+    textAlign: "center",
+    marginBottom: "12px",
+  };
+}
+
+function modalWinnerStyle(config) {
+  return {
+    fontSize: "1.05rem",
+    fontWeight: "600",
+    color: config.accent,
+    margin: 0,
+    padding: "6px 16px",
+    background: "rgba(0,0,0,0.2)",
+    borderRadius: 20,
+    display: "inline-block",
+  };
+}
+
+function modalCardsContainerStyle(config) {
+  return {
+    background: "rgba(0,0,0,0.2)",
+    borderRadius: 16,
+    padding: "10px",
+    marginBottom: "10px",
+    border: `1px solid ${config.accent}22`,
+  };
+}
+
+function modalCommunityStyle() {
+  return {
+    textAlign: "center",
+    marginBottom: "8px",
+    padding: "4px",
+    background: "rgba(0,0,0,0.15)",
+    borderRadius: 10,
+  };
+}
+
+function modalCommunityLabelStyle() {
+  return {
+    fontSize: "0.55rem",
+    color: "#aaa",
+    marginBottom: "4px",
+    display: "block",
+    textTransform: "uppercase",
+    letterSpacing: "2px",
+    fontWeight: "600",
+  };
+}
+
+function modalCardsRowStyle() {
+  return {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "4px",
+    flexWrap: "wrap",
+    padding: "4px 0",
+    minHeight: "65px",
+  };
+}
+
+function cardBaseStyle(isFlipped) {
+  return {
+    display: "inline-flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 44,
+    height: 64,
+    margin: "1px",
+    borderRadius: 6,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+    flexShrink: 0,
+    position: "relative",
+    transition: "transform 0.2s ease",
+    transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+  };
+}
+
+function cardFrontStyle(isRed) {
+  return {
+    background: "linear-gradient(145deg, #ffffff, #f0f0f0)",
+    border: "1px solid #ddd",
+    color: isRed ? "#cc0000" : "#000",
+  };
+}
+
+function cardBackStyle() {
+  return {
+    background:
+      "repeating-linear-gradient(45deg, #2b5797, #2b5797 8px, #1d3f6e 8px, #1d3f6e 16px)",
+    border: "2px solid #1a3a6e",
+  };
+}
+
+function cardRankStyle(isRed) {
+  return {
+    fontSize: "0.9rem",
+    fontWeight: "800",
+    color: isRed ? "#cc0000" : "#000",
+    lineHeight: 1,
+    marginBottom: "-2px",
+  };
+}
+
+function cardSuitStyle(isRed) {
+  return {
+    fontSize: "1rem",
+    color: isRed ? "#cc0000" : "#000",
+    lineHeight: 1,
+  };
+}
+
+function modalComparisonStyle() {
+  return {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "stretch",
+    padding: "6px 0",
+    borderTop: "1px solid rgba(255,255,255,0.06)",
+    borderBottom: "1px solid rgba(255,255,255,0.06)",
+    marginBottom: "4px",
+    gap: "6px",
+  };
+}
+
+function modalPlayerStyle(isPlayer) {
+  return {
+    flex: 1,
+    textAlign: isPlayer ? "left" : "right",
+    minWidth: "90px",
+    padding: "4px 6px",
+    borderRadius: 10,
+    background: isPlayer ? "rgba(76,175,80,0.05)" : "rgba(255,152,0,0.05)",
+  };
+}
+
+function modalPlayerNameStyle(isPlayer) {
+  return {
+    fontSize: "0.7rem",
+    fontWeight: "700",
+    color: isPlayer ? "#4caf50" : "#ff9800",
+    marginBottom: "4px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: isPlayer ? "flex-start" : "flex-end",
+    gap: "4px",
+    flexWrap: "wrap",
+  };
+}
+
+function modalHandStyle(isPlayer, config) {
+  return {
+    fontSize: "0.78rem",
+    fontWeight: "700",
+    color: isPlayer ? "#4caf50" : "#ff9800",
+    background: "rgba(0,0,0,0.25)",
+    padding: "2px 10px",
+    borderRadius: 12,
+    display: "inline-block",
+    marginTop: "4px",
+    border: `1px solid ${config.accent}22`,
+  };
+}
+
+function modalVersusStyle() {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "1.2rem",
+    fontWeight: "800",
+    color: "#888",
+    padding: "0 8px",
+    minWidth: "30px",
+  };
+}
+
+function modalPotStyle(config) {
+  return {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "8px 12px",
+    fontSize: "0.9rem",
+    background: "rgba(0,0,0,0.15)",
+    borderRadius: 12,
+    marginBottom: "6px",
+    border: `1px solid ${config.accent}11`,
+  };
+}
+
+function modalResultAmountStyle(isWin, isTie, data) {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  };
+}
+
+function winAmountStyle() {
+  return {
+    color: "#4caf50",
+    fontWeight: "800",
+    fontSize: "1.1rem",
+    textShadow: "0 0 20px rgba(76,175,80,0.3)",
+  };
+}
+
+function loseAmountStyle() {
+  return {
+    color: "#f44336",
+    fontWeight: "800",
+    fontSize: "1.1rem",
+    textShadow: "0 0 20px rgba(244,67,54,0.3)",
+  };
+}
+
+function tieAmountStyle() {
+  return {
+    color: "#ffc107",
+    fontWeight: "800",
+    fontSize: "1.1rem",
+    textShadow: "0 0 20px rgba(255,193,7,0.3)",
+  };
+}
+
+function modalCpuThoughtStyle(config) {
+  return {
+    textAlign: "center",
+    fontSize: "0.7rem",
+    color: "#bbb",
+    fontStyle: "italic",
+    padding: "6px 12px",
+    marginBottom: "8px",
+    background: "rgba(0,0,0,0.15)",
+    borderRadius: 12,
+    minHeight: "22px",
+    border: `1px solid ${config.accent}11`,
+  };
+}
+
+function modalCloseButtonStyle(config) {
+  return {
+    background: "linear-gradient(145deg, #f7d97c, #d6a12e)",
+    border: "none",
+    fontWeight: "700",
+    fontSize: "0.9rem",
+    padding: "10px 24px",
+    borderRadius: 50,
+    boxShadow: "0 4px 0 #7a4c1a, 0 0 30px rgba(255,215,0,0.1)",
+    color: "#2e241f",
+    width: "100%",
+    transition: "all 0.2s ease",
+    marginTop: "4px",
+    letterSpacing: "0.5px",
+    position: "relative",
+    overflow: "hidden",
+  };
+}
+
+function winnerBadgeStyle() {
+  return {
+    marginTop: "4px",
+    fontSize: "1.2rem",
+    animation: "bounce 1s ease-in-out infinite",
+  };
+}
+
+function loserBadgeStyle() {
+  return {
+    marginTop: "4px",
+    fontSize: "1.2rem",
+    opacity: 0.6,
+  };
+}
+
+function tieBadgeStyle() {
+  return {
+    marginTop: "4px",
+    fontSize: "1.2rem",
+    animation: "pulse 1.5s ease-in-out infinite",
+  };
 }

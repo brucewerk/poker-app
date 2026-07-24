@@ -1,4 +1,4 @@
-// components/Poker/ToolbarButtons.jsx - TODOS OS BOTÕES COM ESTILO UNIFICADO
+// components/Poker/ToolbarButtons.jsx - COM TEMA E TORNEIOS
 "use client";
 
 import SoundToggle from "./SoundToggle.jsx";
@@ -22,10 +22,10 @@ export default function ToolbarButtons({
       {/* 🔥 SOUND TOGGLE */}
       <SoundToggle />
 
-      {/* 🔥 TEMA TOGGLE - ESTILO UNIFICADO */}
+      {/* 🔥 TEMA TOGGLE */}
       <ThemeToggle />
 
-      {/* 🔥 TURBO */}
+      {/* 🔥 TURBO TOGGLE */}
       <TurboButton onToggle={onTurboToggle} isTurbo={isTurbo} />
 
       {/* 🔥 FULLSCREEN */}
@@ -40,7 +40,7 @@ export default function ToolbarButtons({
       {/* 🔥 ONLINE */}
       <OnlineButton onClick={onOnlineClick} isActive={isOnlineActive} />
 
-      {/* 🔥 TORNEIOS - ESTILO UNIFICADO */}
+      {/* 🔥 TORNEIOS */}
       <button
         onClick={onTournamentClick}
         style={tournamentButtonStyle()}
@@ -70,10 +70,10 @@ function tournamentButtonStyle() {
   return {
     width: 44,
     height: 44,
-    background: "rgba(0,0,0,0.6)",
-    border: "1px solid rgba(255,255,255,0.2)",
+    background: "rgba(255,215,0,0.15)",
+    border: "1px solid rgba(255,215,0,0.3)",
     borderRadius: "50%",
-    color: "white",
+    color: "gold",
     fontSize: "1.2rem",
     cursor: "pointer",
     backdropFilter: "blur(4px)",
