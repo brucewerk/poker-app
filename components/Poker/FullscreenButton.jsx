@@ -1,4 +1,4 @@
-// components/Poker/FullscreenButton.jsx
+// components/Poker/FullscreenButton.jsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -34,30 +34,10 @@ export default function FullscreenButton() {
   return (
     <button
       onClick={toggleFullscreen}
-      style={buttonStyle()}
+      className="toolbar-btn"
       title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
     >
       ⛶
     </button>
   );
-}
-
-// ====================== ESTILOS ======================
-function buttonStyle() {
-  return {
-    width: 44,
-    height: 44,
-    background: "rgba(0,0,0,0.6)",
-    border: "1px solid rgba(255,255,255,0.2)",
-    borderRadius: "50%",
-    color: "white",
-    fontSize: "1.2rem",
-    cursor: "pointer",
-    backdropFilter: "blur(4px)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    transition: "all 0.3s ease",
-    position: "relative",
-  };
 }

@@ -1,4 +1,4 @@
-// app/page.jsx - CORRIGIDO (sem duplicatas)
+// app/page.jsx - COMPLETO (COM BOTÃO DE TORNEIOS UNIFICADO)
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -78,6 +78,7 @@ export default function PokerGame() {
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [showFindingsModal, setShowFindingsModal] = useState(false);
   const [showTournamentLobby, setShowTournamentLobby] = useState(false);
+  const [isTournamentActive, setIsTournamentActive] = useState(false);
   const [newFindings, setNewFindings] = useState([]);
   const [newAchievements, setNewAchievements] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -122,10 +123,25 @@ export default function PokerGame() {
   const hasLostAllRef = useRef(false);
   const chipsToSaveRef = useRef(null);
   const saveHandHistoryRef = useRef(false);
+  const isSavingHistoryRef = useRef(false);
+  const savedHandIdsRef = useRef(new Set());
   const isProcessingAction = useRef(false);
 
   const currentUser = session?.user?.username || null;
   const userChips = session?.user?.chips || 0;
+
+  // ============================================================
+  // 🔥 FUNÇÃO PARA ABRIR/FECHAR TORNEIOS
+  // ============================================================
+  const handleTournamentClick = useCallback(() => {
+    setIsTournamentActive(true);
+    setShowTournamentLobby(true);
+  }, []);
+
+  const handleTournamentClose = useCallback(() => {
+    setIsTournamentActive(false);
+    setShowTournamentLobby(false);
+  }, []);
 
   // ============================================================
   // 🔥 TOAST PADRONIZADO (APENAS EVENTOS IMPORTANTES)
@@ -785,15 +801,68 @@ export default function PokerGame() {
   // ====================== SALVAR HISTÓRICO ======================
   const saveHandHistory = useCallback(
     async (handData) => {
+      console.log("🔴 [HISTORY] saveHandHistory CHAMADO!", {
+        result: handData?.result,
+        pot: handData?.pot,
+        timestamp: handData?.timestamp,
+        hasId: !!handData?.id,
+        stack: new Error().stack,
+      });
+
       if (!currentUser) {
+        console.warn("⚠️ [HISTORY] Usuário não logado, ignorando...");
+        return;
+      }
+
+      if (!handData || typeof handData !== "object") {
+        console.warn("⚠️ [HISTORY] Dados da mão inválidos, ignorando...");
+        return;
+      }
+
+      const validResults = ["win", "loss", "tie"];
+      if (!handData.result || !validResults.includes(handData.result)) {
+        console.warn("⚠️ [HISTORY] Resultado inválido:", handData.result);
+        return;
+      }
+
+      const handId =
+        handData.id ||
+        `${currentUser}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+      if (savedHandIdsRef.current.has(handId)) {
+        console.log(`⏳ [HISTORY] ID ${handId} já foi salvo, ignorando...`);
+        return;
+      }
+
+      const duplicateKey = `${handData.timestamp}_${handData.result}_${handData.pot}`;
+      if (window._lastHandKey === duplicateKey) {
+        console.log(
+          `⏳ [HISTORY] Duplicata detectada (${duplicateKey}), ignorando...`,
+        );
+        return;
+      }
+      window._lastHandKey = duplicateKey;
+
+      if (isSavingHistoryRef.current) {
+        console.log("⏳ [HISTORY] Já salvando histórico, ignorando chamada...");
         return;
       }
 
       if (saveHandHistoryRef.current) {
+        console.log(
+          "⏳ [HISTORY] Aguardando salvamento anterior, ignorando...",
+        );
         return;
       }
 
+      savedHandIdsRef.current.add(handId);
       saveHandHistoryRef.current = true;
+      isSavingHistoryRef.current = true;
+
+      const handDataWithId = {
+        id: handId,
+        ...handData,
+      };
 
       try {
         const res = await fetch("/api/save-hand-history", {
@@ -801,19 +870,26 @@ export default function PokerGame() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             username: currentUser,
-            handData,
+            handData: handDataWithId,
           }),
         });
 
         const data = await res.json();
+
         if (data.success) {
-          console.log("✅ [HISTORY] Salvo com sucesso! Total:", data.total);
+          console.log(
+            `✅ [HISTORY] Salvo com sucesso! Total: ${data.total || 0}`,
+          );
+        } else {
+          console.warn(`⚠️ [HISTORY] Resposta sem sucesso:`, data);
         }
       } catch (error) {
-        console.error("❌ [HISTORY] Erro:", error);
+        console.error("❌ [HISTORY] Erro ao salvar:", error);
       } finally {
         setTimeout(() => {
           saveHandHistoryRef.current = false;
+          isSavingHistoryRef.current = false;
+          console.log("🔄 [HISTORY] Flags liberadas");
         }, 500);
       }
     },
@@ -920,6 +996,8 @@ export default function PokerGame() {
 
           const comparison = compareHands(pScore, cScore);
 
+          const handId = `${currentUser || "player"}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
           if (comparison === 0) {
             const split = Math.floor(finalState.pot / 2);
             const remainder = finalState.pot - split * 2;
@@ -933,6 +1011,7 @@ export default function PokerGame() {
             result = "tie";
 
             saveHandHistory({
+              id: handId,
               result: "tie",
               playerHand: pName,
               cpuHand: cName,
@@ -972,6 +1051,7 @@ export default function PokerGame() {
             await updateStats("win", won, pName, state.playerAllin);
 
             saveHandHistory({
+              id: handId,
               result: "win",
               playerHand: pName,
               cpuHand: cName,
@@ -1011,6 +1091,7 @@ export default function PokerGame() {
             await updateStats("loss", lost, cName);
 
             saveHandHistory({
+              id: handId,
               result: "loss",
               playerHand: pName,
               cpuHand: cName,
@@ -1101,6 +1182,12 @@ export default function PokerGame() {
 
     const data = resultData;
     setResultData(null);
+
+    setTimeout(() => {
+      savedHandIdsRef.current.clear();
+      window._lastHandKey = null;
+      console.log("🧹 [HISTORY] IDs salvos limpos");
+    }, 500);
 
     requestAnimationFrame(() => {
       const refreshChipsAfterModal = async () => {
@@ -2358,7 +2445,7 @@ export default function PokerGame() {
           transition: "var(--transition-theme)",
         }}
       >
-        {/* 🔥 BOTÃO DE SAIR - LADO DIREITO (SEM THEME TOGGLE DUPLICADO) */}
+        {/* 🔥 BOTÃO DE SAIR - LADO DIREITO (SEM BOTÃO DE TORNEIO DUPLICADO) */}
         {currentUser && (
           <div
             style={{
@@ -2392,7 +2479,7 @@ export default function PokerGame() {
           </div>
         )}
 
-        {/* 🔥 TOOLBAR - BOTÕES À DIREITA (INCLUI TEMA E TORNEIOS) */}
+        {/* 🔥 TOOLBAR - BOTÕES À DIREITA (INCLUI TEMA, TORNEIOS E TODOS OS DEMAIS) */}
         <ToolbarButtons
           isTurbo={isTurbo}
           onTurboToggle={handleTurboToggle}
@@ -2400,7 +2487,8 @@ export default function PokerGame() {
           isMultiplayerActive={multiplayerModeActive}
           onOnlineClick={() => setShowOnline(true)}
           isOnlineActive={!!onlineGame}
-          onTournamentClick={() => setShowTournamentLobby(true)}
+          onTournamentClick={handleTournamentClick}
+          isTournamentActive={isTournamentActive}
         />
 
         {showMultiplayerModal && (
@@ -2454,7 +2542,7 @@ export default function PokerGame() {
 
         {showTournamentLobby && (
           <TournamentLobby
-            onClose={() => setShowTournamentLobby(false)}
+            onClose={handleTournamentClose}
             username={currentUser}
           />
         )}

@@ -1,4 +1,4 @@
-// components/Poker/TournamentGame.jsx - CORREÇÃO
+// components/Poker/TournamentGame.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -64,13 +64,11 @@ export default function TournamentGame({ tournament, onLeave, username }) {
       const data = await res.json();
 
       if (data.success && isMounted.current) {
-        // 🔥 Se o jogo já existe, carregar
         if (data.gameState) {
           setGameState(data.gameState);
           setPlayers(data.gameState?.players || []);
           setLoading(false);
 
-          // 🔥 Verificar se o torneio terminou
           if (data.gameState?.status === "finished") {
             setShowResult(true);
             setResultData(data.gameState);
@@ -81,7 +79,6 @@ export default function TournamentGame({ tournament, onLeave, username }) {
             return;
           }
 
-          // 🔥 Notificações
           if (
             data.gameState?.lastAction &&
             data.gameState?.lastAction !== notification
@@ -93,9 +90,7 @@ export default function TournamentGame({ tournament, onLeave, username }) {
           return;
         }
 
-        // 🔥 Se não tem gameState e o torneio está ativo, iniciar
         if (data.tournament?.status === "active" && !data.gameState) {
-          // Verificar se há pelo menos 2 jogadores
           const activePlayers =
             data.tournament.players?.filter((p) => !p.isEliminated) || [];
           if (activePlayers.length >= 2) {
@@ -133,10 +128,8 @@ export default function TournamentGame({ tournament, onLeave, username }) {
     isMounted.current = true;
     startAttempted.current = false;
 
-    // 🔥 Carregar estado inicial
     fetchGameState();
 
-    // 🔥 Polling a cada 2 segundos
     intervalRef.current = setInterval(() => {
       if (isMounted.current && !showResult) {
         fetchGameState();
@@ -219,7 +212,7 @@ export default function TournamentGame({ tournament, onLeave, username }) {
           </div>
 
           <div style={resultPlayersStyle()}>
-            <h3>📊 Classificação Final</h3>
+            <h3 style={resultPlayersTitleStyle()}>📊 Classificação Final</h3>
             {resultData.ranking?.map((player, index) => (
               <div key={index} style={resultPlayerItemStyle(index === 0)}>
                 <span>#{index + 1}</span>
@@ -244,7 +237,7 @@ export default function TournamentGame({ tournament, onLeave, username }) {
     return (
       <div style={containerStyle()}>
         <div style={headerStyle()}>
-          <h2>🏅 {tournament.name}</h2>
+          <h2 style={titleStyle()}>🏅 {tournament.name}</h2>
           <button onClick={onLeave} style={leaveButtonStyle()}>
             ✕ Sair
           </button>
@@ -268,7 +261,7 @@ export default function TournamentGame({ tournament, onLeave, username }) {
     return (
       <div style={containerStyle()}>
         <div style={headerStyle()}>
-          <h2>🏅 {tournament.name}</h2>
+          <h2 style={titleStyle()}>🏅 {tournament.name}</h2>
           <button onClick={onLeave} style={leaveButtonStyle()}>
             ✕ Sair
           </button>
@@ -300,7 +293,7 @@ export default function TournamentGame({ tournament, onLeave, username }) {
   return (
     <div style={containerStyle()}>
       <div style={headerStyle()}>
-        <h2>🏅 {tournament.name}</h2>
+        <h2 style={titleStyle()}>🏅 {tournament.name}</h2>
         <button onClick={onLeave} style={leaveButtonStyle()}>
           ✕ Sair
         </button>
@@ -318,17 +311,21 @@ export default function TournamentGame({ tournament, onLeave, username }) {
       )}
 
       <div style={infoStyle()}>
-        <span>💰 Pote: {gameState.pot || 0}</span>
-        <span>
+        <span style={{ color: "var(--text-primary)" }}>
+          💰 Pote: {gameState.pot || 0}
+        </span>
+        <span style={{ color: "var(--text-primary)" }}>
           🎯 Blinds: {gameState.blinds?.smallBlind || 25}/
           {gameState.blinds?.bigBlind || 50}
         </span>
-        <span>
+        <span style={{ color: "var(--text-primary)" }}>
           👥 Vivos:{" "}
           {gameState.players?.filter((p) => !p.isEliminated && !p.isFolded)
             .length || 0}
         </span>
-        <span>📊 Fase: {gameState.phase || "preflop"}</span>
+        <span style={{ color: "var(--text-primary)" }}>
+          📊 Fase: {gameState.phase || "preflop"}
+        </span>
       </div>
 
       {/* Cartas Comunitárias */}
@@ -462,16 +459,17 @@ export default function TournamentGame({ tournament, onLeave, username }) {
 // ====================== ESTILOS ======================
 function containerStyle() {
   return {
-    background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
+    background: "var(--bg-modal)",
     borderRadius: 30,
     padding: "20px",
     minHeight: "500px",
-    color: "white",
+    color: "var(--text-primary)",
     position: "fixed",
     inset: 0,
     zIndex: 1000,
     margin: "20px",
     overflowY: "auto",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -500,13 +498,22 @@ function headerStyle() {
   };
 }
 
+function titleStyle() {
+  return {
+    color: "var(--text-primary)",
+    margin: 0,
+    fontSize: "1.5rem",
+    transition: "var(--transition-theme)",
+  };
+}
+
 function leaveButtonStyle() {
   return {
     background: "rgba(244,67,54,0.3)",
     border: "1px solid #f44336",
     borderRadius: 20,
     padding: "8px 16px",
-    color: "white",
+    color: "var(--text-primary)",
     cursor: "pointer",
     transition: "all 0.3s ease",
   };
@@ -539,10 +546,11 @@ function communityLabelStyle() {
   return {
     display: "block",
     fontSize: "0.7rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
     marginBottom: "10px",
     textTransform: "uppercase",
     letterSpacing: "2px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -590,7 +598,9 @@ function playerNameStyle() {
   return {
     fontWeight: "bold",
     fontSize: "0.9rem",
+    color: "var(--text-primary)",
     marginBottom: "8px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -721,8 +731,9 @@ function loadingSpinnerStyle() {
 
 function loadingTextStyle() {
   return {
-    color: "#aaa",
+    color: "var(--text-muted)",
     fontSize: "1rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -755,7 +766,8 @@ function waitingTextStyle() {
 function waitingSubTextStyle() {
   return {
     fontSize: "0.9rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -775,36 +787,29 @@ function startGameButtonStyle() {
   };
 }
 
-function emptyGameStyle() {
-  return {
-    textAlign: "center",
-    color: "#aaa",
-    fontSize: "1.2rem",
-    padding: "40px",
-  };
-}
-
 function resultModalStyle() {
   return {
-    background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
+    background: "var(--bg-modal)",
     padding: "30px 40px",
     borderRadius: 30,
     maxWidth: 500,
     width: "100%",
-    color: "white",
-    border: "3px solid gold",
+    color: "var(--text-primary)",
+    border: "3px solid var(--border-gold)",
     maxHeight: "80vh",
     overflowY: "auto",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+    boxShadow: "0 20px 60px var(--shadow-dark)",
+    transition: "var(--transition-theme)",
   };
 }
 
 function resultTitleStyle() {
   return {
     textAlign: "center",
-    color: "gold",
+    color: "var(--text-primary)",
     margin: "0 0 20px",
     fontSize: "1.8rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -832,6 +837,15 @@ function resultPlayersStyle() {
     flexDirection: "column",
     gap: "8px",
     marginBottom: "20px",
+  };
+}
+
+function resultPlayersTitleStyle() {
+  return {
+    color: "var(--text-primary)",
+    fontSize: "1rem",
+    marginBottom: "10px",
+    transition: "var(--transition-theme)",
   };
 }
 

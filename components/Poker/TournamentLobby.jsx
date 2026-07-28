@@ -1,4 +1,4 @@
-// components/Poker/TournamentLobby.jsx - COMPLETO COM HEADER CORRIGIDO
+// components/Poker/TournamentLobby.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -376,9 +376,15 @@ export default function TournamentLobby({ onClose, username }) {
         animate={{ scale: 1, y: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 400, damping: 28 }}
       >
-        {/* 🔥 HEADER CORRIGIDO - BOTÃO DE REFRESH AO LADO DO TÍTULO */}
+        {/* 🔥 HEADER CORRIGIDO - TÍTULO COM COR DINÂMICA */}
         <div style={headerRowStyle()}>
-          <h2 style={titleStyle()}>
+          <h2
+            style={{
+              ...titleStyle(),
+              color: "var(--text-primary)",
+              transition: "var(--transition-theme)",
+            }}
+          >
             🏅 TORNEIOS
             <button
               onClick={handleRefresh}
@@ -760,26 +766,26 @@ function overlayStyle() {
 
 function modalStyle() {
   return {
-    background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
+    background: "var(--bg-modal)",
     padding: "30px 35px",
     borderRadius: 30,
     maxWidth: 600,
     width: "100%",
     maxHeight: "85vh",
     overflowY: "auto",
-    color: "white",
-    border: "2px solid gold",
+    color: "var(--text-primary)",
+    border: "2px solid var(--border-gold)",
     position: "relative",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+    boxShadow: "0 20px 60px var(--shadow-dark)",
+    transition: "var(--transition-theme)",
   };
 }
 
-// 🔥 CLOSE BUTTON CORRIGIDO
 function closeButtonStyle() {
   return {
     background: "rgba(255,255,255,0.05)",
     border: "none",
-    color: "white",
+    color: "var(--text-primary)",
     fontSize: "1.3rem",
     cursor: "pointer",
     padding: "5px 10px",
@@ -793,7 +799,6 @@ function closeButtonStyle() {
   };
 }
 
-// 🔥 HEADER CORRIGIDO
 function headerRowStyle() {
   return {
     display: "flex",
@@ -803,10 +808,8 @@ function headerRowStyle() {
   };
 }
 
-// 🔥 TITLE CORRIGIDO COM O BOTÃO DE REFRESH
 function titleStyle() {
   return {
-    color: "gold",
     margin: 0,
     fontSize: "1.5rem",
     fontWeight: "800",
@@ -817,7 +820,6 @@ function titleStyle() {
   };
 }
 
-// 🔥 REFRESH BUTTON CORRIGIDO (MENOR E AO LADO DO TÍTULO)
 function refreshButtonStyle(isRefreshing) {
   return {
     background: isRefreshing
@@ -827,7 +829,7 @@ function refreshButtonStyle(isRefreshing) {
     borderRadius: "50%",
     width: 32,
     height: 32,
-    color: isRefreshing ? "#666" : "gold",
+    color: isRefreshing ? "#666" : "var(--text-primary)",
     cursor: isRefreshing ? "not-allowed" : "pointer",
     fontSize: "0.9rem",
     display: "flex",
@@ -840,9 +842,10 @@ function refreshButtonStyle(isRefreshing) {
 
 function subtitleStyle() {
   return {
-    color: "#ffd700",
+    color: "var(--text-secondary)",
     fontSize: "1.1rem",
     margin: "0 0 10px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -904,8 +907,9 @@ function labelStyle() {
   return {
     display: "block",
     fontSize: "0.7rem",
-    color: "#888",
+    color: "var(--text-muted)",
     marginBottom: "4px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -916,7 +920,7 @@ function inputStyle() {
     borderRadius: 10,
     border: "1px solid rgba(255,255,255,0.1)",
     background: "rgba(0,0,0,0.3)",
-    color: "white",
+    color: "var(--text-primary)",
     fontSize: "0.85rem",
     outline: "none",
     transition: "border-color 0.3s ease",
@@ -930,7 +934,7 @@ function selectStyle() {
     borderRadius: 10,
     border: "1px solid rgba(255,255,255,0.1)",
     background: "rgba(0,0,0,0.3)",
-    color: "white",
+    color: "var(--text-primary)",
     fontSize: "0.85rem",
     outline: "none",
   };
@@ -971,8 +975,9 @@ function tournamentsListStyle() {
 function emptyStyle() {
   return {
     textAlign: "center",
-    color: "#888",
+    color: "var(--text-muted)",
     padding: "20px 0",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1000,11 +1005,12 @@ function tournamentNameStyle() {
   return {
     fontWeight: "bold",
     fontSize: "1rem",
-    color: "#fff",
+    color: "var(--text-primary)",
     display: "flex",
     alignItems: "center",
     gap: "6px",
     flexWrap: "wrap",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1039,17 +1045,19 @@ function tournamentInfoStyle() {
     display: "flex",
     gap: "15px",
     fontSize: "0.75rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
     flexWrap: "wrap",
+    transition: "var(--transition-theme)",
   };
 }
 
 function tournamentDescStyle() {
   return {
     fontSize: "0.75rem",
-    color: "#888",
+    color: "var(--text-muted)",
     marginTop: "4px",
     fontStyle: "italic",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1187,8 +1195,9 @@ function loadingSpinnerStyle() {
 
 function loadingTextStyle() {
   return {
-    color: "#aaa",
+    color: "var(--text-muted)",
     fontSize: "1rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1209,14 +1218,15 @@ function editOverlayStyle() {
 
 function editModalStyle() {
   return {
-    background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
+    background: "var(--bg-modal)",
     padding: "30px",
     borderRadius: 25,
     maxWidth: 500,
     width: "100%",
-    color: "white",
-    border: "2px solid gold",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+    color: "var(--text-primary)",
+    border: "2px solid var(--border-gold)",
+    boxShadow: "0 20px 60px var(--shadow-dark)",
+    transition: "var(--transition-theme)",
   };
 }
 

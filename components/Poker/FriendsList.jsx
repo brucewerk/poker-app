@@ -1503,9 +1503,10 @@ export default function FriendsList({ username, onJoinGame }) {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              color: "gold",
+              color: "var(--text-primary)",
               fontWeight: "bold",
               fontSize: "1rem",
+              transition: "var(--transition-theme)",
             }}
           >
             <span>💬 {selectedChatFriend}</span>
@@ -1625,6 +1626,7 @@ export default function FriendsList({ username, onJoinGame }) {
                 color: "var(--text-primary)",
                 fontSize: "0.85rem",
                 outline: "none",
+                transition: "var(--transition-theme)",
               }}
               maxLength={500}
             />
@@ -2101,6 +2103,7 @@ export default function FriendsList({ username, onJoinGame }) {
   if (loading) {
     return (
       <div
+        className="friends-card"
         style={{
           background: "var(--bg-panel)",
           backdropFilter: "blur(4px)",
@@ -2113,7 +2116,18 @@ export default function FriendsList({ username, onJoinGame }) {
           overflow: "hidden",
         }}
       >
-        <h3 style={{ color: "gold", margin: "0 0 10px", fontSize: "1rem" }}>
+        <h3
+          className="card-title"
+          style={{
+            color: "gold",
+            margin: "0 0 10px",
+            fontSize: "1rem",
+            fontWeight: "700",
+            borderBottom: "2px solid var(--border-gold)",
+            paddingBottom: 8,
+            transition: "var(--transition-theme)",
+          }}
+        >
           👥 AMIGOS
         </h3>
         <p
@@ -2140,6 +2154,7 @@ export default function FriendsList({ username, onJoinGame }) {
       <InviteModal />
 
       <div
+        className="friends-card"
         style={{
           background: "var(--bg-panel)",
           backdropFilter: "blur(4px)",
@@ -2169,7 +2184,18 @@ export default function FriendsList({ username, onJoinGame }) {
               flexWrap: "wrap",
             }}
           >
-            <h3 style={{ color: "gold", margin: "0 0 10px", fontSize: "1rem" }}>
+            <h3
+              className="card-title"
+              style={{
+                color: "gold",
+                margin: "0 0 10px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                borderBottom: "2px solid var(--border-gold)",
+                paddingBottom: 8,
+                transition: "var(--transition-theme)",
+              }}
+            >
               👥 AMIGOS
             </h3>
             {onlineFriends.length > 0 && (
@@ -2243,6 +2269,7 @@ export default function FriendsList({ username, onJoinGame }) {
                 color: "gold",
                 fontSize: "1rem",
                 cursor: "pointer",
+                transition: "var(--transition-theme)",
               }}
             >
               {showFriends ? "▲" : "▼"} ({friends.length})
@@ -2372,6 +2399,7 @@ export default function FriendsList({ username, onJoinGame }) {
                     padding: "4px 8px",
                     borderBottom: "1px solid var(--border-light)",
                     marginBottom: "4px",
+                    transition: "var(--transition-theme)",
                   }}
                 >
                   <span>🏆 Ranking entre amigos</span>

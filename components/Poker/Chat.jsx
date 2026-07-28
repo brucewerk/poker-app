@@ -1,4 +1,4 @@
-// components/Poker/Chat.jsx - VERSÃO PREMIUM COM EMOJIS E CORRIGIDA
+// components/Poker/Chat.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -69,7 +69,6 @@ export default function Chat({ socket, roomId, playerName }) {
         return newMessages;
       });
 
-      // Incrementar contador de não lidas se o chat estiver minimizado
       if (isMinimized && data.player !== playerName) {
         setUnreadCount((prev) => prev + 1);
       }
@@ -162,7 +161,7 @@ export default function Chat({ socket, roomId, playerName }) {
           <div style={emptyMessagesStyle()}>
             <span style={{ fontSize: "2rem" }}>💬</span>
             <p>Nenhuma mensagem ainda</p>
-            <span style={{ fontSize: "0.7rem", color: "#666" }}>
+            <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
               Seja o primeiro a falar!
             </span>
           </div>
@@ -249,20 +248,21 @@ export default function Chat({ socket, roomId, playerName }) {
 // ====================== ESTILOS ======================
 function containerStyle() {
   return {
-    background: "rgba(0,0,0,0.85)",
+    background: "var(--bg-modal)",
     borderRadius: "12px",
     display: "flex",
     flexDirection: "column",
     height: "350px",
     width: "100%",
     maxWidth: "400px",
-    border: "1px solid rgba(255,215,0,0.15)",
+    border: "1px solid var(--border-gold)",
     position: "fixed",
     bottom: "20px",
     right: "20px",
     zIndex: 100,
-    boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+    boxShadow: "0 8px 32px var(--shadow-dark)",
     backdropFilter: "blur(8px)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -270,14 +270,15 @@ function headerStyle() {
   return {
     padding: "10px 15px",
     background: "rgba(255,215,0,0.08)",
-    borderBottom: "1px solid rgba(255,215,0,0.1)",
+    borderBottom: "1px solid var(--border-gold)",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    color: "gold",
+    color: "var(--text-primary)",
     fontWeight: "bold",
     borderTopLeftRadius: "12px",
     borderTopRightRadius: "12px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -292,8 +293,9 @@ function headerButtonsStyle() {
 function messageCountStyle() {
   return {
     fontSize: "0.65rem",
-    color: "#888",
+    color: "var(--text-muted)",
     fontWeight: "normal",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -301,7 +303,7 @@ function minimizeButtonStyle() {
   return {
     background: "none",
     border: "none",
-    color: "#888",
+    color: "var(--text-muted)",
     cursor: "pointer",
     fontSize: "1rem",
     padding: "0 5px",
@@ -314,18 +316,19 @@ function minimizedButtonStyle() {
     position: "fixed",
     bottom: "20px",
     right: "20px",
-    background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
-    border: "1px solid gold",
+    background: "var(--bg-modal)",
+    border: "1px solid var(--border-gold)",
     borderRadius: "50px",
     padding: "10px 20px",
-    color: "gold",
+    color: "var(--text-primary)",
     cursor: "pointer",
     zIndex: 100,
-    boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+    boxShadow: "0 4px 16px var(--shadow-dark)",
     fontSize: "0.9rem",
     display: "flex",
     alignItems: "center",
     gap: "8px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -360,8 +363,9 @@ function emptyMessagesStyle() {
     alignItems: "center",
     justifyContent: "center",
     height: "100%",
-    color: "#555",
+    color: "var(--text-muted)",
     gap: "4px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -401,22 +405,24 @@ function playerNameStyle(isSystem) {
 
 function timestampStyle() {
   return {
-    color: "#666",
+    color: "var(--text-muted)",
     fontSize: "0.55rem",
+    transition: "var(--transition-theme)",
   };
 }
 
 function messageTextStyle(isSystem) {
   return {
-    color: isSystem ? "#aaa" : "#eee",
+    color: isSystem ? "var(--text-muted)" : "var(--text-primary)",
     fontSize: "0.85rem",
     wordBreak: "break-word",
+    transition: "var(--transition-theme)",
   };
 }
 
 function inputContainerStyle() {
   return {
-    borderTop: "1px solid rgba(255,255,255,0.05)",
+    borderTop: "1px solid var(--border-light)",
     position: "relative",
   };
 }
@@ -427,12 +433,13 @@ function emojisContainerStyle() {
     bottom: "100%",
     left: 0,
     right: 0,
-    background: "rgba(0,0,0,0.95)",
-    border: "1px solid rgba(255,215,0,0.15)",
+    background: "var(--bg-modal)",
+    border: "1px solid var(--border-gold)",
     borderRadius: "8px 8px 0 0",
     padding: "8px",
     maxHeight: "150px",
     overflowY: "auto",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -465,7 +472,7 @@ function emojiToggleStyle() {
     cursor: "pointer",
     padding: "4px 8px",
     borderRadius: "4px",
-    color: "#888",
+    color: "var(--text-muted)",
     transition: "color 0.3s ease",
   };
 }
@@ -484,9 +491,9 @@ function inputStyle() {
     flex: 1,
     padding: "6px 12px",
     borderRadius: "20px",
-    border: "1px solid rgba(255,255,255,0.1)",
-    background: "rgba(0,0,0,0.3)",
-    color: "white",
+    border: "1px solid var(--border-input)",
+    background: "var(--bg-input)",
+    color: "var(--text-primary)",
     fontSize: "0.85rem",
     outline: "none",
     transition: "border-color 0.3s ease",

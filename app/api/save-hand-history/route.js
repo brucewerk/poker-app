@@ -35,42 +35,72 @@ export async function POST(request) {
 
     await dbConnect();
 
+    // 🔥 GERAR ID ÚNICO (se não veio)
+    const handId =
+      handData.id ||
+      `${username}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
     const handToSave = {
+      id: handId,
       ...handData,
       timestamp: handData.timestamp || new Date().toISOString(),
     };
 
-    // 🔥 USAR updateOne COM $push
-    const result = await User.updateOne(
-      { username },
-      {
-        $push: {
-          handHistory: {
-            $each: [handToSave],
-            $slice: -100,
-            $position: 0,
-          },
-        },
-      },
-      {
-        optimisticConcurrency: false,
-      },
-    );
-
-    if (result.matchedCount === 0) {
+    // 🔥 BUSCAR USUÁRIO
+    const user = await User.findOne({ username });
+    if (!user) {
       return NextResponse.json(
         { success: false, error: "Usuário não encontrado" },
         { status: 404 },
       );
     }
 
-    // 🔥 BUSCAR O USUÁRIO ATUALIZADO PARA RETORNAR O TOTAL
-    const updatedUser = await User.findOne({ username });
-    const total = updatedUser?.handHistory?.length || 0;
+    // 🔥 INICIALIZAR handHistory SE NÃO EXISTIR
+    if (!user.handHistory) {
+      user.handHistory = [];
+    }
 
-    console.log(
-      `✅ [HISTORY] Histórico salvo para ${username} (total: ${total})`,
-    );
+    // 🔥 VERIFICAR SE JÁ EXISTE UMA ENTRADA COM O MESMO ID
+    const existingIndex = user.handHistory.findIndex((h) => h.id === handId);
+
+    if (existingIndex !== -1) {
+      // 🔥 ATUALIZAR A ENTRADA EXISTENTE (SUBSTITUIR)
+      user.handHistory[existingIndex] = handToSave;
+      console.log(`🔄 [HISTORY] Entrada ${handId} atualizada para ${username}`);
+    } else {
+      // 🔥 VERIFICAR POR DUPLICATA BASEADA EM TIMESTAMP + RESULTADO + POTE
+      const existsByData = user.handHistory.some(
+        (h) =>
+          h.timestamp === handToSave.timestamp &&
+          h.result === handToSave.result &&
+          h.pot === handToSave.pot,
+      );
+
+      if (existsByData) {
+        console.log(`⚠️ [HISTORY] Duplicata por dados detectada, ignorando...`);
+        return NextResponse.json({
+          success: true,
+          message: "Duplicata ignorada (dados)",
+          total: user.handHistory.length,
+        });
+      }
+
+      // 🔥 ADICIONAR NOVA ENTRADA NO INÍCIO
+      user.handHistory.unshift(handToSave);
+      console.log(
+        `✅ [HISTORY] Nova entrada ${handId} adicionada para ${username}`,
+      );
+    }
+
+    // 🔥 LIMITAR A 100 ENTRADAS
+    if (user.handHistory.length > 100) {
+      user.handHistory = user.handHistory.slice(0, 100);
+    }
+
+    // 🔥 SALVAR
+    await user.save();
+
+    const total = user.handHistory.length;
 
     return NextResponse.json({
       success: true,

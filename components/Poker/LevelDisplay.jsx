@@ -1,4 +1,4 @@
-// components/Poker/LevelDisplay.jsx - CORRIGIDO
+// components/Poker/LevelDisplay.jsx - COMPLETO COM TÍTULO PADRONIZADO
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -283,15 +283,26 @@ export default function LevelDisplay({
 
       <div style={containerStyle()}>
         <motion.div
+          className="level-display-card"
           style={cardStyle()}
           whileHover={{ scale: 1.01 }}
           transition={{ type: "spring", stiffness: 300 }}
         >
           <div style={headerStyle()}>
-            <div style={levelInfoStyle()}>
-              <span style={levelNumberStyle()}>Nível {level}</span>
-              <span style={levelTitleStyle()}>{title}</span>
-            </div>
+            <h3
+              className="card-title"
+              style={{
+                color: "gold",
+                margin: "0 0 10px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                borderBottom: "2px solid var(--border-gold)",
+                paddingBottom: 8,
+                transition: "var(--transition-theme)",
+              }}
+            >
+              📊 NÍVEL
+            </h3>
             <button
               onClick={() => setShowRanksModal(true)}
               style={rankButtonStyle()}
@@ -301,42 +312,49 @@ export default function LevelDisplay({
             </button>
           </div>
 
-          <div style={progressContainerStyle()}>
-            <div style={progressBarStyle()}>
-              <motion.div
-                style={{
-                  ...progressFillStyle(),
-                  width: `${Math.min(100, progress)}%`,
-                }}
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, progress)}%` }}
-                transition={{ duration: 0.8 }}
-              />
+          <div style={levelContentStyle()}>
+            <div style={levelInfoStyle()}>
+              <span style={levelNumberStyle()}>Nível {level}</span>
+              <span style={levelTitleStyle()}>{title}</span>
             </div>
-            <div style={progressTextStyle()}>
-              {xp} / {xpToNext} XP ({Math.round(progress)}%)
-            </div>
-          </div>
 
-          <div style={statsRowStyle()}>
-            <motion.div
-              style={statItemStyle()}
-              whileHover={{ scale: 1.05 }}
-              onClick={onShowAchievements}
-            >
-              <span style={statIconStyle()}>🏅</span>
-              <span style={statValueStyle()}>{achievements || 0}</span>
-              <span style={statLabelStyle()}>conquistas</span>
-            </motion.div>
-            <motion.div
-              style={statItemStyle()}
-              whileHover={{ scale: 1.05 }}
-              onClick={onShowFindings}
-            >
-              <span style={statIconStyle()}>🔍</span>
-              <span style={statValueStyle()}>{findings || 0}</span>
-              <span style={statLabelStyle()}>achados</span>
-            </motion.div>
+            <div style={progressContainerStyle()}>
+              <div style={progressBarStyle()}>
+                <motion.div
+                  style={{
+                    ...progressFillStyle(),
+                    width: `${Math.min(100, progress)}%`,
+                  }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, progress)}%` }}
+                  transition={{ duration: 0.8 }}
+                />
+              </div>
+              <div style={progressTextStyle()}>
+                {xp} / {xpToNext} XP ({Math.round(progress)}%)
+              </div>
+            </div>
+
+            <div style={statsRowStyle()}>
+              <motion.div
+                style={statItemStyle()}
+                whileHover={{ scale: 1.05 }}
+                onClick={onShowAchievements}
+              >
+                <span style={statIconStyle()}>🏅</span>
+                <span style={statValueStyle()}>{achievements || 0}</span>
+                <span style={statLabelStyle()}>conquistas</span>
+              </motion.div>
+              <motion.div
+                style={statItemStyle()}
+                whileHover={{ scale: 1.05 }}
+                onClick={onShowFindings}
+              >
+                <span style={statIconStyle()}>🔍</span>
+                <span style={statValueStyle()}>{findings || 0}</span>
+                <span style={statLabelStyle()}>achados</span>
+              </motion.div>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -345,7 +363,7 @@ export default function LevelDisplay({
 }
 
 // ============================================================
-// 🎨 ESTILOS - CORRIGIDOS COM VARIÁVEIS CSS
+// 🎨 ESTILOS
 // ============================================================
 
 function containerStyle() {
@@ -358,15 +376,15 @@ function containerStyle() {
 
 function cardStyle() {
   return {
-    background: "var(--bg-card)",
-    borderRadius: 16,
-    padding: "16px 18px",
+    background: "var(--bg-panel)",
+    backdropFilter: "blur(4px)",
+    borderRadius: 20,
+    padding: 15,
+    marginTop: 10,
+    color: "var(--text-primary)",
     border: "1px solid var(--border-gold)",
     transition: "var(--transition-theme)",
-    cursor: "pointer",
-    width: "100%",
-    boxSizing: "border-box",
-    overflow: "hidden",
+    boxShadow: "var(--shadow-dark)",
   };
 }
 
@@ -399,6 +417,14 @@ function headerStyle() {
   };
 }
 
+function levelContentStyle() {
+  return {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  };
+}
+
 function levelInfoStyle() {
   return {
     display: "flex",
@@ -422,6 +448,7 @@ function levelTitleStyle() {
     fontWeight: "600",
     fontSize: "0.9rem",
     opacity: 0.8,
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -442,7 +469,7 @@ function rankButtonStyle() {
 
 function progressContainerStyle() {
   return {
-    marginBottom: "12px",
+    marginBottom: "4px",
   };
 }
 
@@ -472,6 +499,7 @@ function progressTextStyle() {
     fontSize: "0.65rem",
     color: "var(--text-muted)",
     marginTop: "3px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -489,13 +517,14 @@ function statItemStyle() {
     display: "flex",
     alignItems: "center",
     gap: "4px",
-    background: "rgba(255,255,255,0.03)",
+    background: "var(--bg-status-item, rgba(255,255,255,0.05))",
     padding: "4px 12px",
     borderRadius: "12px",
     cursor: "pointer",
     transition: "all 0.3s ease",
     flexWrap: "wrap",
     justifyContent: "center",
+    border: "1px solid var(--border-light)",
   };
 }
 
@@ -510,6 +539,7 @@ function statValueStyle() {
     fontWeight: "bold",
     color: "var(--text-primary)",
     fontSize: "0.85rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -519,6 +549,8 @@ function statLabelStyle() {
     fontSize: "0.6rem",
     textTransform: "uppercase",
     letterSpacing: "0.5px",
+    fontWeight: "600",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -678,6 +710,7 @@ function rankNameStyle(isUnlocked, isCurrent) {
     alignItems: "center",
     gap: "8px",
     flexWrap: "wrap",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -732,6 +765,7 @@ function rankLevelStyle() {
   return {
     fontSize: "0.6rem",
     color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -765,6 +799,7 @@ function rankNextStyle() {
     opacity: 0.7,
     display: "block",
     marginBottom: "2px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -803,6 +838,7 @@ function rankProgressTextStyle() {
     fontSize: "0.55rem",
     color: "var(--text-muted)",
     whiteSpace: "nowrap",
+    transition: "var(--transition-theme)",
   };
 }
 

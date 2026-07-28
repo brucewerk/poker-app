@@ -1,4 +1,4 @@
-// components/Poker/OnlineLobby.jsx - CORRIGIDO (usando socketClient singleton)
+// components/Poker/OnlineLobby.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -592,6 +592,7 @@ function modalStyle() {
     boxShadow: "0 20px 60px var(--shadow-dark)",
     scrollbarWidth: "thin",
     scrollbarColor: "rgba(255,215,0,0.3) transparent",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -608,10 +609,11 @@ function headerStyle() {
 
 function titleStyle() {
   return {
-    color: "gold",
+    color: "var(--text-primary)",
     margin: 0,
     fontSize: "1.4rem",
     fontWeight: "bold",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -619,7 +621,7 @@ function closeButtonStyle() {
   return {
     background: "none",
     border: "none",
-    color: "#888",
+    color: "var(--text-muted)",
     fontSize: "1.3rem",
     cursor: "pointer",
     padding: "4px 8px",
@@ -734,6 +736,7 @@ function invitePlayersStyle() {
   return {
     fontSize: "0.8rem",
     color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -788,6 +791,7 @@ function sectionTitleStyle() {
     fontSize: "0.95rem",
     color: "var(--text-secondary)",
     fontWeight: "600",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -815,6 +819,7 @@ function labelStyle() {
     fontSize: "0.8rem",
     color: "var(--text-muted)",
     fontWeight: "500",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -889,6 +894,7 @@ function loadingStyle() {
     padding: "30px 0",
     color: "var(--text-muted)",
     fontSize: "0.9rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -909,6 +915,7 @@ function emptyStyle() {
     textAlign: "center",
     padding: "30px 0",
     color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1002,6 +1009,7 @@ function roomDetailsStyle() {
     alignItems: "center",
     gap: "8px",
     flexWrap: "wrap",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1010,6 +1018,7 @@ function playerNamesStyle() {
     fontSize: "0.7rem",
     color: "var(--text-muted)",
     opacity: 0.7,
+    transition: "var(--transition-theme)",
   };
 }
 

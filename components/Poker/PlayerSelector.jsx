@@ -1,4 +1,4 @@
-// components/Poker/PlayerSelector.jsx
+// components/Poker/PlayerSelector.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
 "use client";
 
 export default function PlayerSelector({
@@ -18,7 +18,7 @@ export default function PlayerSelector({
     >
       {players.map((player, index) => (
         <button
-          key={`player-${index}-${player.name}`} // 🔥 CHAVE ÚNICA
+          key={`player-${index}-${player.name}`}
           onClick={() => onSelectPlayer(index)}
           style={{
             padding: "10px 25px",
@@ -31,7 +31,7 @@ export default function PlayerSelector({
               currentPlayer === index
                 ? "rgba(255,215,0,0.2)"
                 : "rgba(0,0,0,0.4)",
-            color: currentPlayer === index ? "gold" : "#aaa",
+            color: currentPlayer === index ? "gold" : "var(--text-muted)",
             fontWeight: "bold",
             fontSize: "1rem",
             cursor: "pointer",

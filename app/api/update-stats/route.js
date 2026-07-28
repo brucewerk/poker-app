@@ -1,4 +1,4 @@
-// app/api/update-stats/route.js - COMPLETO COM MÉTRICAS AVANÇADAS
+// app/api/update-stats/route.js - COMPLETO CORRIGIDO
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -50,7 +50,6 @@ export async function POST(request) {
         currentStreak: 0,
         handsLost: 0,
         handsTied: 0,
-        // 🔥 NOVAS MÉTRICAS PARA ESTATÍSTICAS AVANÇADAS
         totalChips: 0,
         lastHandTimestamp: null,
         handsByPosition: {
@@ -111,7 +110,6 @@ export async function POST(request) {
         user.stats.biggestWin = chips;
       }
 
-      // 🔥 MELHOR MÃO
       if (normalizedHandName) {
         const handOrder = [
           "Carta Alta",
@@ -131,7 +129,6 @@ export async function POST(request) {
           user.stats.bestHand = normalizedHandName;
         }
 
-        // 🔥 REGISTRAR DISTRIBUIÇÃO DE MÃOS
         if (!user.stats.handsByType) {
           user.stats.handsByType = {};
         }
@@ -139,7 +136,6 @@ export async function POST(request) {
           (user.stats.handsByType[normalizedHandName] || 0) + 1;
       }
 
-      // 🔥 STREAK
       user.stats.currentStreak = (user.stats.currentStreak || 0) + 1;
       if ((user.stats.currentStreak || 0) > (user.stats.bestStreak || 0)) {
         user.stats.bestStreak = user.stats.currentStreak;
@@ -149,7 +145,6 @@ export async function POST(request) {
         user.stats.allInWins = (user.stats.allInWins || 0) + 1;
       }
 
-      // 🔥 XP POR VITÓRIA
       xpGain = 10 + Math.floor(chips / 10);
       if (wasAllIn) xpGain += 20;
       if (chips >= 500) xpGain += 15;
@@ -165,10 +160,8 @@ export async function POST(request) {
       xpGain = 5;
     }
 
-    // 🔥 ATUALIZAR TOTAL DE FICHAS
     user.stats.totalChips = (user.stats.totalChips || 0) + chipsChange;
 
-    // 🔥 ADICIONAR XP
     user.xp = (user.xp || 0) + xpGain;
     user.totalXpEarned = (user.totalXpEarned || 0) + xpGain;
 
@@ -181,8 +174,6 @@ export async function POST(request) {
     if (newLevel > oldLevel) {
       user.level = newLevel;
       leveledUp = true;
-
-      // 🔥 BÔNUS DE FICHAS POR SUBIR DE NÍVEL
       const levelBonus = newLevel * 100;
       user.chips = (user.chips || 0) + levelBonus;
     }
@@ -199,7 +190,6 @@ export async function POST(request) {
           if (!user.achievements.find((a) => a === ach.id)) {
             user.achievements.push(ach.id);
             unlockedAchievements.push(ach);
-            // 🔥 BÔNUS XP POR CONQUISTA
             if (ach.xpBonus) {
               user.xp = (user.xp || 0) + ach.xpBonus;
             }
@@ -228,30 +218,10 @@ export async function POST(request) {
       // Módulo findings não existe
     }
 
-    // 🔥 SALVAR HISTÓRICO DA MÃO (para gráficos e estatísticas)
-    if (result === "win" || result === "loss" || result === "tie") {
-      const handEntry = {
-        result: result,
-        playerHand: normalizedHandName || "Carta Alta",
-        cpuHand: "CPU", // Será substituído pelo histórico real
-        pot: chips || 0,
-        chipsWon: result === "win" ? chips : 0,
-        chipsLost: result === "loss" ? chips : 0,
-        wasAllIn: wasAllIn || false,
-        timestamp: new Date().toISOString(),
-        // 🔥 NOVOS CAMPOS PARA ESTATÍSTICAS AVANÇADAS
-        handType: normalizedHandName || "Carta Alta",
-        chipsChange: chipsChange,
-      };
+    // 🔥 🔥 🔥 REMOVIDO: SALVAR HISTÓRICO AQUI - Agora só o save-hand-history faz isso
+    // O histórico agora é salvo APENAS pelo save-hand-history/route.js
 
-      // Adicionar ao histórico (limitado a 100 entradas)
-      user.handHistory.unshift(handEntry);
-      if (user.handHistory.length > 100) {
-        user.handHistory = user.handHistory.slice(0, 100);
-      }
-    }
-
-    // 🔥 SALVAR STREAK HISTORY (para gráfico de streaks)
+    // 🔥 SALVAR STREAK HISTORY
     if (!user.stats.streakHistory) {
       user.stats.streakHistory = [];
     }
@@ -267,10 +237,8 @@ export async function POST(request) {
 
     await user.save();
 
-    // 🔥 CALCULAR INFORMAÇÕES DO NÍVEL ATUAL
     const currentLevelInfo = calculateLevel(user.xp || 0);
 
-    // 🔥 RESPONSE COM TODOS OS DADOS
     const response = {
       success: true,
       stats: user.stats,
@@ -284,7 +252,6 @@ export async function POST(request) {
       xpGain: xpGain,
       newAchievements: unlockedAchievements,
       newFindings: unlockedFindings,
-      // 🔥 DADOS ADICIONAIS
       chips: user.chips || 0,
       totalChipsWon: user.stats.totalChipsWon || 0,
     };

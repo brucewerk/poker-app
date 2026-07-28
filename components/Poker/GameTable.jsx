@@ -1,4 +1,4 @@
-// components/Poker/GameTable.jsx - CORREÇÃO DO NOME DO JOGADOR
+// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO
 "use client";
 
 import { useState, useEffect, useMemo, memo, useRef } from "react";
@@ -23,7 +23,7 @@ const GameTable = memo(function GameTable({
   multiplayerPlayers,
   currentPlayerIndex,
   onSwitchPlayer,
-  currentUser, // 🔥 NOVO: Receber o usuário atual
+  currentUser,
 }) {
   const [potAnimationKey, setPotAnimationKey] = useState(0);
   const [showPotEffect, setShowPotEffect] = useState(false);
@@ -88,6 +88,7 @@ const GameTable = memo(function GameTable({
       chips.push(
         <motion.div
           key={`chip-${chipKeyCounter.current}-${i}`}
+          className="game-table-chip"
           initial={{ scale: 0, rotate: 0, y: -20 }}
           animate={{
             scale: 1,
@@ -111,7 +112,6 @@ const GameTable = memo(function GameTable({
 
   const shouldRenderChips = pot > 0 && pot < 5000;
 
-  // 🔥 DETERMINAR O NOME DO JOGADOR
   const playerDisplayName = useMemo(() => {
     if (isMultiplayer && multiplayerPlayers && multiplayerPlayers.length > 0) {
       return (
@@ -123,18 +123,19 @@ const GameTable = memo(function GameTable({
 
   return (
     <motion.div
+      className="game-table-container"
       style={tableContainerStyle()}
       variants={tableGlowVariants}
       animate={tableState}
       initial="idle"
     >
-      <div style={tableFeltStyle()}>
+      <div className="game-table-felt" style={tableFeltStyle()}>
         {/* Área do dealer */}
-        <div style={dealerAreaStyle()}>
+        <div className="game-table-dealer" style={dealerAreaStyle()}>
           <motion.span
-            style={dealerLabelStyle()}
+            className="game-table-dealer-text"
             animate={{
-              opacity: [0.7, 1, 0.7],
+              opacity: [0.7, 0.9, 0.7],
               scale: [1, 1.05, 1],
             }}
             transition={{ duration: 2, repeat: Infinity }}
@@ -144,11 +145,14 @@ const GameTable = memo(function GameTable({
         </div>
 
         {/* Cartas da CPU */}
-        <div style={cpuAreaStyle()}>
-          <div style={playerLabelStyle()}>
-            🤖 CPU
+        <div
+          className="game-table-player-area game-table-player-area-cpu"
+          style={cpuAreaStyle()}
+        >
+          <div className="game-table-player-label">
+            <span className="game-table-player-label-text">🤖 CPU</span>
             <motion.span
-              style={chipsLabelStyle()}
+              className="game-table-chips-label"
               key={`cpu-bet-${cpuBet}-${Date.now()}`}
               initial={{ scale: 1 }}
               animate={{ scale: cpuBet > 0 ? [1, 1.2, 1] : 1 }}
@@ -157,7 +161,7 @@ const GameTable = memo(function GameTable({
               💰 {cpuBet}
             </motion.span>
           </div>
-          <div style={cardsRowStyle()}>
+          <div className="game-table-cards-row">
             {cpuCards && cpuCards.length > 0 ? (
               cpuCards.map((card, i) => (
                 <Card
@@ -170,12 +174,12 @@ const GameTable = memo(function GameTable({
                 />
               ))
             ) : (
-              <span style={emptyCardsStyle()}>Aguardando...</span>
+              <span className="game-table-empty-cards-text">🔒 ???</span>
             )}
           </div>
           {cpuHandName && (
             <motion.div
-              style={handBadgeStyle()}
+              className="game-table-hand-badge game-table-hand-badge-cpu"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 300 }}
@@ -185,22 +189,22 @@ const GameTable = memo(function GameTable({
           )}
           {cpuThought && (
             <motion.div
-              style={thoughtBubbleStyle()}
+              className="game-table-cpu-thought"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <span style={{ opacity: 0.5 }}>💭</span> {cpuThought}
+              <span className="game-table-thought-icon">💭</span> {cpuThought}
             </motion.div>
           )}
         </div>
 
         {/* Cartas comunitárias */}
-        <div style={communityAreaStyle()}>
-          <div style={communityLabelStyle()}>
-            🔥 MESA
+        <div className="game-table-community-area" style={communityAreaStyle()}>
+          <div className="game-table-community-label-wrapper">
+            <span className="game-table-community-label">🔥 MESA</span>
             <motion.span
-              style={stageBadgeStyle()}
+              className="game-table-stage-badge"
               key={`stage-${stage}`}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -219,7 +223,7 @@ const GameTable = memo(function GameTable({
                         : stage}
             </motion.span>
           </div>
-          <div style={communityCardsRowStyle()}>
+          <div className="game-table-community-cards-row">
             {communityCards && communityCards.length > 0
               ? communityCards.map((card, i) => (
                   <motion.div
@@ -243,14 +247,19 @@ const GameTable = memo(function GameTable({
               : Array(5)
                   .fill(0)
                   .map((_, i) => (
-                    <div key={`empty-${i}`} style={emptyCardSlotStyle()} />
+                    <div
+                      key={`empty-${i}`}
+                      className="game-table-empty-card"
+                      style={emptyCardSlotStyle()}
+                    />
                   ))}
           </div>
 
           {/* Área do pote */}
-          <div style={potAreaStyle()}>
+          <div className="game-table-pot-area">
             <motion.div
               key={`pot-${potAnimationKey}`}
+              className="game-table-pot"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{
                 scale: showPotEffect ? 1.1 : 1,
@@ -264,7 +273,7 @@ const GameTable = memo(function GameTable({
               style={potDisplayStyle()}
             >
               <motion.span
-                style={{ color: "gold", fontWeight: "bold" }}
+                className="game-table-pot-text"
                 animate={{
                   scale: showPotEffect ? [1, 1.15, 1] : 1,
                 }}
@@ -273,15 +282,15 @@ const GameTable = memo(function GameTable({
                 💰 Pote: ${pot}
               </motion.span>
               {shouldRenderChips && (
-                <div style={chipContainerStyle()}>{renderChips}</div>
+                <div className="game-table-chip-container">{renderChips}</div>
               )}
             </motion.div>
           </div>
 
           {/* Apostas atuais */}
-          <div style={betsDisplayStyle()}>
+          <div className="game-table-bets-display">
             <motion.span
-              style={betDisplayStyle(true)}
+              className="game-table-bet game-table-bet-player"
               key={`player-bet-${playerBet}`}
               initial={{ scale: 1 }}
               animate={{ scale: playerBet > 0 ? [1, 1.1, 1] : 1 }}
@@ -290,7 +299,7 @@ const GameTable = memo(function GameTable({
               👤 ${playerBet}
             </motion.span>
             <motion.span
-              style={betDisplayStyle(false)}
+              className="game-table-bet game-table-bet-cpu"
               key={`cpu-bet-${cpuBet}`}
               initial={{ scale: 1 }}
               animate={{ scale: cpuBet > 0 ? [1, 1.1, 1] : 1 }}
@@ -299,18 +308,23 @@ const GameTable = memo(function GameTable({
               🤖 ${cpuBet}
             </motion.span>
             {currentBet > 0 && (
-              <span style={currentBetStyle()}>📊 Aposta: ${currentBet}</span>
+              <span className="game-table-current-bet">
+                📊 Aposta: ${currentBet}
+              </span>
             )}
           </div>
         </div>
 
-        {/* 🔥 CARTAS DO JOGADOR - CORRIGIDO */}
-        <div style={playerAreaStyle()}>
-          <div style={playerLabelStyle()}>
+        {/* Cartas do jogador */}
+        <div
+          className="game-table-player-area game-table-player-area-player"
+          style={playerAreaStyle()}
+        >
+          <div className="game-table-player-label">
             🃏{" "}
-            <span style={playerNameHighlightStyle()}>{playerDisplayName}</span>
+            <span className="game-table-player-name">{playerDisplayName}</span>
             <motion.span
-              style={chipsLabelStyle()}
+              className="game-table-chips-label"
               key={`player-bet-label-${playerBet}`}
               initial={{ scale: 1 }}
               animate={{ scale: playerBet > 0 ? [1, 1.2, 1] : 1 }}
@@ -319,12 +333,12 @@ const GameTable = memo(function GameTable({
               💰 {playerBet}
             </motion.span>
             {isMultiplayer && (
-              <span style={playerCounterStyle()}>
+              <span className="game-table-player-counter">
                 {currentPlayerIndex + 1}/{multiplayerPlayers?.length || 1}
               </span>
             )}
           </div>
-          <div style={cardsRowStyle()}>
+          <div className="game-table-cards-row">
             {playerCards && playerCards.length > 0 ? (
               playerCards.map((card, i) => (
                 <Card
@@ -336,12 +350,12 @@ const GameTable = memo(function GameTable({
                 />
               ))
             ) : (
-              <span style={emptyCardsStyle()}>Aguardando...</span>
+              <span className="game-table-empty-cards-text">🔒 ???</span>
             )}
           </div>
           {playerHandName && (
             <motion.div
-              style={handBadgeStyle(true)}
+              className="game-table-hand-badge game-table-hand-badge-player"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 300 }}
@@ -355,12 +369,16 @@ const GameTable = memo(function GameTable({
         {isMultiplayer &&
           multiplayerPlayers &&
           multiplayerPlayers.length > 1 && (
-            <div style={multiplayerControlsStyle()}>
+            <div className="game-table-multiplayer-controls">
               {multiplayerPlayers.map((player, index) => (
                 <motion.button
                   key={`mp-${index}-${player.name}`}
                   onClick={() => onSwitchPlayer?.(index)}
-                  style={multiplayerButtonStyle(index === currentPlayerIndex)}
+                  className={
+                    index === currentPlayerIndex
+                      ? "game-table-multiplayer-btn-active"
+                      : "game-table-multiplayer-btn"
+                  }
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -373,10 +391,10 @@ const GameTable = memo(function GameTable({
         {/* Modo Turbo indicador */}
         {isTurbo && (
           <motion.div
-            style={turboBadgeStyle()}
+            className="game-table-turbo-badge"
             animate={{
-              scale: [1, 1.1, 1],
-              opacity: [0.7, 1, 0.7],
+              scale: [1, 1.05, 1],
+              opacity: [0.7, 0.9, 0.7],
             }}
             transition={{ duration: 1.2, repeat: Infinity }}
           >
@@ -389,6 +407,7 @@ const GameTable = memo(function GameTable({
 });
 
 // ====================== ESTILOS ======================
+
 function tableContainerStyle() {
   return {
     width: "100%",
@@ -396,20 +415,22 @@ function tableContainerStyle() {
     margin: "0 auto",
     padding: "10px",
     borderRadius: 60,
-    background: "radial-gradient(ellipse at center, #1a3a1a, #0a1a0a)",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.8), inset 0 0 40px rgba(0,100,0,0.1)",
+    background: "var(--bg-table)",
+    boxShadow: "var(--table-shadow)",
+    transition: "var(--transition-theme)",
   };
 }
 
 function tableFeltStyle() {
   return {
-    background: "radial-gradient(ellipse at center, #1a6a3a, #0a3a1a)",
+    background: "var(--bg-felt)",
     borderRadius: 50,
     padding: "30px 20px",
     position: "relative",
     minHeight: 500,
-    border: "3px solid #2a2a1a",
-    boxShadow: "inset 0 0 60px rgba(0,0,0,0.5)",
+    border: "3px solid var(--border-felt)",
+    boxShadow: "inset 0 0 60px var(--shadow-felt)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -419,20 +440,13 @@ function dealerAreaStyle() {
     top: 10,
     left: "50%",
     transform: "translateX(-50%)",
-    background: "rgba(255,215,0,0.12)",
+    background: "var(--bg-element)",
     padding: "4px 20px",
     borderRadius: 20,
-    border: "1px solid rgba(255,215,0,0.2)",
+    border: "1px solid var(--border-element)",
     backdropFilter: "blur(4px)",
-  };
-}
-
-function dealerLabelStyle() {
-  return {
-    color: "gold",
-    fontSize: "0.7rem",
-    fontWeight: "bold",
-    letterSpacing: "2px",
+    boxShadow: "0 2px 8px var(--shadow-element)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -441,9 +455,11 @@ function cpuAreaStyle() {
     textAlign: "center",
     marginBottom: "20px",
     padding: "10px",
-    background: "rgba(0,0,0,0.2)",
+    background: "var(--bg-status-item)",
     borderRadius: 20,
-    border: "1px solid rgba(255,255,255,0.05)",
+    border: "1px solid var(--border-element)",
+    boxShadow: "0 2px 8px var(--shadow-element)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -452,9 +468,11 @@ function playerAreaStyle() {
     textAlign: "center",
     marginTop: "20px",
     padding: "10px",
-    background: "rgba(0,0,0,0.2)",
+    background: "var(--bg-status-item)",
     borderRadius: 20,
-    border: "1px solid rgba(255,255,255,0.05)",
+    border: "1px solid var(--border-element)",
+    boxShadow: "0 2px 8px var(--shadow-element)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -462,48 +480,31 @@ function communityAreaStyle() {
   return {
     textAlign: "center",
     padding: "15px",
-    background: "rgba(0,0,0,0.15)",
+    background: "rgba(0, 0, 0, 0.10)",
     borderRadius: 25,
     margin: "10px 0",
-    border: "1px solid rgba(255,215,0,0.08)",
+    border: "1px solid var(--border-gold)",
     position: "relative",
+    transition: "var(--transition-theme)",
   };
 }
 
 function playerLabelStyle() {
   return {
-    color: "#ffefb9",
-    fontSize: "0.8rem",
-    fontWeight: "bold",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "10px",
     flexWrap: "wrap",
-  };
-}
-
-function playerNameHighlightStyle() {
-  return {
-    color: "#4caf50",
-    fontWeight: "bold",
-    fontSize: "0.85rem",
-  };
-}
-
-function chipsLabelStyle() {
-  return {
-    color: "gold",
-    fontSize: "0.7rem",
-    display: "inline-block",
+    transition: "var(--transition-theme)",
   };
 }
 
 function playerCounterStyle() {
   return {
-    color: "#4caf50",
+    color: "var(--green)",
     fontSize: "0.6rem",
-    background: "rgba(76,175,80,0.2)",
+    background: "rgba(76, 175, 80, 0.2)",
     padding: "2px 8px",
     borderRadius: 10,
   };
@@ -534,25 +535,12 @@ function communityCardsRowStyle() {
 
 function communityLabelStyle() {
   return {
-    color: "#aaa",
-    fontSize: "0.7rem",
-    marginBottom: "8px",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     gap: "12px",
     flexWrap: "wrap",
-  };
-}
-
-function stageBadgeStyle() {
-  return {
-    color: "#ffd700",
-    fontSize: "0.6rem",
-    background: "rgba(255,215,0,0.1)",
-    padding: "2px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,215,0,0.15)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -561,41 +549,10 @@ function emptyCardSlotStyle() {
     width: 75,
     height: 105,
     borderRadius: 8,
-    background:
-      "repeating-linear-gradient(45deg, rgba(255,255,255,0.02), rgba(255,255,255,0.02) 10px, rgba(255,255,255,0.005) 10px, rgba(255,255,255,0.005) 20px)",
-    border: "2px dashed rgba(255,255,255,0.05)",
+    background: "var(--bg-empty-card)",
+    border: "2px dashed var(--border-empty-card)",
     margin: "0 3px",
-  };
-}
-
-function handBadgeStyle(isPlayer = false) {
-  return {
-    background: isPlayer ? "rgba(76,175,80,0.15)" : "rgba(255,152,0,0.15)",
-    borderRadius: 20,
-    padding: "4px 14px",
-    fontSize: "0.7rem",
-    marginTop: "6px",
-    display: "inline-block",
-    color: isPlayer ? "#4caf50" : "#ff9800",
-    fontWeight: "bold",
-    border: `1px solid ${isPlayer ? "rgba(76,175,80,0.2)" : "rgba(255,152,0,0.2)"}`,
-    backdropFilter: "blur(4px)",
-  };
-}
-
-function thoughtBubbleStyle() {
-  return {
-    background: "rgba(26,26,10,0.8)",
-    borderRadius: 20,
-    padding: "4px 14px",
-    fontSize: "0.65rem",
-    marginTop: "4px",
-    display: "inline-block",
-    color: "#ccaa66",
-    fontStyle: "italic",
-    border: "1px solid rgba(255,215,0,0.08)",
-    maxWidth: "90%",
-    backdropFilter: "blur(4px)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -608,18 +565,20 @@ function potAreaStyle() {
 
 function potDisplayStyle() {
   return {
-    color: "gold",
+    color: "var(--text-white)",
     fontSize: "1rem",
     fontWeight: "bold",
-    background: "rgba(0,0,0,0.25)",
+    background: "var(--bg-pot)",
     padding: "8px 20px",
     borderRadius: 20,
     display: "inline-block",
     position: "relative",
-    border: "1px solid rgba(255,215,0,0.1)",
+    border: "1px solid var(--border-gold)",
     backdropFilter: "blur(4px)",
     minWidth: "120px",
     textAlign: "center",
+    boxShadow: "0 2px 8px var(--shadow-element)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -647,7 +606,7 @@ function chipStyle(index) {
     borderRadius: "50%",
     background: `radial-gradient(circle at 35% 35%, ${color}, ${adjustColor(color, -50)})`,
     border: "2px solid rgba(255,255,255,0.15)",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+    boxShadow: "0 2px 6px var(--shadow-chip)",
   };
 }
 
@@ -655,38 +614,11 @@ function betsDisplayStyle() {
   return {
     display: "flex",
     justifyContent: "center",
-    gap: "20px",
+    gap: "12px",
     marginTop: "8px",
     fontSize: "0.7rem",
-    color: "#aaa",
     flexWrap: "wrap",
-  };
-}
-
-function betDisplayStyle(isPlayer) {
-  return {
-    color: isPlayer ? "#4caf50" : "#ff9800",
-    fontWeight: "bold",
-    background: "rgba(0,0,0,0.15)",
-    padding: "2px 12px",
-    borderRadius: 12,
-  };
-}
-
-function currentBetStyle() {
-  return {
-    color: "#ffd700",
-    fontWeight: "bold",
-    background: "rgba(255,215,0,0.05)",
-    padding: "2px 12px",
-    borderRadius: 12,
-  };
-}
-
-function emptyCardsStyle() {
-  return {
-    color: "#666",
-    fontSize: "0.8rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -702,31 +634,20 @@ function multiplayerControlsStyle() {
 
 function multiplayerButtonStyle(isActive) {
   return {
-    background: isActive ? "rgba(255,215,0,0.15)" : "rgba(255,255,255,0.03)",
-    border: isActive ? "1px solid gold" : "1px solid rgba(255,255,255,0.05)",
-    color: isActive ? "gold" : "#888",
+    background: isActive ? "var(--bg-element)" : "var(--bg-element)",
+    border: isActive
+      ? "1px solid var(--border-gold)"
+      : "1px solid var(--border-element)",
+    color: "var(--text-white)",
     padding: "4px 12px",
     borderRadius: 20,
     cursor: "pointer",
     fontSize: "0.7rem",
+    boxShadow: isActive
+      ? "0 2px 8px var(--shadow-element)"
+      : "0 2px 6px var(--shadow-element)",
     transition: "all 0.3s ease",
-  };
-}
-
-function turboBadgeStyle() {
-  return {
-    position: "absolute",
-    top: "50%",
-    right: 20,
-    transform: "translateY(-50%)",
-    color: "#ff9800",
-    fontSize: "0.8rem",
-    fontWeight: "bold",
-    background: "rgba(255,152,0,0.12)",
-    padding: "4px 14px",
-    borderRadius: 20,
-    border: "1px solid rgba(255,152,0,0.2)",
-    backdropFilter: "blur(4px)",
+    opacity: isActive ? 0.95 : 0.7,
   };
 }
 

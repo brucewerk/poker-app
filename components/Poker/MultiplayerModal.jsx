@@ -1,4 +1,4 @@
-// components/Poker/MultiplayerModal.jsx
+// components/Poker/MultiplayerModal.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
 "use client";
 
 import { useState } from "react";
@@ -51,7 +51,7 @@ export default function MultiplayerModal({ onStart, onClose }) {
         </div>
 
         <div style={infoStyle()}>
-          <p>📌 Como funciona:</p>
+          <p style={infoTitleStyle()}>📌 Como funciona:</p>
           <ul style={listStyle()}>
             <li>Os jogadores alternam turnos</li>
             <li>Cada um vê suas cartas</li>
@@ -84,14 +84,15 @@ function overlayStyle() {
 
 function modalStyle() {
   return {
-    background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
+    background: "var(--bg-modal)",
     padding: "30px 40px",
     borderRadius: 30,
     maxWidth: 450,
     width: "100%",
-    color: "white",
-    border: "2px solid gold",
+    color: "var(--text-primary)",
+    border: "2px solid var(--border-gold)",
     position: "relative",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -102,27 +103,30 @@ function closeButtonStyle() {
     right: 20,
     background: "none",
     border: "none",
-    color: "white",
+    color: "var(--text-primary)",
     fontSize: "1.5rem",
     cursor: "pointer",
+    transition: "var(--transition-theme)",
   };
 }
 
 function titleStyle() {
   return {
     textAlign: "center",
-    color: "gold",
+    color: "var(--text-primary)",
     margin: "0 0 5px",
     fontSize: "1.8rem",
+    transition: "var(--transition-theme)",
   };
 }
 
 function subtitleStyle() {
   return {
     textAlign: "center",
-    color: "#aaa",
+    color: "var(--text-muted)",
     marginBottom: "20px",
     fontSize: "0.9rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -145,9 +149,10 @@ function inputGroupStyle() {
 
 function labelStyle() {
   return {
-    color: "#ffefb9",
+    color: "var(--text-secondary)",
     fontSize: "0.9rem",
     fontWeight: "bold",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -155,10 +160,11 @@ function inputStyle() {
   return {
     padding: "10px 15px",
     borderRadius: 15,
-    border: "1px solid rgba(255,215,0,0.3)",
-    background: "rgba(0,0,0,0.3)",
-    color: "white",
+    border: "1px solid var(--border-input)",
+    background: "var(--bg-input)",
+    color: "var(--text-primary)",
     fontSize: "1rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -172,12 +178,22 @@ function infoStyle() {
   };
 }
 
+function infoTitleStyle() {
+  return {
+    color: "var(--text-primary)",
+    margin: "0 0 8px 0",
+    fontWeight: "bold",
+    transition: "var(--transition-theme)",
+  };
+}
+
 function listStyle() {
   return {
-    color: "#ccc",
+    color: "var(--text-secondary)",
     fontSize: "0.85rem",
     paddingLeft: "20px",
     margin: "5px 0",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -193,5 +209,6 @@ function buttonStyle() {
     boxShadow: "0 4px 0 #7a4c1a",
     color: "#2e241f",
     width: "100%",
+    transition: "all 0.3s ease",
   };
 }

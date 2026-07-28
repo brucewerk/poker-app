@@ -1,4 +1,4 @@
-// components/Poker/StatsPanel.jsx - CORRIGIDO
+// components/Poker/StatsPanel.jsx - COMPLETO COM TÍTULO PADRONIZADO
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -191,7 +191,20 @@ export default function StatsPanel({
   if (!username || error) {
     return (
       <div style={panelStyle()}>
-        <h3 style={titleStyle()}>📊 ESTATÍSTICAS</h3>
+        <h3
+          className="card-title"
+          style={{
+            color: "gold",
+            margin: "0 0 10px",
+            fontSize: "1rem",
+            fontWeight: "700",
+            borderBottom: "2px solid var(--border-gold)",
+            paddingBottom: 8,
+            transition: "var(--transition-theme)",
+          }}
+        >
+          📊 ESTATÍSTICAS
+        </h3>
         <p style={textStyle()}>
           Jogue algumas mãos para ver suas estatísticas!
         </p>
@@ -202,7 +215,20 @@ export default function StatsPanel({
   if (loading) {
     return (
       <div style={panelStyle()}>
-        <h3 style={titleStyle()}>📊 ESTATÍSTICAS</h3>
+        <h3
+          className="card-title"
+          style={{
+            color: "gold",
+            margin: "0 0 10px",
+            fontSize: "1rem",
+            fontWeight: "700",
+            borderBottom: "2px solid var(--border-gold)",
+            paddingBottom: 8,
+            transition: "var(--transition-theme)",
+          }}
+        >
+          📊 ESTATÍSTICAS
+        </h3>
         <p style={textStyle()}>Carregando...</p>
       </div>
     );
@@ -211,7 +237,20 @@ export default function StatsPanel({
   if (!stats || stats.handsPlayed === 0) {
     return (
       <div style={panelStyle()}>
-        <h3 style={titleStyle()}>📊 ESTATÍSTICAS</h3>
+        <h3
+          className="card-title"
+          style={{
+            color: "gold",
+            margin: "0 0 10px",
+            fontSize: "1rem",
+            fontWeight: "700",
+            borderBottom: "2px solid var(--border-gold)",
+            paddingBottom: 8,
+            transition: "var(--transition-theme)",
+          }}
+        >
+          📊 ESTATÍSTICAS
+        </h3>
         <p style={textStyle()}>
           Jogue algumas mãos para ver suas estatísticas!
         </p>
@@ -229,7 +268,20 @@ export default function StatsPanel({
   return (
     <div style={panelStyle()}>
       <div style={headerStyle()}>
-        <h3 style={titleStyle()}>📊 ESTATÍSTICAS</h3>
+        <h3
+          className="card-title"
+          style={{
+            color: "gold",
+            margin: "0 0 10px",
+            fontSize: "1rem",
+            fontWeight: "700",
+            borderBottom: "2px solid var(--border-gold)",
+            paddingBottom: 8,
+            transition: "var(--transition-theme)",
+          }}
+        >
+          📊 ESTATÍSTICAS
+        </h3>
         <button
           onClick={() => setShowDetails(!showDetails)}
           style={toggleButtonStyle()}
@@ -412,6 +464,7 @@ function panelStyle() {
     color: "var(--text-primary)",
     border: "1px solid var(--border-gold)",
     transition: "var(--transition-theme)",
+    boxShadow: "var(--shadow-dark)",
   };
 }
 
@@ -420,14 +473,7 @@ function headerStyle() {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-  };
-}
-
-function titleStyle() {
-  return {
-    color: "gold",
-    margin: "0 0 10px",
-    fontSize: "1rem",
+    marginBottom: "10px",
   };
 }
 
@@ -439,6 +485,7 @@ function toggleButtonStyle() {
     fontSize: "1.2rem",
     cursor: "pointer",
     padding: "0 5px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -448,6 +495,7 @@ function textStyle() {
     color: "var(--text-secondary)",
     padding: "10px 0",
     fontSize: "0.85rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -461,10 +509,12 @@ function statsGridStyle() {
 
 function statItemStyle() {
   return {
-    background: "rgba(255,255,255,0.05)",
+    background: "var(--bg-status-item, rgba(255,255,255,0.05))",
     padding: "8px",
     borderRadius: 10,
     textAlign: "center",
+    border: "1px solid var(--border-light)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -474,6 +524,8 @@ function statLabelStyle() {
     fontSize: "0.7rem",
     color: "var(--text-muted)",
     marginBottom: "2px",
+    fontWeight: "600",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -483,6 +535,7 @@ function statValueStyle(color = "gold") {
     fontSize: "1.1rem",
     fontWeight: "bold",
     color: color,
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -492,6 +545,7 @@ function detailsStyle() {
     padding: "10px",
     background: "rgba(0,0,0,0.3)",
     borderRadius: 10,
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -503,6 +557,7 @@ function detailRowStyle() {
     fontSize: "0.85rem",
     color: "var(--text-secondary)",
     borderBottom: "1px solid rgba(255,255,255,0.05)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -539,6 +594,7 @@ function advancedStatsStyle() {
     padding: "8px",
     background: "rgba(0,0,0,0.2)",
     borderRadius: 10,
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -609,6 +665,7 @@ function chartTitleStyle() {
     color: "var(--text-muted)",
     marginBottom: "6px",
     textAlign: "center",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -734,6 +791,7 @@ function achievementHeaderStyle() {
     alignItems: "center",
     fontSize: "0.85rem",
     color: "var(--text-secondary)",
+    transition: "var(--transition-theme)",
   };
 }
 

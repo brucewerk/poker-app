@@ -1,4 +1,4 @@
-// components/Poker/HandHistory.jsx - CORRIGIDO
+// components/Poker/HandHistory.jsx - CORRIGIDO (SEM DUPLICAÇÃO)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -12,9 +12,18 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
   const intervalRef = useRef(null);
   const mountedRef = useRef(true);
   const isFetchingRef = useRef(false);
+  const lastFetchRef = useRef(0);
 
   const fetchHistory = async (silent = false) => {
     if (!username || !mountedRef.current || isFetchingRef.current) return;
+
+    // 🔥 EVITAR FETCH DUPLICADO NO MESMO SEGUNDO
+    const now = Date.now();
+    if (now - lastFetchRef.current < 1000) {
+      console.log("⏳ Fetch muito rápido, ignorando...");
+      return;
+    }
+    lastFetchRef.current = now;
 
     try {
       isFetchingRef.current = true;
@@ -26,11 +35,29 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
       const data = await res.json();
 
       if (data.success && mountedRef.current) {
-        setHistory(data.history || []);
-        setTotal(data.total || 0);
+        // 🔥 GARANTIR QUE NÃO HÁ DUPLICATAS
+        const historyData = data.history || [];
+
+        // Remover duplicatas baseado em timestamp (se existir)
+        const uniqueHistory = historyData.filter((hand, index, self) => {
+          // Se tiver ID, usar ID
+          if (hand.id) {
+            return index === self.findIndex((h) => h.id === hand.id);
+          }
+          // Se não tiver ID, usar timestamp + resultado + pote como chave
+          const key = `${hand.timestamp}_${hand.result}_${hand.pot}`;
+          return (
+            index ===
+            self.findIndex((h) => `${h.timestamp}_${h.result}_${h.pot}` === key)
+          );
+        });
+
+        setHistory(uniqueHistory);
+        setTotal(uniqueHistory.length || 0);
+
         if (!silent) {
           console.log(
-            `📜 [HISTORY] Carregadas ${data.history?.length || 0} partidas (total: ${data.total || 0})`,
+            `📜 [HISTORY] Carregadas ${uniqueHistory.length} partidas (total: ${data.total || 0})`,
           );
         }
       }
@@ -65,7 +92,8 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
         setHistory([]);
         setTotal(0);
         alert("✅ Histórico limpo com sucesso!");
-        setTimeout(() => fetchHistory(), 500);
+        // 🔥 RECARREGAR APÓS LIMPAR
+        setTimeout(() => fetchHistory(false), 500);
       }
     } catch (error) {
       console.error("Erro ao limpar histórico:", error);
@@ -75,20 +103,26 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
     }
   };
 
+  // 🔥 EFETUAR FETCH INICIAL E CONFIGURAR INTERVALO
   useEffect(() => {
     mountedRef.current = true;
 
     if (username) {
-      fetchHistory();
+      // 🔥 FETCH INICIAL (SEM SILÊNCIO)
+      fetchHistory(false);
+
+      // 🔥 CONFIGURAR INTERVALO (COM SILÊNCIO)
       intervalRef.current = setInterval(() => {
         if (isResultModalOpen) {
           console.log("🔍 [HISTORY] Pausado - Modal aberto");
           return;
         }
         if (username && mountedRef.current) {
-          fetchHistory(true);
+          fetchHistory(true); // 🔥 TRUE = SILENCIOSO
         }
-      }, 10000);
+      }, 15000); // 🔥 15 SEGUNDOS EM VEZ DE 10
+    } else {
+      setLoading(false);
     }
 
     return () => {
@@ -99,6 +133,17 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
       }
     };
   }, [username, isResultModalOpen]);
+
+  // 🔥 RECARREGAR QUANDO O MODAL DE RESULTADO FECHAR
+  useEffect(() => {
+    if (!isResultModalOpen && username && mountedRef.current) {
+      // 🔥 PEQUENO DELAY PARA EVITAR CONFLITOS
+      const timer = setTimeout(() => {
+        fetchHistory(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isResultModalOpen]);
 
   if (loading) {
     return (
@@ -145,11 +190,13 @@ export default function HandHistory({ username, isResultModalOpen = false }) {
                 : "#f44336";
             const resultIcon = isWin ? "🏆" : isTie ? "🤝" : "💔";
 
+            // 🔥 CHAVE ÚNICA PARA CADA ITEM
+            const uniqueKey = hand.id
+              ? `hand-${hand.id}`
+              : `hand-${index}-${hand.timestamp || Date.now()}`;
+
             return (
-              <div
-                key={`hand-${index}-${hand.timestamp}-${hand.result}`}
-                style={historyItemStyle(isWin, isTie)}
-              >
+              <div key={uniqueKey} style={historyItemStyle(isWin, isTie)}>
                 <div style={historyHeaderStyle()}>
                   <span style={historyResultStyle(resultColor)}>
                     {resultIcon} {hand.result?.toUpperCase() || "—"}
@@ -209,9 +256,13 @@ function panelStyle() {
 
 function titleStyle() {
   return {
-    color: "gold",
+    color: "var(--text-primary)",
     margin: "0 0 10px",
     fontSize: "1rem",
+    fontWeight: "700",
+    borderBottom: "2px solid var(--border-gold)",
+    paddingBottom: 8,
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -235,6 +286,7 @@ function countStyle() {
   return {
     fontSize: "0.7rem",
     color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -255,6 +307,7 @@ function emptyStyle() {
     color: "var(--text-muted)",
     fontSize: "0.85rem",
     padding: "10px 0",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -305,6 +358,7 @@ function historyHandStyle() {
   return {
     fontSize: "0.75rem",
     color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -316,6 +370,7 @@ function historyDetailStyle() {
     color: "var(--text-muted)",
     marginTop: "2px",
     alignItems: "center",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -338,6 +393,7 @@ function historyTimeStyle() {
     marginLeft: "auto",
     color: "var(--text-muted)",
     fontSize: "0.6rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -347,6 +403,7 @@ function moreStyle() {
     fontSize: "0.65rem",
     color: "var(--text-muted)",
     padding: "4px",
+    transition: "var(--transition-theme)",
   };
 }
 

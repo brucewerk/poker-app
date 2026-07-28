@@ -1,4 +1,4 @@
-// components/Poker/OnlineGame.jsx - COMPLETO CORRIGIDO
+// components/Poker/OnlineGame.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -349,8 +349,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     console.log(`✅ Ready toggled para: ${newReadyState}`);
   }, [socket, roomId, playerName, isReady]);
 
-  // components/Poker/OnlineGame.jsx - PARTE MODIFICADA (localize a função leaveRoom)
-
   // 🔥 SAIR DA SALA
   const leaveRoom = useCallback(async () => {
     if (isLeaving) return;
@@ -360,8 +358,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
 
     if (socket) {
       socket.emit("leave-room", { roomId });
-
-      // 🔥 Emitir evento adicional para garantir que o FriendsList reset
       socket.emit("player-left-room", {
         roomId: roomId,
         playerName: playerName,
@@ -415,7 +411,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           <div style={resultPotStyle()}>💰 Pote: {resultData.pot} fichas</div>
 
           <div style={resultCommunityStyle()}>
-            <span style={{ color: "#888", marginRight: "10px" }}>
+            <span style={{ color: "var(--text-muted)", marginRight: "10px" }}>
               Cartas da mesa:
             </span>
             {resultData.communityCards &&
@@ -424,7 +420,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
                 <CardDisplay key={i} card={card} />
               ))
             ) : (
-              <span style={{ color: "#666" }}>(nenhuma)</span>
+              <span style={{ color: "var(--text-muted)" }}>(nenhuma)</span>
             )}
           </div>
 
@@ -453,10 +449,10 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           </div>
 
           <div style={resultStatusStyle()}>
-            <span style={{ color: "#888", fontSize: "0.85rem" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
               👥 {closed}/{total} jogadores já fecharam
             </span>
-            <span style={{ color: "#666", fontSize: "0.75rem" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>
               ⏳ Fechamento automático em 25s
             </span>
           </div>
@@ -631,7 +627,11 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
 
         <div style={communityStyle()}>
           <span
-            style={{ color: "#888", fontSize: "0.8rem", marginRight: "10px" }}
+            style={{
+              color: "var(--text-muted)",
+              fontSize: "0.8rem",
+              marginRight: "10px",
+            }}
           >
             Mesa:
           </span>
@@ -640,7 +640,9 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
               <CardDisplay key={i} card={card} />
             ))
           ) : (
-            <span style={{ color: "#666" }}>Aguardando cartas...</span>
+            <span style={{ color: "var(--text-muted)" }}>
+              Aguardando cartas...
+            </span>
           )}
         </div>
 
@@ -667,7 +669,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
                       <CardDisplay key={i} card={card} faceDown={!isCurrent} />
                     ))
                   ) : (
-                    <span style={{ color: "#666" }}>🔒</span>
+                    <span style={{ color: "var(--text-muted)" }}>🔒</span>
                   )}
                 </div>
                 <div style={playerChipsStyle()}>💰 {player.chips}</div>
@@ -778,26 +780,28 @@ function resultOverlayStyle() {
 
 function resultModalStyle() {
   return {
-    background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
+    background: "var(--bg-modal)",
     padding: "30px 40px",
     borderRadius: 30,
     maxWidth: 500,
     width: "100%",
-    color: "white",
-    border: "3px solid gold",
+    color: "var(--text-primary)",
+    border: "3px solid var(--border-gold)",
     maxHeight: "80vh",
     overflowY: "auto",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+    boxShadow: "0 20px 60px var(--shadow-dark)",
+    transition: "var(--transition-theme)",
   };
 }
 
 function resultTitleStyle() {
   return {
     textAlign: "center",
-    color: "gold",
+    color: "var(--text-primary)",
     margin: "0 0 15px",
     fontSize: "1.8rem",
     fontWeight: "800",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -844,15 +848,17 @@ function resultPlayerItemStyle(isWinner) {
 function resultPlayerNameStyle(isWinner) {
   return {
     fontWeight: "bold",
-    color: isWinner ? "gold" : "#fff",
+    color: isWinner ? "gold" : "var(--text-primary)",
     fontSize: "1rem",
+    transition: "var(--transition-theme)",
   };
 }
 
 function resultPlayerHandStyle(isWinner) {
   return {
-    color: isWinner ? "#4caf50" : "#aaa",
+    color: isWinner ? "#4caf50" : "var(--text-muted)",
     fontSize: "0.9rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -939,8 +945,9 @@ function resultHintStyle() {
   return {
     textAlign: "center",
     fontSize: "0.75rem",
-    color: "#888",
+    color: "var(--text-muted)",
     marginTop: "10px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -957,31 +964,33 @@ function resultLockedStyle() {
 
 function lobbyStyle() {
   return {
-    background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
+    background: "var(--bg-modal)",
     borderRadius: 30,
     padding: "20px",
     minHeight: "400px",
-    color: "white",
+    color: "var(--text-primary)",
     position: "fixed",
     inset: 0,
     zIndex: 1000,
     margin: 20,
     overflowY: "auto",
+    transition: "var(--transition-theme)",
   };
 }
 
 function gameStyle() {
   return {
-    background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
+    background: "var(--bg-modal)",
     borderRadius: 30,
     padding: "20px",
     minHeight: "500px",
-    color: "white",
+    color: "var(--text-primary)",
     position: "fixed",
     inset: 0,
     zIndex: 1000,
     margin: 20,
     overflowY: "auto",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -998,9 +1007,10 @@ function headerStyle() {
 
 function titleStyle() {
   return {
-    color: "gold",
+    color: "var(--text-primary)",
     margin: 0,
     fontSize: "1.5rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1010,7 +1020,7 @@ function leaveButtonStyle() {
     border: "1px solid #f44336",
     borderRadius: 20,
     padding: "8px 16px",
-    color: "white",
+    color: "var(--text-primary)",
     cursor: "pointer",
     transition: "all 0.3s ease",
   };
@@ -1052,7 +1062,8 @@ function playersListTitleStyle() {
   return {
     margin: "0 0 12px 0",
     fontSize: "1rem",
-    color: "#aaa",
+    color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1060,7 +1071,8 @@ function emptyPlayersStyle() {
   return {
     textAlign: "center",
     padding: "30px 0",
-    color: "#666",
+    color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1081,6 +1093,8 @@ function playerNameTextStyle() {
   return {
     fontWeight: "bold",
     fontSize: "0.95rem",
+    color: "var(--text-primary)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1095,7 +1109,8 @@ function youBadgeStyle() {
 function playerStatusStyle(isReady) {
   return {
     fontSize: "0.8rem",
-    color: isReady ? "#4caf50" : "#888",
+    color: isReady ? "#4caf50" : "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1149,8 +1164,9 @@ function spinnerStyle() {
 function infoStyle() {
   return {
     textAlign: "center",
-    color: "#aaa",
+    color: "var(--text-muted)",
     marginTop: "15px",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1164,8 +1180,9 @@ function waitingHintStyle() {
     background: "rgba(255,215,0,0.05)",
     borderRadius: 10,
     marginTop: "10px",
-    color: "#888",
+    color: "var(--text-muted)",
     fontSize: "0.85rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1183,6 +1200,8 @@ function potStyle() {
     textAlign: "center",
     fontSize: "1.3rem",
     marginBottom: "15px",
+    color: "var(--text-primary)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1232,6 +1251,8 @@ function playerNameGameStyle() {
     fontWeight: "bold",
     marginBottom: "8px",
     fontSize: "0.9rem",
+    color: "var(--text-primary)",
+    transition: "var(--transition-theme)",
   };
 }
 
