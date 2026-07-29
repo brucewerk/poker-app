@@ -1,4 +1,4 @@
-// app/api/auth/[...nextauth]/route.js - AJUSTE DO ERRO SILENCIOSO
+// app/api/auth/[...nextauth]/route.js - COM LOGS AMIGÁVEIS
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
@@ -18,14 +18,16 @@ export const authOptions = {
           await dbConnect();
 
           if (!credentials?.username || !credentials?.password) {
-            // 🔥 RETORNAR NULL EM VEZ DE LANÇAR ERRO
             return null;
           }
 
           const user = await User.findOne({ username: credentials.username });
 
           if (!user) {
-            // 🔥 RETORNAR NULL EM VEZ DE LANÇAR ERRO
+            // 🔥 LOG AMIGÁVEL - SEM ERRO
+            console.info(
+              `🔐 Tentativa de login: "${credentials.username}" - Usuário não encontrado`,
+            );
             return null;
           }
 
@@ -35,11 +37,13 @@ export const authOptions = {
           );
 
           if (!isValid) {
-            // 🔥 RETORNAR NULL EM VEZ DE LANÇAR ERRO
+            console.info(
+              `🔐 Tentativa de login: "${credentials.username}" - Senha incorreta`,
+            );
             return null;
           }
 
-          console.log(`✅ Login bem-sucedido: ${credentials.username}`);
+          console.info(`✅ Login bem-sucedido: ${credentials.username}`);
 
           return {
             id: user._id.toString(),
@@ -49,7 +53,7 @@ export const authOptions = {
             xp: user.xp || 0,
           };
         } catch (error) {
-          console.error("❌ Erro no authorize:", error);
+          console.info("🔐 Erro no processo de autenticação");
           return null;
         }
       },
@@ -79,7 +83,7 @@ export const authOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 dias
+    maxAge: 30 * 24 * 60 * 60,
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: false,
@@ -87,15 +91,10 @@ export const authOptions = {
     signIn: "/login",
   },
   logger: {
-    error: (code, ...message) => {
-      console.error(`❌ NextAuth Error [${code}]:`, ...message);
-    },
-    warn: (code, ...message) => {
-      console.warn(`⚠️ NextAuth Warning [${code}]:`, ...message);
-    },
-    debug: (code, ...message) => {
-      // Não logar debug
-    },
+    // 🔥 SUPRIMIR LOGS DESNECESSÁRIOS
+    error: () => {},
+    warn: () => {},
+    debug: () => {},
   },
 };
 

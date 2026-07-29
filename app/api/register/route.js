@@ -1,4 +1,4 @@
-// app/api/register/route.js
+// app/api/register/route.js - COM LOGS AMIGÁVEIS
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/mongoose";
@@ -8,7 +8,6 @@ export async function POST(request) {
   try {
     const { username, password } = await request.json();
 
-    // Validações
     if (!username || !password) {
       return NextResponse.json(
         { success: false, error: "Todos os campos são obrigatórios" },
@@ -32,19 +31,20 @@ export async function POST(request) {
 
     await dbConnect();
 
-    // Verificar se usuário já existe
     const existingUser = await User.findOne({ username });
     if (existingUser) {
+      // 🔥 LOG AMIGÁVEL - SEM ERRO
+      console.info(
+        `📝 Tentativa de registro: "${username}" - Usuário já existe`,
+      );
       return NextResponse.json(
         { success: false, error: "Usuário já existe" },
         { status: 400 },
       );
     }
 
-    // Hash da senha
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 🔥 Criar usuário - SEM EMAIL
     const user = new User({
       username,
       password: hashedPassword,
@@ -70,14 +70,15 @@ export async function POST(request) {
 
     await user.save();
 
-    console.log(`✅ Novo usuário registrado: ${username}`);
+    console.info(`✅ Novo usuário registrado: ${username}`);
 
     return NextResponse.json({
       success: true,
       message: "Usuário criado com sucesso",
     });
   } catch (error) {
-    console.error("Erro no registro:", error);
+    // 🔥 LOG AMIGÁVEL - SEM ERRO
+    console.info("📝 Erro no registro de usuário");
     return NextResponse.json(
       { success: false, error: "Erro ao criar usuário" },
       { status: 500 },

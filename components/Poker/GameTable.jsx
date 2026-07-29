@@ -129,7 +129,7 @@ const GameTable = memo(function GameTable({
       initial="idle"
     >
       <div className="game-table-felt" style={tableFeltStyle()}>
-        {/* Área do dealer */}
+        {/* Área do dealer com Turbo integrado ao lado direito */}
         <div className="game-table-dealer" style={dealerAreaStyle()}>
           <motion.span
             className="game-table-dealer-text"
@@ -141,6 +141,31 @@ const GameTable = memo(function GameTable({
           >
             🎯 DEALER
           </motion.span>
+          {isTurbo && (
+            <motion.span
+              style={{
+                marginLeft: "12px",
+                padding: "2px 12px",
+                borderRadius: "12px",
+                background: "rgba(255, 152, 0, 0.2)",
+                border: "1px solid rgba(255, 152, 0, 0.3)",
+                color: "#ff9800",
+                fontSize: "0.55rem",
+                fontWeight: "700",
+                letterSpacing: "0.5px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+              animate={{
+                scale: [1, 1.08, 1],
+                opacity: [0.7, 1, 0.7],
+              }}
+              transition={{ duration: 1.2, repeat: Infinity }}
+            >
+              🚀 TURBO
+            </motion.span>
+          )}
         </div>
 
         {/* Cartas da CPU */}
@@ -386,20 +411,6 @@ const GameTable = memo(function GameTable({
               ))}
             </div>
           )}
-
-        {/* Modo Turbo indicador */}
-        {isTurbo && (
-          <motion.div
-            className="game-table-turbo-badge"
-            animate={{
-              scale: [1, 1.05, 1],
-              opacity: [0.7, 0.9, 0.7],
-            }}
-            transition={{ duration: 1.2, repeat: Infinity }}
-          >
-            🚀 TURBO
-          </motion.div>
-        )}
       </div>
     </motion.div>
   );
@@ -446,6 +457,9 @@ function dealerAreaStyle() {
     backdropFilter: "blur(4px)",
     boxShadow: "0 2px 8px var(--shadow-element)",
     transition: "var(--transition-theme)",
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
   };
 }
 
@@ -488,61 +502,6 @@ function communityAreaStyle() {
   };
 }
 
-function playerLabelStyle() {
-  return {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px",
-    flexWrap: "wrap",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function playerCounterStyle() {
-  return {
-    color: "var(--green)",
-    fontSize: "0.6rem",
-    background: "rgba(76, 175, 80, 0.2)",
-    padding: "2px 8px",
-    borderRadius: 10,
-  };
-}
-
-function cardsRowStyle() {
-  return {
-    display: "flex",
-    justifyContent: "center",
-    gap: "6px",
-    flexWrap: "wrap",
-    marginTop: "5px",
-    minHeight: 80,
-    alignItems: "center",
-  };
-}
-
-function communityCardsRowStyle() {
-  return {
-    display: "flex",
-    justifyContent: "center",
-    gap: "10px",
-    flexWrap: "wrap",
-    minHeight: 110,
-    alignItems: "center",
-  };
-}
-
-function communityLabelStyle() {
-  return {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "12px",
-    flexWrap: "wrap",
-    transition: "var(--transition-theme)",
-  };
-}
-
 function emptyCardSlotStyle() {
   return {
     width: 75,
@@ -552,13 +511,6 @@ function emptyCardSlotStyle() {
     border: "2px dashed var(--border-empty-card)",
     margin: "0 3px",
     transition: "var(--transition-theme)",
-  };
-}
-
-function potAreaStyle() {
-  return {
-    marginTop: "10px",
-    position: "relative",
   };
 }
 
@@ -581,18 +533,6 @@ function potDisplayStyle() {
   };
 }
 
-function chipContainerStyle() {
-  return {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    width: "100%",
-    height: "100%",
-    pointerEvents: "none",
-  };
-}
-
 function chipStyle(index) {
   const colors = ["#ffd700", "#ff6b35", "#4caf50", "#2196f3", "#e91e63"];
   const color = colors[index % colors.length];
@@ -606,47 +546,6 @@ function chipStyle(index) {
     background: `radial-gradient(circle at 35% 35%, ${color}, ${adjustColor(color, -50)})`,
     border: "2px solid rgba(255,255,255,0.15)",
     boxShadow: "0 2px 6px var(--shadow-chip)",
-  };
-}
-
-function betsDisplayStyle() {
-  return {
-    display: "flex",
-    justifyContent: "center",
-    gap: "12px",
-    marginTop: "8px",
-    fontSize: "0.7rem",
-    flexWrap: "wrap",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function multiplayerControlsStyle() {
-  return {
-    display: "flex",
-    justifyContent: "center",
-    gap: "8px",
-    marginTop: "15px",
-    flexWrap: "wrap",
-  };
-}
-
-function multiplayerButtonStyle(isActive) {
-  return {
-    background: isActive ? "var(--bg-element)" : "var(--bg-element)",
-    border: isActive
-      ? "1px solid var(--border-gold)"
-      : "1px solid var(--border-element)",
-    color: "var(--text-white)",
-    padding: "4px 12px",
-    borderRadius: 20,
-    cursor: "pointer",
-    fontSize: "0.7rem",
-    boxShadow: isActive
-      ? "0 2px 8px var(--shadow-element)"
-      : "0 2px 6px var(--shadow-element)",
-    transition: "all 0.3s ease",
-    opacity: isActive ? 0.95 : 0.7,
   };
 }
 

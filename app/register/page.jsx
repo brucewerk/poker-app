@@ -1,8 +1,9 @@
-// app/register/page.jsx - CORRIGIDO COM TEMA
+// app/register/page.jsx - COMPLETO COM TRATAMENTO DE ERROS AMIGÁVEL
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function RegisterPage() {
@@ -11,19 +12,26 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
     if (password !== confirmPassword) {
-      setError("As senhas não coincidem");
+      setError("❌ As senhas não coincidem.");
       return;
     }
 
     if (password.length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres");
+      setError("❌ A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (username.length < 3) {
+      setError("❌ O usuário deve ter pelo menos 3 caracteres.");
       return;
     }
 
@@ -38,40 +46,60 @@ export default function RegisterPage() {
 
       const data = await res.json();
 
-      if (data.success) {
-        console.log("✅ Usuário registrado com sucesso!");
-        router.push("/login");
-      } else {
-        setError(data.error || "Erro ao criar conta");
+      if (!res.ok) {
+        // 🔥 TRATAR COMO MENSAGEM AMIGÁVEL
+        if (data.error?.includes("já existe")) {
+          console.info(
+            `📝 Tentativa de registro: "${username}" - Usuário já existe`,
+          );
+          setError("❌ Este usuário já está registrado. Tente outro nome.");
+        } else {
+          console.info(
+            `📝 Tentativa de registro: "${username}" - ${data.error || "Erro"}`,
+          );
+          setError(`❌ ${data.error || "Erro ao registrar"}`);
+        }
+        setLoading(false);
+        return;
       }
+
+      console.info(`✅ Registro bem-sucedido: ${username}`);
+      setSuccess("✅ Conta criada com sucesso! Redirecionando...");
+
+      setTimeout(() => {
+        router.push("/login");
+      }, 2000);
     } catch (error) {
-      console.error("Erro ao registrar:", error);
-      setError("Erro ao criar conta. Tente novamente.");
-    } finally {
+      // 🔥 EVITAR LOG DE ERRO DESNECESSÁRIO
+      console.info("📝 Erro de conexão no registro");
+      setError("❌ Erro de conexão. Tente novamente.");
       setLoading(false);
     }
   };
 
   return (
     <div className="auth-container">
-      <div className="auth-card">
+      <motion.div
+        className="auth-card"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3 }}
+      >
         <div className="auth-header">
           <div className="auth-icon">🃏</div>
-          <h1 className="auth-title">Criar Conta</h1>
-          <p className="auth-subtitle">Comece a jogar poker agora!</p>
+          <h1 className="auth-title">Registrar</h1>
+          <p className="auth-subtitle">Crie sua conta para jogar</p>
         </div>
-
-        {error && <div className="auth-error">❌ {error}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-input-group">
             <label className="auth-label">Usuário</label>
             <input
               type="text"
+              className="auth-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="auth-input"
-              placeholder="Escolha um usuário"
+              placeholder="Escolha um nome de usuário"
               required
               disabled={loading}
             />
@@ -81,9 +109,9 @@ export default function RegisterPage() {
             <label className="auth-label">Senha</label>
             <input
               type="password"
+              className="auth-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="auth-input"
               placeholder="Mínimo 6 caracteres"
               required
               disabled={loading}
@@ -94,27 +122,55 @@ export default function RegisterPage() {
             <label className="auth-label">Confirmar Senha</label>
             <input
               type="password"
+              className="auth-input"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="auth-input"
               placeholder="Digite a senha novamente"
               required
               disabled={loading}
             />
           </div>
 
+          {error && (
+            <motion.div
+              className="auth-error"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              {error}
+            </motion.div>
+          )}
+
+          {success && (
+            <motion.div
+              style={{
+                background: "rgba(76,175,80,0.12)",
+                border: "1px solid #4caf50",
+                borderRadius: 15,
+                padding: "10px 15px",
+                color: "#4caf50",
+                textAlign: "center",
+                fontSize: "0.9rem",
+              }}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              {success}
+            </motion.div>
+          )}
+
           <button type="submit" className="auth-button" disabled={loading}>
-            {loading ? "⏳ Criando..." : "🎯 Criar Conta"}
+            {loading ? "⏳ Criando conta..." : "🚀 Criar Conta"}
           </button>
         </form>
 
         <div className="auth-footer">
+          Já tem uma conta?{" "}
           <Link href="/login" className="auth-link">
-            Já tem conta?{" "}
-            <span className="auth-link-highlight">Faça login</span>
+            Faça login
           </Link>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

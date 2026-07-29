@@ -1,4 +1,4 @@
-// components/Poker/SoundToggle.jsx - CONTROLE DE SOM PREMIUM CORRIGIDO
+// components/Poker/SoundToggle.jsx - CONTROLE DE SOM PREMIUM (COM LOGS AMIGÁVEIS)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -27,7 +27,7 @@ export default function SoundToggle() {
     soundManager.setVolume(savedVolume);
 
     const initSound = () => {
-      console.log("🔊 Inicializando áudio por interação do usuário");
+      console.info("🔊 Inicializando áudio por interação do usuário");
       soundManager.initAudioContext();
       soundManager.loadSounds();
 
@@ -48,7 +48,7 @@ export default function SoundToggle() {
 
     const tryAutoInit = () => {
       if (!soundManager.isInitialized && document.hasFocus()) {
-        console.log("🔊 Tentando iniciar áudio automaticamente");
+        console.info("🔊 Tentando iniciar áudio automaticamente");
         soundManager.initAudioContext();
         soundManager.loadSounds();
 
@@ -83,7 +83,7 @@ export default function SoundToggle() {
     localStorage.setItem("sound-muted", String(newMuted));
 
     if (!newMuted) {
-      console.log("🔊 Ativando som...");
+      console.info("🔊 Ativando som...");
       soundManager.initAudioContext();
       soundManager.loadSounds();
       soundManager.setVolume(volume);
@@ -91,7 +91,7 @@ export default function SoundToggle() {
         soundManager.testSound();
       }, 150);
     } else {
-      console.log("🔇 Som desativado");
+      console.info("🔇 Som desativado");
     }
   };
 
@@ -101,14 +101,12 @@ export default function SoundToggle() {
     soundManager.setVolume(newVolume);
   };
 
-  // 🔥 Tocar som ao SOLTAR o slider (onMouseUp)
   const handleVolumeMouseUp = () => {
     if (!isMuted) {
       soundManager.playSound("deal", { volume: Math.max(0.05, volume * 0.3) });
     }
   };
 
-  // 🔥 Mostrar controle de volume (mouse enter NO BOTÃO)
   const handleButtonMouseEnter = () => {
     setIsHovering(true);
     setShowVolumeControl(true);
@@ -119,7 +117,6 @@ export default function SoundToggle() {
     }
   };
 
-  // 🔥 Esconder controle após 2 segundos sem foco
   const handleButtonMouseLeave = () => {
     setIsHovering(false);
 
@@ -134,7 +131,6 @@ export default function SoundToggle() {
     }, 2000);
   };
 
-  // 🔥 Manter aberto se o mouse estiver no popup
   const handlePopupMouseEnter = () => {
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
