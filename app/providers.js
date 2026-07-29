@@ -3,11 +3,14 @@
 
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "./theme/ThemeContext";
+import { ToastProvider } from "@/components/Toast/ToastManager";
 
 export default function Providers({ children, session }) {
   return (
     <SessionProvider session={session}>
-      <ThemeProvider>{children}</ThemeProvider>
+      <ThemeProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </ThemeProvider>
     </SessionProvider>
   );
 }

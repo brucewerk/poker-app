@@ -1,8 +1,17 @@
+// components/Poker/FriendsList.jsx - CORREÇÃO FINAL
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
+
+// 🔥 SINGLETON PARA O SOCKET (EVITA MÚLTIPLAS CONEXÕES)
+const SOCKET_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
+
+let globalSocket = null;
+let globalSocketListeners = new Map();
+let globalOnlineUsers = [];
 
 export default function FriendsList({ username, onJoinGame }) {
   // ============================================================
@@ -49,21 +58,22 @@ export default function FriendsList({ username, onJoinGame }) {
   const cardFeedbackTimerRef = useRef(null);
   const feedbackTimeoutRef = useRef(null);
 
+  // 🔥 REFS PARA CONTROLE DE CONEXÃO
   const socketRef = useRef(null);
-  const intervalRef = useRef(null);
+  const isConnectedRef = useRef(false);
   const isMounted = useRef(true);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 3;
+
+  const intervalRef = useRef(null);
   const onlineUsersRef = useRef([]);
   const chatEndRef = useRef(null);
   const chatInputRef = useRef(null);
   const redirectTimeoutRef = useRef(null);
   const isChatOpenRef = useRef(false);
   const messagesContainerRef = useRef(null);
-  const previousOnJoinGameRef = useRef(null);
   const resettingRef = useRef(false);
   const currentRoomIdRef = useRef(null);
-
-  const SOCKET_URL =
-    process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
   // ============================================================
   // 🔥 useMemo
@@ -260,6 +270,54 @@ export default function FriendsList({ username, onJoinGame }) {
   }, [username, closeFloatingInvite, clearCardFeedback]);
 
   // ============================================================
+  // 🔥 FUNÇÃO PARA CONECTAR AO SOCKET (USANDO SINGLETON GLOBAL)
+  // ============================================================
+  const connectSocket = useCallback(() => {
+    // 🔥 SE JÁ EXISTE SOCKET GLOBAL, REUTILIZAR
+    if (globalSocket && globalSocket.connected) {
+      console.log("🔌 Socket global já conectado, reutilizando...");
+      socketRef.current = globalSocket;
+      return globalSocket;
+    }
+
+    // 🔥 SE EXISTE SOCKET GLOBAL MAS ESTÁ DESCONECTADO, RECONECTAR
+    if (globalSocket) {
+      console.log("🔄 Reconectando socket global...");
+      globalSocket.connect();
+      socketRef.current = globalSocket;
+      return globalSocket;
+    }
+
+    console.log(
+      `🔵 FriendsList: Criando nova conexão Socket.IO para ${username}`,
+    );
+
+    const socket = io(SOCKET_URL, {
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 10000,
+      autoConnect: true,
+      reconnection: true,
+      transports: ["websocket", "polling"],
+    });
+
+    globalSocket = socket;
+    socketRef.current = socket;
+    return socket;
+  }, [username]);
+
+  // ============================================================
+  // 🔥 FUNÇÃO PARA DESCONECTAR SOCKET
+  // ============================================================
+  const disconnectSocket = useCallback(() => {
+    // 🔥 NUNCA DESCONECTAR O SOCKET GLOBAL AQUI
+    // Apenas limpar referências locais
+    console.log("🔌 Limpando referências locais do socket");
+    socketRef.current = null;
+    isConnectedRef.current = false;
+  }, []);
+
+  // ============================================================
   // 🔥 FUNÇÃO PARA ABRIR CHAT
   // ============================================================
   const openChat = useCallback(
@@ -293,57 +351,91 @@ export default function FriendsList({ username, onJoinGame }) {
   );
 
   // ============================================================
-  // 🔥 useEffect - DETECTAR SAÍDA DO MULTIPLAYER
-  // ============================================================
-  useEffect(() => {
-    if (previousOnJoinGameRef.current !== null && onJoinGame === null) {
-      console.log(`🔄 Detectada saída do multiplayer, resetando estado...`);
-      resetLobbyState();
-      clearCardFeedback();
-    }
-    previousOnJoinGameRef.current = onJoinGame;
-  }, [onJoinGame, resetLobbyState, clearCardFeedback]);
-
-  // ============================================================
-  // 🔥 useEffect - CONECTAR AO SOCKET
+  // 🔥 useEffect - CONECTAR AO SOCKET (USANDO SINGLETON GLOBAL)
   // ============================================================
   useEffect(() => {
     if (!username) return;
 
-    console.log(`🔵 FriendsList: Conectando ao Socket.IO para ${username}`);
+    // 🔥 USAR SOCKET GLOBAL
+    const socket = connectSocket();
 
-    if (!socketRef.current) {
-      socketRef.current = io(SOCKET_URL, {
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        timeout: 10000,
-        autoConnect: true,
-        reconnection: true,
-      });
-    }
+    // 🔥 TIMEOUT DE CONEXÃO
+    const connectionTimeout = setTimeout(() => {
+      if (!socket.connected) {
+        console.warn("⏳ Timeout de conexão do socket");
+        setIsConnected(false);
+        isConnectedRef.current = false;
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          reconnectAttemptsRef.current++;
+          showCardFeedback(
+            `⚠️ Tentando reconectar... (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`,
+            true,
+            3000,
+          );
+        }
+      }
+    }, 5000);
 
-    const socket = socketRef.current;
+    // 🔥 REMOVER LISTENERS ANTIGOS (PARA EVITAR DUPLICIDADE)
+    socket.off("connect");
+    socket.off("disconnect");
+    socket.off("connect_error");
+    socket.off("friends-online");
+    socket.off("room-created");
+    socket.off("group-invite");
+    socket.off("invite-accepted");
+    socket.off("invite-declined");
+    socket.off("invite-sent");
+    socket.off("private-message");
+    socket.off("room-update");
+    socket.off("leave-room-response");
+    socket.off("game-reset");
+    socket.off("error");
 
     socket.on("connect", () => {
+      clearTimeout(connectionTimeout);
       console.log(`🟢 FriendsList: Socket conectado (${socket.id})`);
       setIsConnected(true);
+      isConnectedRef.current = true;
+      reconnectAttemptsRef.current = 0;
       socket.emit("friend-online", { username });
+      showCardFeedback("✅ Conectado ao servidor!", false, 2000);
     });
 
     socket.on("disconnect", () => {
       console.log(`🔴 FriendsList: Socket desconectado`);
       setIsConnected(false);
+      isConnectedRef.current = false;
+      showCardFeedback("⚠️ Desconectado do servidor", true, 3000);
     });
 
     socket.on("connect_error", (err) => {
-      console.error(`❌ FriendsList: Erro de conexão:`, err.message);
+      clearTimeout(connectionTimeout);
+      console.warn(`⚠️ FriendsList: Erro de conexão:`, err.message);
       setIsConnected(false);
-      showCardFeedback("⚠️ Erro de conexão com o servidor", true, 5000);
+      isConnectedRef.current = false;
+
+      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        reconnectAttemptsRef.current++;
+        showCardFeedback(
+          `⚠️ Reconectando... (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`,
+          true,
+          3000,
+        );
+      } else {
+        showCardFeedback(
+          "⚠️ Servidor offline. Tente recarregar a página.",
+          true,
+          5000,
+        );
+      }
     });
 
+    // 🔥 ATUALIZAR ONLINE USERS GLOBAL E LOCAL
     socket.on("friends-online", (data) => {
       console.log("📡 Friends online recebido:", data);
       const onlineList = data.online || [];
+      globalOnlineUsers = onlineList;
       onlineUsersRef.current = onlineList;
 
       setFriends((prevFriends) => {
@@ -359,6 +451,19 @@ export default function FriendsList({ username, onJoinGame }) {
       });
     });
 
+    // 🔥 INICIALIZAR COM OS ONLINE USERS ATUAIS
+    if (socket.connected) {
+      clearTimeout(connectionTimeout);
+      socket.emit("friend-online", { username });
+      setIsConnected(true);
+      isConnectedRef.current = true;
+      // Usar os online users já armazenados
+      if (globalOnlineUsers.length > 0) {
+        onlineUsersRef.current = globalOnlineUsers;
+      }
+    }
+
+    // 🔥 RESTANTE DOS EVENTOS...
     socket.on("room-created", (data) => {
       console.log("📡 Sala criada com sucesso:", data);
       setIsCreatingRoom(false);
@@ -638,22 +743,28 @@ export default function FriendsList({ username, onJoinGame }) {
       showCardFeedback(`❌ ${data.message || "Erro desconhecido"}`, true, 4000);
     });
 
+    // 🔥 SE JÁ ESTIVER CONECTADO, EMITIR EVENTO
     if (socket.connected) {
+      clearTimeout(connectionTimeout);
       socket.emit("friend-online", { username });
       setIsConnected(true);
+      isConnectedRef.current = true;
     }
 
     return () => {
+      clearTimeout(connectionTimeout);
+      // 🔥 NÃO REMOVER TODOS OS LISTENERS DO SOCKET GLOBAL
+      // Apenas os que este componente adicionou
       socket.off("connect");
       socket.off("disconnect");
       socket.off("connect_error");
       socket.off("friends-online");
+      socket.off("room-created");
       socket.off("group-invite");
       socket.off("invite-accepted");
       socket.off("invite-declined");
       socket.off("invite-sent");
       socket.off("private-message");
-      socket.off("room-created");
       socket.off("room-update");
       socket.off("leave-room-response");
       socket.off("game-reset");
@@ -663,27 +774,27 @@ export default function FriendsList({ username, onJoinGame }) {
         clearTimeout(redirectTimeoutRef.current);
         redirectTimeoutRef.current = null;
       }
+    };
+  }, [username, connectSocket, showCardFeedback]);
+
+  // ============================================================
+  // 🔥 useEffect - LIMPAR REFERÊNCIAS AO DESMONTAR
+  // ============================================================
+  useEffect(() => {
+    isMounted.current = true;
+
+    return () => {
+      isMounted.current = false;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      // 🔥 NÃO DESCONECTAR O SOCKET GLOBAL AQUI
+      // Apenas limpar referências locais
+      disconnectSocket();
       clearCardFeedback();
     };
-  }, [
-    username,
-    onJoinGame,
-    pendingInvites,
-    scrollChatToBottom,
-    selectedChatFriend,
-    showChat,
-    isInLobby,
-    resetLobbyState,
-    isProcessingInvite,
-    showCardFeedback,
-    showFloatingInviteCard,
-    closeFloatingInvite,
-    openChat,
-    isChatOpenRef,
-    cardFeedback,
-    clearCardFeedback,
-    addNotification,
-  ]);
+  }, [disconnectSocket, clearCardFeedback]);
 
   // ============================================================
   // 🔥 useEffect - BUSCAR AMIGOS
@@ -702,24 +813,24 @@ export default function FriendsList({ username, onJoinGame }) {
         const data = await res.json();
 
         if (data.success && isMounted.current) {
+          // 🔥 USAR globalOnlineUsers COMO FONTE DE VERDADE
+          const onlineNames =
+            globalOnlineUsers.length > 0
+              ? globalOnlineUsers
+              : onlineUsersRef.current;
+
           const validFriends = (data.friends || []).map((friend) => ({
             username: friend.username || "Desconhecido",
             level: friend.level || 1,
             chips: friend.chips || 0,
-            isOnline: false,
+            isOnline: onlineNames.includes(friend.username),
             isInGame: false,
             lastSeen: null,
             selected: false,
           }));
 
-          const onlineNames = onlineUsersRef.current;
-          const updatedFriends = validFriends.map((f) => ({
-            ...f,
-            isOnline: onlineNames.includes(f.username),
-          }));
-
-          setFriends(updatedFriends);
-          setOnlineFriends(updatedFriends.filter((f) => f.isOnline));
+          setFriends(validFriends);
+          setOnlineFriends(validFriends.filter((f) => f.isOnline));
 
           if (!silent) {
             console.info(`✅ ${validFriends.length} amigos carregados`);
@@ -745,7 +856,10 @@ export default function FriendsList({ username, onJoinGame }) {
   useEffect(() => {
     isMounted.current = true;
     if (username) {
-      fetchFriends();
+      // Pequeno delay para garantir que o socket já tenha recebido os online users
+      setTimeout(() => {
+        fetchFriends();
+      }, 300);
     } else {
       setLoading(false);
     }
@@ -1056,7 +1170,7 @@ export default function FriendsList({ username, onJoinGame }) {
   const addFriend = useCallback(async () => {
     const friendName = newFriend.trim();
     if (!friendName) {
-      showCardFeedback("Digite o nome do amigo", true, 3000);
+      showCardFeedback("❌ Digite o nome do amigo", true, 3000);
       return;
     }
 
@@ -1088,7 +1202,11 @@ export default function FriendsList({ username, onJoinGame }) {
       try {
         data = await res.json();
       } catch (e) {
-        showCardFeedback("Erro ao processar resposta do servidor", true, 3000);
+        showCardFeedback(
+          "❌ Erro ao processar resposta do servidor",
+          true,
+          3000,
+        );
         setRefreshing(false);
         return;
       }
@@ -1099,6 +1217,7 @@ export default function FriendsList({ username, onJoinGame }) {
           true,
           3000,
         );
+        setRefreshing(false);
         return;
       }
 
@@ -1114,10 +1233,38 @@ export default function FriendsList({ username, onJoinGame }) {
         );
       } else {
         const errorMsg = data.error || "Erro ao adicionar amigo";
-        showCardFeedback(`❌ ${errorMsg}`, true, 3000);
+
+        if (
+          errorMsg.includes("não encontrado") ||
+          errorMsg.includes("não existe")
+        ) {
+          showCardFeedback(
+            `❌ Usuário "${friendName}" não encontrado. Verifique o nome.`,
+            true,
+            4000,
+          );
+        } else if (errorMsg.includes("já é seu amigo")) {
+          showCardFeedback(
+            `❌ "${friendName}" já está na sua lista de amigos!`,
+            true,
+            3000,
+          );
+        } else if (errorMsg.includes("adicionar a si mesmo")) {
+          showCardFeedback(
+            `❌ Você não pode adicionar a si mesmo!`,
+            true,
+            3000,
+          );
+        } else {
+          showCardFeedback(`❌ ${errorMsg}`, true, 3000);
+        }
       }
     } catch (error) {
-      showCardFeedback("❌ Erro de conexão com o servidor", true, 3000);
+      showCardFeedback(
+        "❌ Erro de conexão com o servidor. Tente novamente.",
+        true,
+        4000,
+      );
     } finally {
       setRefreshing(false);
     }
@@ -2342,9 +2489,10 @@ export default function FriendsList({ username, onJoinGame }) {
                   color: "#f44336",
                   fontSize: "0.8rem",
                   textAlign: "center",
-                  padding: "5px",
+                  padding: "8px 12px",
                   background: "rgba(244,67,54,0.1)",
                   borderRadius: 10,
+                  border: "1px solid rgba(244,67,54,0.2)",
                 }}
               >
                 {error}
@@ -2356,9 +2504,10 @@ export default function FriendsList({ username, onJoinGame }) {
                   color: "#4caf50",
                   fontSize: "0.8rem",
                   textAlign: "center",
-                  padding: "5px",
+                  padding: "8px 12px",
                   background: "rgba(76,175,80,0.1)",
                   borderRadius: 10,
+                  border: "1px solid rgba(76,175,80,0.2)",
                 }}
               >
                 {success}

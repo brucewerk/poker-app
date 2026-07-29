@@ -1,406 +1,282 @@
-// components/Poker/Card.jsx - COM EFEITOS PREMIUM
+// components/Poker/Card.jsx - COMPLETO CORRIGIDO
 "use client";
 
-import { useState, useEffect, useMemo, memo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { getCardDisplayName } from "@/lib/poker/deck.js";
+import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 
-const Card = memo(function Card({
+export default function Card({
   card,
   faceDown = false,
   delay = 0,
-  isRevealing = false,
   size = "normal",
-  onRevealComplete,
   isHighlighted = false,
+  isRevealing = false,
 }) {
-  const [isFlipped, setIsFlipped] = useState(faceDown);
-  const [isVisible, setIsVisible] = useState(false);
-  const [isGlowing, setIsGlowing] = useState(false);
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
 
-  const dimensions = useMemo(() => {
-    const sizeMap = {
-      small: { width: 50, height: 70, fontSize: "0.7rem" },
-      normal: { width: 60, height: 85, fontSize: "0.8rem" },
-      large: { width: 75, height: 105, fontSize: "1rem" },
-    };
-    return sizeMap[size] || sizeMap.normal;
-  }, [size]);
-
-  // Efeito de entrada com delay
   useEffect(() => {
-    if (delay > 0) {
-      const timer = setTimeout(() => setIsVisible(true), delay);
-      return () => clearTimeout(timer);
+    if (typeof window !== "undefined") {
+      const theme = document.documentElement.getAttribute("data-theme");
+      setIsDarkTheme(theme === "dark");
     }
-    setIsVisible(true);
-  }, [delay]);
+  }, []);
 
-  // Efeito de revelação
   useEffect(() => {
     if (isRevealing && faceDown) {
-      const timer = setTimeout(() => {
-        setIsFlipped(false);
-        if (onRevealComplete) onRevealComplete();
-      }, 300 + delay);
+      setIsFlipping(true);
+      const timer = setTimeout(() => setIsFlipping(false), 600);
       return () => clearTimeout(timer);
     }
-    setIsFlipped(faceDown);
-  }, [faceDown, isRevealing, delay, onRevealComplete]);
+  }, [isRevealing, faceDown]);
 
-  // Efeito de brilho para cartas altas
-  useEffect(() => {
-    if (card && (card.rank === 14 || card.rank === 13)) {
-      const timer = setTimeout(() => setIsGlowing(true), 100);
-      return () => clearTimeout(timer);
-    }
-  }, [card]);
-
-  if (!card) {
-    return <div style={cardPlaceholderStyle(dimensions)} />;
-  }
+  if (!card) return null;
 
   const isRed = card.suit === "♥" || card.suit === "♦";
-  const displayName = getCardDisplayName(card);
+  const rankDisplay =
+    card.rank === 14
+      ? "A"
+      : card.rank === 13
+        ? "K"
+        : card.rank === 12
+          ? "Q"
+          : card.rank === 11
+            ? "J"
+            : card.rank === 10
+              ? "10"
+              : card.rank;
 
-  // Variantes de animação com efeitos premium
-  const cardVariants = {
-    hidden: {
-      scale: 0.85,
-      opacity: 0,
-      rotateY: faceDown ? 180 : 0,
-      y: -30,
-    },
-    visible: {
-      scale: 1,
-      opacity: 1,
-      rotateY: isFlipped ? 180 : 0,
-      y: 0,
-      transition: {
-        type: "spring",
-        stiffness: 350,
-        damping: 25,
-        delay: delay / 1000,
-      },
-    },
-    flip: {
-      rotateY: isFlipped ? 180 : 0,
-      transition: {
-        type: "spring",
-        stiffness: 450,
-        damping: 20,
-      },
-    },
-    glow: {
-      boxShadow: [
-        "0 0 15px rgba(255,215,0,0.2)",
-        "0 0 35px rgba(255,215,0,0.5)",
-        "0 0 15px rgba(255,215,0,0.2)",
-      ],
-      transition: {
-        duration: 1.8,
-        repeat: Infinity,
-        ease: "easeInOut",
-      },
-    },
-    highlight: {
-      y: -8,
-      scale: 1.05,
-      boxShadow: "0 8px 30px rgba(255,215,0,0.4)",
-      transition: {
-        type: "spring",
-        stiffness: 400,
-        damping: 20,
-      },
-    },
+  // 🔥 CORRIGIDO: Garantir que todos os tamanhos tenham valores definidos
+  const sizeMap = {
+    small: { width: 50, height: 70, fontSize: "0.8rem", suitSize: "0.9rem" },
+    normal: { width: 60, height: 84, fontSize: "0.9rem", suitSize: "1rem" },
+    large: { width: 70, height: 98, fontSize: "1rem", suitSize: "1.2rem" },
   };
 
-  const renderRank = useMemo(() => {
-    const rank = card.rank;
-    if (rank === 14) return "A";
-    if (rank === 13) return "K";
-    if (rank === 12) return "Q";
-    if (rank === 11) return "J";
-    if (rank === 10) return "10";
-    return rank;
-  }, [card.rank]);
+  // 🔥 CORRIGIDO: Fallback para "normal" se o size não existir
+  const sizeConfig = sizeMap[size] || sizeMap.normal;
+
+  // 🔥 DESIGN DAS CARTAS POR TEMA
+  const getCardStyles = () => {
+    if (faceDown) {
+      // 🔥 Costas das cartas - DIFERENTE POR TEMA
+      if (isDarkTheme) {
+        return {
+          background:
+            "repeating-linear-gradient(45deg, #2b5797, #2b5797 10px, #1d3f6e 10px, #1d3f6e 20px)",
+          border: "2px solid #1a3a6e",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+          color: "rgba(255,255,255,0.3)",
+        };
+      } else {
+        return {
+          background: "linear-gradient(145deg, #e8e0d8, #d5ccc4)",
+          border: "2px solid #c4b8ae",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          color: "rgba(0,0,0,0.15)",
+        };
+      }
+    }
+
+    return {
+      background: isDarkTheme
+        ? "linear-gradient(145deg, #ffffff, #f0ece8)"
+        : "linear-gradient(145deg, #ffffff, #f8f5f0)",
+      border: isDarkTheme ? "1px solid #ddd" : "1px solid #c4b8ae",
+      boxShadow: isDarkTheme
+        ? "0 4px 12px rgba(0,0,0,0.25)"
+        : "0 4px 12px rgba(0,0,0,0.08)",
+      color: isRed ? "#cc0000" : "#1f2a2f",
+    };
+  };
+
+  const cardStyles = getCardStyles();
+
+  // 🔥 CORRIGIDO: Calcular tamanhos em pixels para evitar NaN
+  const fontSize = sizeConfig.fontSize;
+  const suitSize = sizeConfig.suitSize;
+  const suitSizeLarge = `calc(${suitSize} * 1.8)`;
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial="hidden"
-          animate={isHighlighted ? ["visible", "highlight"] : "visible"}
-          variants={cardVariants}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8, y: -20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{
+        delay: delay / 1000,
+        type: "spring",
+        stiffness: 400,
+        damping: 25,
+      }}
+      whileHover={
+        !faceDown ? { scale: 1.05, y: -4, transition: { duration: 0.2 } } : {}
+      }
+      style={{
+        display: "inline-flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: sizeConfig.width,
+        height: sizeConfig.height,
+        margin: "2px",
+        borderRadius: 8,
+        boxShadow:
+          isHighlighted && !faceDown
+            ? "0 0 20px rgba(255,215,0,0.5), 0 4px 16px rgba(0,0,0,0.2)"
+            : cardStyles.boxShadow,
+        flexShrink: 0,
+        position: "relative",
+        background: cardStyles.background,
+        border: cardStyles.border,
+        transition: "var(--transition-theme)",
+        transform: isHighlighted && !faceDown ? "translateY(-4px)" : "none",
+      }}
+    >
+      {faceDown ? (
+        <div
           style={{
-            ...cardContainerStyle(dimensions),
-            perspective: "900px",
-            willChange: "transform, opacity",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            borderRadius: 6,
+            background: cardStyles.background,
+            position: "relative",
           }}
         >
-          <motion.div
-            animate={{
-              rotateY: isFlipped ? 180 : 0,
-            }}
-            transition={{
-              type: "spring",
-              stiffness: 400,
-              damping: 20,
-            }}
+          {!isDarkTheme && (
+            <>
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 6,
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  borderRadius: 4,
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 10,
+                  border: "1px solid rgba(0,0,0,0.04)",
+                  borderRadius: 3,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "1.2rem",
+                  color: "rgba(0,0,0,0.08)",
+                  fontWeight: 300,
+                  letterSpacing: "2px",
+                }}
+              >
+                ♠
+              </span>
+            </>
+          )}
+          {isDarkTheme && (
+            <div
+              style={{
+                width: "60%",
+                height: "60%",
+                borderRadius: "50%",
+                border: "2px solid rgba(255,255,255,0.06)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span style={{ fontSize: "1.5rem", opacity: 0.1 }}>♠</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <span
             style={{
-              ...cardWrapperStyle(),
-              willChange: "transform",
+              fontSize: fontSize,
+              fontWeight: 800,
+              color: cardStyles.color,
+              lineHeight: 1,
+              position: "absolute",
+              top: 4,
+              left: 6,
             }}
           >
-            {/* Frente da carta com design premium */}
-            <motion.div
-              style={{
-                ...cardFrontStyle(isRed, dimensions),
-                backfaceVisibility: "hidden",
-                position: "absolute",
-                width: "100%",
-                height: "100%",
-                borderRadius: 8,
-              }}
-              animate={isGlowing ? "glow" : {}}
-              variants={cardVariants}
-            >
-              {/* Brilho premium no canto */}
-              <div style={cardShineStyle()} />
-
-              <div style={cardContentStyle()}>
-                <div style={cardCornerStyle("top-left", isRed)}>
-                  <span style={cardRankStyle(isRed, dimensions)}>
-                    {renderRank}
-                  </span>
-                  <span style={cardSuitStyle(isRed)}>{card.suit}</span>
-                </div>
-                <div style={cardCenterStyle()}>
-                  <span style={cardCenterSuitStyle(isRed, dimensions)}>
-                    {card.suit}
-                  </span>
-                  {card.rank >= 11 && (
-                    <span style={cardCenterRankStyle(isRed)}>{renderRank}</span>
-                  )}
-                </div>
-                <div style={cardCornerStyle("bottom-right", isRed)}>
-                  <span style={cardRankStyle(isRed, dimensions)}>
-                    {renderRank}
-                  </span>
-                  <span style={cardSuitStyle(isRed)}>{card.suit}</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Verso da carta com design premium */}
-            <motion.div
-              style={{
-                ...cardBackStyle(dimensions),
-                backfaceVisibility: "hidden",
-                position: "absolute",
-                width: "100%",
-                height: "100%",
-                borderRadius: 8,
-                transform: "rotateY(180deg)",
-              }}
-            >
-              {/* Padrão premium no verso */}
-              <div style={cardBackPatternStyle()} />
-              <div style={cardBackCenterStyle()}>♠</div>
-            </motion.div>
-          </motion.div>
-        </motion.div>
+            {rankDisplay}
+          </span>
+          <span
+            style={{
+              fontSize: suitSize,
+              color: cardStyles.color,
+              lineHeight: 1,
+              position: "absolute",
+              top: 18,
+              left: 6,
+            }}
+          >
+            {card.suit}
+          </span>
+          <span
+            style={{
+              fontSize: suitSize,
+              color: cardStyles.color,
+              lineHeight: 1,
+              position: "absolute",
+              bottom: 4,
+              right: 6,
+              transform: "rotate(180deg)",
+            }}
+          >
+            {rankDisplay}
+          </span>
+          <span
+            style={{
+              fontSize: suitSize,
+              color: cardStyles.color,
+              lineHeight: 1,
+              position: "absolute",
+              bottom: 18,
+              right: 6,
+              transform: "rotate(180deg)",
+            }}
+          >
+            {card.suit}
+          </span>
+          {/* 🔥 CORRIGIDO: Usar string para o fontSize */}
+          <span
+            style={{
+              fontSize: suitSizeLarge,
+              color: cardStyles.color,
+              opacity: 0.15,
+              lineHeight: 1,
+            }}
+          >
+            {card.suit}
+          </span>
+        </>
       )}
-    </AnimatePresence>
+
+      {isHighlighted && !faceDown && (
+        <motion.div
+          style={{
+            position: "absolute",
+            inset: -3,
+            borderRadius: 10,
+            border: "2px solid rgba(255,215,0,0.4)",
+            boxShadow: "0 0 20px rgba(255,215,0,0.2)",
+            pointerEvents: "none",
+          }}
+          animate={{
+            opacity: [0.6, 1, 0.6],
+          }}
+          transition={{
+            duration: 1.5,
+            repeat: Infinity,
+          }}
+        />
+      )}
+    </motion.div>
   );
-});
-
-// ====================== ESTILOS PREMIUM ======================
-function cardContainerStyle(dimensions) {
-  return {
-    display: "inline-block",
-    width: dimensions.width,
-    height: dimensions.height,
-    margin: "0 4px",
-    flexShrink: 0,
-  };
 }
-
-function cardWrapperStyle() {
-  return {
-    position: "relative",
-    width: "100%",
-    height: "100%",
-    transformStyle: "preserve-3d",
-  };
-}
-
-function cardFrontStyle(isRed, dimensions) {
-  return {
-    background: isRed
-      ? "linear-gradient(145deg, #ffffff, #f8f0f0)"
-      : "linear-gradient(145deg, #ffffff, #f5f5f5)",
-    border: "2px solid #ddd",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
-    color: isRed ? "#cc0000" : "#000",
-    fontSize: dimensions.fontSize,
-    fontWeight: "bold",
-    padding: "4px",
-    position: "relative",
-    overflow: "hidden",
-  };
-}
-
-function cardShineStyle() {
-  return {
-    position: "absolute",
-    top: -50,
-    left: -50,
-    width: 200,
-    height: 200,
-    background:
-      "radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%)",
-    pointerEvents: "none",
-    opacity: 0.3,
-  };
-}
-
-function cardBackStyle(dimensions) {
-  return {
-    background: "linear-gradient(145deg, #1a3a6e, #2b5797)",
-    border: "2px solid #1a3a6e",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
-    position: "relative",
-    overflow: "hidden",
-  };
-}
-
-function cardBackPatternStyle() {
-  return {
-    position: "absolute",
-    inset: 0,
-    background: `
-      repeating-linear-gradient(
-        45deg,
-        rgba(255,255,255,0.05) 0px,
-        rgba(255,255,255,0.05) 8px,
-        rgba(255,255,255,0.02) 8px,
-        rgba(255,255,255,0.02) 16px
-      ),
-      repeating-linear-gradient(
-        -45deg,
-        rgba(255,255,255,0.05) 0px,
-        rgba(255,255,255,0.05) 8px,
-        rgba(255,255,255,0.02) 8px,
-        rgba(255,255,255,0.02) 16px
-      )
-    `,
-    borderRadius: 6,
-  };
-}
-
-function cardBackCenterStyle() {
-  return {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    fontSize: "2rem",
-    color: "rgba(255,255,255,0.15)",
-    fontWeight: "bold",
-  };
-}
-
-function cardContentStyle() {
-  return {
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    width: "100%",
-    height: "100%",
-    padding: "4px",
-    position: "relative",
-    zIndex: 1,
-  };
-}
-
-function cardCornerStyle(position, isRed) {
-  const posStyles = {
-    "top-left": { top: 4, left: 4, alignItems: "flex-start" },
-    "bottom-right": {
-      bottom: 4,
-      right: 4,
-      alignItems: "flex-end",
-      transform: "rotate(180deg)",
-    },
-  };
-  return {
-    display: "flex",
-    flexDirection: "column",
-    position: "absolute",
-    ...posStyles[position],
-    color: isRed ? "#cc0000" : "#000",
-    lineHeight: 1,
-  };
-}
-
-function cardRankStyle(isRed, dimensions) {
-  return {
-    fontSize: `calc(${dimensions.fontSize} * 1.2)`,
-    fontWeight: "800",
-    color: isRed ? "#cc0000" : "#000",
-  };
-}
-
-function cardSuitStyle(isRed) {
-  return {
-    fontSize: "0.8rem",
-    color: isRed ? "#cc0000" : "#000",
-    marginTop: "-2px",
-  };
-}
-
-function cardCenterStyle() {
-  return {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-  };
-}
-
-function cardCenterSuitStyle(isRed, dimensions) {
-  return {
-    fontSize: `calc(${dimensions.fontSize} * 2.8)`,
-    color: isRed ? "#cc0000" : "#000",
-    opacity: 0.25,
-    lineHeight: 1,
-  };
-}
-
-function cardCenterRankStyle(isRed) {
-  return {
-    fontSize: "0.8rem",
-    fontWeight: "800",
-    color: isRed ? "#cc0000" : "#000",
-    marginTop: "-4px",
-    opacity: 0.5,
-  };
-}
-
-function cardPlaceholderStyle(dimensions) {
-  return {
-    display: "inline-block",
-    width: dimensions.width,
-    height: dimensions.height,
-    margin: "0 4px",
-    opacity: 0,
-    flexShrink: 0,
-  };
-}
-
-export default Card;

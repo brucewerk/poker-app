@@ -1,4 +1,4 @@
-// app/page.jsx - COMPLETO (COM BOTÃO DE TORNEIOS UNIFICADO)
+// app/page.jsx - COMPLETO (COM TOAST PREMIUM)
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -23,7 +23,6 @@ import LevelDisplay from "@/components/Poker/LevelDisplay.jsx";
 import FindingsModal from "@/components/Poker/FindingsModal.jsx";
 import FriendsList from "@/components/Poker/FriendsList.jsx";
 import MissionsPanel from "@/components/Poker/MissionsPanel.jsx";
-import OnlineButton from "@/components/Poker/OnlineButton.jsx";
 import OnlineLobby from "@/components/Poker/OnlineLobby.jsx";
 import OnlineGame from "@/components/Poker/OnlineGame.jsx";
 import { soundManager } from "@/lib/sound.js";
@@ -36,6 +35,8 @@ import PlayerSelector from "@/components/Poker/PlayerSelector.jsx";
 import ToolbarButtons from "@/components/Poker/ToolbarButtons.jsx";
 import GameTable from "@/components/Poker/GameTable.jsx";
 import TournamentLobby from "@/components/Poker/TournamentLobby.jsx";
+import ResultModal from "@/components/Poker/ResultModal.jsx";
+import { useToast } from "@/components/Toast/ToastManager";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -69,6 +70,8 @@ const INITIAL_GAME = {
 export default function PokerGame() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
+  const { toast } = useToast();
+
   const [game, setGame] = useState(INITIAL_GAME);
   const [notification, setNotification] = useState({
     msg: "",
@@ -99,13 +102,6 @@ export default function PokerGame() {
   const [resultModalLock, setResultModalLock] = useState(false);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [pendingInviteJoin, setPendingInviteJoin] = useState(null);
-
-  // 🔥 TOAST APENAS PARA EVENTOS IMPORTANTES
-  const [toastMessage, setToastMessage] = useState(null);
-  const [showToast, setShowToast] = useState(false);
-  const [toastType, setToastType] = useState("info");
-  const toastTimerRef = useRef(null);
-  const toastClosingRef = useRef(false);
 
   const cpuTimerRef = useRef(null);
   const pendingSaveRef = useRef(false);
@@ -142,182 +138,6 @@ export default function PokerGame() {
     setIsTournamentActive(false);
     setShowTournamentLobby(false);
   }, []);
-
-  // ============================================================
-  // 🔥 TOAST PADRONIZADO (APENAS EVENTOS IMPORTANTES)
-  // ============================================================
-
-  const showToastMessage = useCallback(
-    (message, type = "info", duration = 6000) => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = null;
-      }
-
-      if (toastMessage && toastMessage === message) {
-        toastTimerRef.current = setTimeout(() => {
-          setShowToast(false);
-          toastTimerRef.current = null;
-          setTimeout(() => setToastMessage(null), 400);
-        }, duration);
-        return;
-      }
-
-      setToastMessage(message);
-      setToastType(type);
-      setShowToast(true);
-
-      toastTimerRef.current = setTimeout(() => {
-        setShowToast(false);
-        toastTimerRef.current = null;
-        setTimeout(() => setToastMessage(null), 400);
-      }, duration);
-    },
-    [toastMessage],
-  );
-
-  const closeToast = useCallback(() => {
-    if (toastClosingRef.current) return;
-    toastClosingRef.current = true;
-
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
-
-    setShowToast(false);
-
-    setTimeout(() => {
-      setToastMessage(null);
-      toastClosingRef.current = false;
-    }, 400);
-  }, []);
-
-  // ============================================================
-  // 🔥 TOAST COMPONENTE
-  // ============================================================
-  const ToastNotification = () => {
-    if (!showToast || !toastMessage) return null;
-
-    const isError = toastType === "error" || toastMessage.includes("❌");
-    const isLevelUp =
-      toastMessage.includes("🎊") || toastMessage.includes("Subiu para Nível");
-    const isAchievement =
-      toastMessage.includes("🎉") || toastMessage.includes("Conquista");
-
-    let icon = "ℹ️";
-    if (isError) icon = "❌";
-    else if (isLevelUp) icon = "🎊";
-    else if (isAchievement) icon = "🎉";
-    else if (toastMessage.includes("✅")) icon = "✅";
-
-    return (
-      <motion.div
-        style={toastStyle(isError, isLevelUp || isAchievement)}
-        initial={{ opacity: 0, y: -30, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -30, scale: 0.95 }}
-        transition={{
-          type: "spring",
-          stiffness: 500,
-          damping: 35,
-          duration: 0.25,
-        }}
-        key="toast-main"
-      >
-        <span style={toastIconStyle()}>{icon}</span>
-        <span style={toastTextStyle()}>{toastMessage}</span>
-        <button onClick={closeToast} style={toastCloseStyle()}>
-          ✕
-        </button>
-      </motion.div>
-    );
-  };
-
-  // ============================================================
-  // 🔥 ESTILOS DO TOAST
-  // ============================================================
-  function toastStyle(isError, isSpecial) {
-    let bgColor, textColor, borderColor;
-
-    if (isError) {
-      bgColor = "rgba(220, 50, 50, 0.95)";
-      textColor = "#ffffff";
-      borderColor = "rgba(244, 67, 54, 0.3)";
-    } else if (isSpecial) {
-      bgColor = "rgba(255, 215, 0, 0.95)";
-      textColor = "#1a1a1a";
-      borderColor = "rgba(255, 215, 0, 0.5)";
-    } else {
-      bgColor = "rgba(30, 30, 40, 0.92)";
-      textColor = "#ffffff";
-      borderColor = "rgba(255, 255, 255, 0.1)";
-    }
-
-    return {
-      position: "fixed",
-      top: "24px",
-      left: "50%",
-      transform: "translateX(-50%)",
-      zIndex: 9999,
-      background: bgColor,
-      color: textColor,
-      padding: "14px 24px",
-      borderRadius: "16px",
-      boxShadow: "0 8px 40px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)",
-      display: "flex",
-      alignItems: "center",
-      gap: "14px",
-      maxWidth: "min(90vw, 500px)",
-      width: "auto",
-      minWidth: "min(280px, 90vw)",
-      backdropFilter: "blur(12px)",
-      WebkitBackdropFilter: "blur(12px)",
-      border: `1px solid ${borderColor}`,
-      flexWrap: "nowrap",
-      overflow: "hidden",
-      boxSizing: "border-box",
-    };
-  }
-
-  function toastIconStyle() {
-    return {
-      fontSize: "1.4rem",
-      flexShrink: 0,
-      width: "28px",
-      textAlign: "center",
-    };
-  }
-
-  function toastTextStyle() {
-    return {
-      flex: "1 1 auto",
-      fontSize: "0.9rem",
-      fontWeight: "500",
-      lineHeight: "1.4",
-      minWidth: "0",
-      wordBreak: "break-word",
-      overflowWrap: "break-word",
-      maxWidth: "100%",
-    };
-  }
-
-  function toastCloseStyle() {
-    return {
-      background: "none",
-      border: "none",
-      color: "inherit",
-      cursor: "pointer",
-      fontSize: "1.1rem",
-      opacity: 0.5,
-      padding: "4px 6px",
-      transition: "all 0.3s ease",
-      flexShrink: 0,
-      borderRadius: "50%",
-      lineHeight: 1,
-      marginLeft: "2px",
-    };
-  }
 
   // ====================== BUSCAR FICHAS DIRETAMENTE DO BANCO ======================
   const fetchChipsFromDB = useCallback(async () => {
@@ -642,9 +462,14 @@ export default function PokerGame() {
         msg.includes("🏅 Achado");
 
       if (isImportant) {
-        const type = isError ? "error" : "info";
-        const duration = msg.includes("🎊 Subiu para Nível") ? 7000 : 5000;
-        showToastMessage(msg, type, duration);
+        // Usar toast premium
+        if (msg.includes("🎊 Subiu para Nível")) {
+          toast.levelUp(msg);
+        } else if (msg.includes("🎉 Conquista")) {
+          toast.achievement(msg);
+        } else if (msg.includes("🏅 Achado")) {
+          toast.finding(msg);
+        }
       }
 
       // 🔥 Sons
@@ -679,7 +504,7 @@ export default function PokerGame() {
         2000,
       );
     },
-    [showToastMessage],
+    [toast],
   );
 
   // ====================== SALVAR ESTADO AUTOMATICAMENTE ======================
@@ -764,9 +589,8 @@ export default function PokerGame() {
             const achievementNames = data.newAchievements
               .map((a) => a.name)
               .join(", ");
-            showNotification(
+            toast.achievement(
               `🎉 Conquista desbloqueada: ${achievementNames}!`,
-              false,
             );
             setNewAchievements(data.newAchievements);
             setTimeout(() => setShowAchievementsModal(true), 1500);
@@ -774,18 +598,14 @@ export default function PokerGame() {
 
           if (data.newFindings?.length > 0) {
             const findingNames = data.newFindings.map((f) => f.name).join(", ");
-            showNotification(
-              `🏅 Achado descoberto: ${findingNames}! (+XP)`,
-              false,
-            );
+            toast.finding(`🏅 Achado descoberto: ${findingNames}! (+XP)`);
             setNewFindings(data.newFindings);
             setTimeout(() => setShowFindingsModal(true), 2500);
           }
 
           if (data.leveledUp) {
-            showNotification(
+            toast.levelUp(
               `🎊 Subiu para Nível ${data.newLevel}! ${data.levelTitle}`,
-              false,
             );
           }
         }
@@ -795,7 +615,7 @@ export default function PokerGame() {
         console.error("Erro ao atualizar estatísticas:", error);
       }
     },
-    [currentUser, showNotification],
+    [currentUser, toast],
   );
 
   // ====================== SALVAR HISTÓRICO ======================
@@ -1931,416 +1751,6 @@ export default function PokerGame() {
     };
   }, []);
 
-  // ====================== MODAL DE RESULTADO ======================
-  function ResultModal({ data, onClose }) {
-    if (!data) return null;
-
-    const isWin = data.winner === "player";
-    const isTie = data.winner === "tie";
-    const [isClosing, setIsClosing] = useState(false);
-    const [showContent, setShowContent] = useState(false);
-
-    useEffect(() => {
-      document.body.style.overflow = "hidden";
-      setIsResultModalOpen(true);
-
-      const timer = setTimeout(() => setShowContent(true), 50);
-
-      return () => {
-        document.body.style.overflow = "";
-        setIsResultModalOpen(false);
-        clearTimeout(timer);
-      };
-    }, []);
-
-    const handleClose = () => {
-      if (isClosing) return;
-      setIsClosing(true);
-      setShowContent(false);
-      setTimeout(() => onClose(), 300);
-    };
-
-    const renderCard = useCallback((card, index, isFlipped = false) => {
-      if (!card) return null;
-      const isRed = card.suit === "♥" || card.suit === "♦";
-      return (
-        <div
-          key={`modal-card-${index}-${card.rank}${card.suit}`}
-          style={{
-            ...cardBaseStyle(isFlipped),
-            ...(isFlipped ? cardBackStyle() : cardFrontStyle(isRed)),
-          }}
-        >
-          {!isFlipped && (
-            <>
-              <span style={cardRankStyle(isRed)}>
-                {card.rank === 14
-                  ? "A"
-                  : card.rank === 13
-                    ? "K"
-                    : card.rank === 12
-                      ? "Q"
-                      : card.rank === 11
-                        ? "J"
-                        : card.rank === 10
-                          ? "10"
-                          : card.rank}
-              </span>
-              <span style={cardSuitStyle(isRed)}>{card.suit}</span>
-            </>
-          )}
-        </div>
-      );
-    }, []);
-
-    const communityCards = useMemo(
-      () => data.communityCards || [],
-      [data.communityCards],
-    );
-    const playerCards = useMemo(
-      () => data.playerCards || [],
-      [data.playerCards],
-    );
-    const cpuCards = useMemo(() => data.cpuCards || [], [data.cpuCards]);
-
-    const resultConfig = {
-      win: {
-        bg: "linear-gradient(145deg, #0d3b1e, #1a6a3a)",
-        border: "2px solid #4caf50",
-        glow: "0 0 60px rgba(76, 175, 80, 0.3)",
-        accent: "#4caf50",
-        icon: "🏆",
-        title: "VITÓRIA!",
-        titleColor: "#4caf50",
-      },
-      loss: {
-        bg: "linear-gradient(145deg, #3b0d0d, #6a1a1a)",
-        border: "2px solid #f44336",
-        glow: "0 0 60px rgba(244, 67, 54, 0.3)",
-        accent: "#f44336",
-        icon: "💔",
-        title: "DERROTA!",
-        titleColor: "#f44336",
-      },
-      tie: {
-        bg: "linear-gradient(145deg, #3b3a0d, #6a6a1a)",
-        border: "2px solid #ffc107",
-        glow: "0 0 60px rgba(255, 193, 7, 0.3)",
-        accent: "#ffc107",
-        icon: "🤝",
-        title: "EMPATE!",
-        titleColor: "#ffc107",
-      },
-    };
-
-    const config = isWin
-      ? resultConfig.win
-      : isTie
-        ? resultConfig.tie
-        : resultConfig.loss;
-
-    const AnimatedSection = ({ children, delay = 0, className = "" }) => (
-      <div
-        style={{
-          opacity: showContent ? 1 : 0,
-          transform: showContent ? "translateY(0)" : "translateY(20px)",
-          transition: `all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms`,
-          willChange: "transform, opacity",
-        }}
-      >
-        {children}
-      </div>
-    );
-
-    return (
-      <div
-        style={{
-          ...modalOverlayStyle(),
-          opacity: isClosing ? 0 : 1,
-          transition: "opacity 0.3s ease-out",
-        }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) handleClose();
-        }}
-      >
-        <div
-          style={{
-            ...modalContentStyle(config),
-            transform: isClosing
-              ? "scale(0.95) rotate(-2deg)"
-              : "scale(1) rotate(0deg)",
-            transition:
-              "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out",
-            willChange: "transform, opacity",
-          }}
-        >
-          <button
-            onClick={handleClose}
-            style={closeButtonStyle()}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-              e.currentTarget.style.transform = "rotate(90deg)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-              e.currentTarget.style.transform = "rotate(0deg)";
-            }}
-          >
-            ✕
-          </button>
-
-          <AnimatedSection delay={0}>
-            <div style={modalHeaderStyle()}>
-              <div
-                style={{
-                  ...iconContainerStyle(),
-                  border: `2px solid ${config.accent}`,
-                  boxShadow: `0 0 40px ${config.accent}33`,
-                }}
-              >
-                <span style={modalIconStyle()}>{config.icon}</span>
-              </div>
-              <h2 style={modalTitleStyle(config)}>{config.title}</h2>
-            </div>
-          </AnimatedSection>
-
-          <AnimatedSection delay={100}>
-            <div style={modalMessageStyle()}>
-              <p style={modalWinnerStyle(config)}>{data.winnerMsg}</p>
-            </div>
-          </AnimatedSection>
-
-          {communityCards.length > 0 ||
-            playerCards.length > 0 ||
-            (cpuCards.length > 0 && (
-              <AnimatedSection delay={150}>
-                <div style={modalCardsContainerStyle(config)}>
-                  {communityCards.length > 0 && (
-                    <div style={modalCommunityStyle()}>
-                      <div style={modalCommunityLabelStyle()}>🔥 MESA</div>
-                      <div style={modalCardsRowStyle()}>
-                        {communityCards.map((card, i) => (
-                          <div
-                            key={`community-${i}`}
-                            style={{
-                              opacity: showContent ? 1 : 0,
-                              transform: showContent
-                                ? "translateY(0)"
-                                : "translateY(30px)",
-                              transition: `all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${200 + i * 80}ms`,
-                              willChange: "transform, opacity",
-                            }}
-                          >
-                            {renderCard(card, i, false)}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={modalComparisonStyle()}>
-                    <div style={modalPlayerStyle(true)}>
-                      <div style={modalPlayerNameStyle(true)}>
-                        <span
-                          style={{ fontSize: "1.2rem", marginRight: "4px" }}
-                        >
-                          🃏
-                        </span>
-                        {data.playerName || "Você"}
-                        {isWin && (
-                          <span
-                            style={{
-                              marginLeft: "8px",
-                              fontSize: "0.6rem",
-                              background: "#4caf50",
-                              color: "white",
-                              padding: "1px 8px",
-                              borderRadius: 10,
-                            }}
-                          >
-                            VENCEDOR
-                          </span>
-                        )}
-                      </div>
-                      <div style={modalCardsRowStyle()}>
-                        {playerCards.length > 0 ? (
-                          playerCards.map((card, i) => (
-                            <div
-                              key={`player-${i}`}
-                              style={{
-                                opacity: showContent ? 1 : 0,
-                                transform: showContent
-                                  ? "translateY(0)"
-                                  : "translateY(30px)",
-                                transition: `all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${300 + i * 100}ms`,
-                                willChange: "transform, opacity",
-                              }}
-                            >
-                              {renderCard(card, i, false)}
-                            </div>
-                          ))
-                        ) : (
-                          <span style={{ color: "#aaa", fontSize: "0.65rem" }}>
-                            Sem cartas
-                          </span>
-                        )}
-                      </div>
-                      <div style={modalHandStyle(true, config)}>
-                        {data.playerHand}
-                      </div>
-                      {isWin && (
-                        <div style={winnerBadgeStyle()}>
-                          <span>🏆</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={modalVersusStyle()}>
-                      <span>⚡</span>
-                    </div>
-
-                    <div style={modalPlayerStyle(false)}>
-                      <div style={modalPlayerNameStyle(false)}>
-                        <span
-                          style={{ fontSize: "1.2rem", marginRight: "4px" }}
-                        >
-                          🤖
-                        </span>
-                        CPU
-                        {!isWin && !isTie && (
-                          <span
-                            style={{
-                              marginLeft: "8px",
-                              fontSize: "0.6rem",
-                              background: "#f44336",
-                              color: "white",
-                              padding: "1px 8px",
-                              borderRadius: 10,
-                            }}
-                          >
-                            VENCEDOR
-                          </span>
-                        )}
-                      </div>
-                      <div style={modalCardsRowStyle()}>
-                        {cpuCards.length > 0 ? (
-                          cpuCards.map((card, i) => (
-                            <div
-                              key={`cpu-${i}`}
-                              style={{
-                                opacity: showContent ? 1 : 0,
-                                transform: showContent
-                                  ? "translateY(0)"
-                                  : "translateY(30px)",
-                                transition: `all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${350 + i * 100}ms`,
-                                willChange: "transform, opacity",
-                              }}
-                            >
-                              {renderCard(card, i, false)}
-                            </div>
-                          ))
-                        ) : (
-                          <span style={{ color: "#aaa", fontSize: "0.65rem" }}>
-                            Sem cartas
-                          </span>
-                        )}
-                      </div>
-                      <div style={modalHandStyle(false, config)}>
-                        {data.cpuHand}
-                      </div>
-                      {!isWin && !isTie && (
-                        <div style={loserBadgeStyle()}>
-                          <span>💔</span>
-                        </div>
-                      )}
-                      {isTie && (
-                        <div style={tieBadgeStyle()}>
-                          <span>🤝</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </AnimatedSection>
-            ))}
-
-          <AnimatedSection delay={200}>
-            <div style={modalPotStyle(config)}>
-              <span style={{ fontSize: "1rem", fontWeight: "bold" }}>
-                💰 Pote: <span style={{ color: "#ffd700" }}>{data.pot}</span>{" "}
-                fichas
-              </span>
-              <div style={modalResultAmountStyle(isWin, isTie, data)}>
-                {isWin && (
-                  <span style={winAmountStyle()}>
-                    <span style={{ fontSize: "0.8rem" }}>+</span>
-                    {data.chipsWon}
-                  </span>
-                )}
-                {!isWin && !isTie && (
-                  <span style={loseAmountStyle()}>
-                    <span style={{ fontSize: "0.8rem" }}>-</span>
-                    {data.chipsLost}
-                  </span>
-                )}
-                {isTie && (
-                  <span style={tieAmountStyle()}>
-                    <span style={{ fontSize: "0.8rem" }}>+</span>
-                    {data.split}
-                  </span>
-                )}
-              </div>
-            </div>
-          </AnimatedSection>
-
-          <AnimatedSection delay={250}>
-            <div style={modalCpuThoughtStyle(config)}>
-              <span style={{ opacity: 0.5 }}>💭</span> {data.cpuThought}
-            </div>
-          </AnimatedSection>
-
-          <AnimatedSection delay={300}>
-            <button
-              onClick={handleClose}
-              style={{
-                ...modalCloseButtonStyle(config),
-                opacity: isClosing ? 0.5 : 1,
-                cursor: isClosing ? "not-allowed" : "pointer",
-              }}
-              disabled={isClosing}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.02)";
-                e.currentTarget.style.boxShadow = `0 6px 20px ${config.accent}44`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = `0 4px 0 #7a4c1a`;
-              }}
-            >
-              {isClosing ? (
-                <span
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                >
-                  <span style={{ animation: "spin 0.8s linear infinite" }}>
-                    ⏳
-                  </span>
-                  FECHANDO...
-                </span>
-              ) : (
-                <span
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                >
-                  <span>▶</span>
-                  CONTINUAR
-                </span>
-              )}
-            </button>
-          </AnimatedSection>
-        </div>
-      </div>
-    );
-  }
-
   // ====================== RENDER ======================
   const g = game;
   const suggestion = getPlayerSuggestion(g);
@@ -2425,10 +1835,7 @@ export default function PokerGame() {
 
   return (
     <>
-      {/* 🔥 TOAST APENAS PARA EVENTOS IMPORTANTES */}
-      <AnimatePresence mode="wait">
-        <ToastNotification />
-      </AnimatePresence>
+      {/* 🔥 TOAST PREMIUM - GERENCIADO PELO ToastManager */}
 
       <div
         style={{
@@ -2445,7 +1852,7 @@ export default function PokerGame() {
           transition: "var(--transition-theme)",
         }}
       >
-        {/* 🔥 BOTÃO DE SAIR - LADO DIREITO (SEM BOTÃO DE TORNEIO DUPLICADO) */}
+        {/* 🔥 BOTÃO DE SAIR - LADO DIREITO */}
         {currentUser && (
           <div
             style={{
@@ -2479,7 +1886,7 @@ export default function PokerGame() {
           </div>
         )}
 
-        {/* 🔥 TOOLBAR - BOTÕES À DIREITA (INCLUI TEMA, TORNEIOS E TODOS OS DEMAIS) */}
+        {/* 🔥 TOOLBAR - BOTÕES À DIREITA */}
         <ToolbarButtons
           isTurbo={isTurbo}
           onTurboToggle={handleTurboToggle}
@@ -2772,390 +2179,4 @@ export default function PokerGame() {
       </div>
     </>
   );
-}
-
-// ====================== ESTILOS PREMIUM DO MODAL ======================
-
-function modalOverlayStyle() {
-  return {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.88)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 2000,
-    padding: 20,
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
-  };
-}
-
-function modalContentStyle(config) {
-  return {
-    background: config.bg,
-    padding: "24px 28px",
-    borderRadius: 24,
-    maxWidth: 520,
-    width: "100%",
-    color: "white",
-    border: config.border,
-    boxShadow: `0 20px 60px rgba(0,0,0,0.6), ${config.glow}`,
-    maxHeight: "90vh",
-    overflowY: "auto",
-    position: "relative",
-    scrollbarWidth: "thin",
-    scrollbarColor: "rgba(255,255,255,0.1) transparent",
-  };
-}
-
-function closeButtonStyle() {
-  return {
-    position: "absolute",
-    top: 12,
-    right: 16,
-    background: "rgba(255,255,255,0.05)",
-    border: "none",
-    color: "#fff",
-    fontSize: "1.1rem",
-    cursor: "pointer",
-    zIndex: 10,
-    width: 32,
-    height: 32,
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.3s ease",
-    opacity: 0.6,
-  };
-}
-
-function iconContainerStyle() {
-  return {
-    width: 60,
-    height: 60,
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "rgba(0,0,0,0.2)",
-    backdropFilter: "blur(4px)",
-  };
-}
-
-function modalIconStyle() {
-  return {
-    fontSize: "2.8rem",
-    lineHeight: 1,
-  };
-}
-
-function modalTitleStyle(config) {
-  return {
-    margin: 0,
-    fontSize: "1.6rem",
-    fontWeight: "800",
-    color: config.titleColor,
-    textShadow: `0 0 30px ${config.accent}44`,
-    letterSpacing: "1px",
-  };
-}
-
-function modalHeaderStyle() {
-  return {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "16px",
-    marginBottom: "8px",
-  };
-}
-
-function modalMessageStyle() {
-  return {
-    textAlign: "center",
-    marginBottom: "12px",
-  };
-}
-
-function modalWinnerStyle(config) {
-  return {
-    fontSize: "1.05rem",
-    fontWeight: "600",
-    color: config.accent,
-    margin: 0,
-    padding: "6px 16px",
-    background: "rgba(0,0,0,0.2)",
-    borderRadius: 20,
-    display: "inline-block",
-  };
-}
-
-function modalCardsContainerStyle(config) {
-  return {
-    background: "rgba(0,0,0,0.2)",
-    borderRadius: 16,
-    padding: "10px",
-    marginBottom: "10px",
-    border: `1px solid ${config.accent}22`,
-  };
-}
-
-function modalCommunityStyle() {
-  return {
-    textAlign: "center",
-    marginBottom: "8px",
-    padding: "4px",
-    background: "rgba(0,0,0,0.15)",
-    borderRadius: 10,
-  };
-}
-
-function modalCommunityLabelStyle() {
-  return {
-    fontSize: "0.55rem",
-    color: "#aaa",
-    marginBottom: "4px",
-    display: "block",
-    textTransform: "uppercase",
-    letterSpacing: "2px",
-    fontWeight: "600",
-  };
-}
-
-function modalCardsRowStyle() {
-  return {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "4px",
-    flexWrap: "wrap",
-    padding: "4px 0",
-    minHeight: "65px",
-  };
-}
-
-function cardBaseStyle(isFlipped) {
-  return {
-    display: "inline-flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 44,
-    height: 64,
-    margin: "1px",
-    borderRadius: 6,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-    flexShrink: 0,
-    position: "relative",
-    transition: "transform 0.2s ease",
-    transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-  };
-}
-
-function cardFrontStyle(isRed) {
-  return {
-    background: "linear-gradient(145deg, #ffffff, #f0f0f0)",
-    border: "1px solid #ddd",
-    color: isRed ? "#cc0000" : "#000",
-  };
-}
-
-function cardBackStyle() {
-  return {
-    background:
-      "repeating-linear-gradient(45deg, #2b5797, #2b5797 8px, #1d3f6e 8px, #1d3f6e 16px)",
-    border: "2px solid #1a3a6e",
-  };
-}
-
-function cardRankStyle(isRed) {
-  return {
-    fontSize: "0.9rem",
-    fontWeight: "800",
-    color: isRed ? "#cc0000" : "#000",
-    lineHeight: 1,
-    marginBottom: "-2px",
-  };
-}
-
-function cardSuitStyle(isRed) {
-  return {
-    fontSize: "1rem",
-    color: isRed ? "#cc0000" : "#000",
-    lineHeight: 1,
-  };
-}
-
-function modalComparisonStyle() {
-  return {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "stretch",
-    padding: "6px 0",
-    borderTop: "1px solid rgba(255,255,255,0.06)",
-    borderBottom: "1px solid rgba(255,255,255,0.06)",
-    marginBottom: "4px",
-    gap: "6px",
-  };
-}
-
-function modalPlayerStyle(isPlayer) {
-  return {
-    flex: 1,
-    textAlign: isPlayer ? "left" : "right",
-    minWidth: "90px",
-    padding: "4px 6px",
-    borderRadius: 10,
-    background: isPlayer ? "rgba(76,175,80,0.05)" : "rgba(255,152,0,0.05)",
-  };
-}
-
-function modalPlayerNameStyle(isPlayer) {
-  return {
-    fontSize: "0.7rem",
-    fontWeight: "700",
-    color: isPlayer ? "#4caf50" : "#ff9800",
-    marginBottom: "4px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: isPlayer ? "flex-start" : "flex-end",
-    gap: "4px",
-    flexWrap: "wrap",
-  };
-}
-
-function modalHandStyle(isPlayer, config) {
-  return {
-    fontSize: "0.78rem",
-    fontWeight: "700",
-    color: isPlayer ? "#4caf50" : "#ff9800",
-    background: "rgba(0,0,0,0.25)",
-    padding: "2px 10px",
-    borderRadius: 12,
-    display: "inline-block",
-    marginTop: "4px",
-    border: `1px solid ${config.accent}22`,
-  };
-}
-
-function modalVersusStyle() {
-  return {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "1.2rem",
-    fontWeight: "800",
-    color: "#888",
-    padding: "0 8px",
-    minWidth: "30px",
-  };
-}
-
-function modalPotStyle(config) {
-  return {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "8px 12px",
-    fontSize: "0.9rem",
-    background: "rgba(0,0,0,0.15)",
-    borderRadius: 12,
-    marginBottom: "6px",
-    border: `1px solid ${config.accent}11`,
-  };
-}
-
-function modalResultAmountStyle(isWin, isTie, data) {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-  };
-}
-
-function winAmountStyle() {
-  return {
-    color: "#4caf50",
-    fontWeight: "800",
-    fontSize: "1.1rem",
-    textShadow: "0 0 20px rgba(76,175,80,0.3)",
-  };
-}
-
-function loseAmountStyle() {
-  return {
-    color: "#f44336",
-    fontWeight: "800",
-    fontSize: "1.1rem",
-    textShadow: "0 0 20px rgba(244,67,54,0.3)",
-  };
-}
-
-function tieAmountStyle() {
-  return {
-    color: "#ffc107",
-    fontWeight: "800",
-    fontSize: "1.1rem",
-    textShadow: "0 0 20px rgba(255,193,7,0.3)",
-  };
-}
-
-function modalCpuThoughtStyle(config) {
-  return {
-    textAlign: "center",
-    fontSize: "0.7rem",
-    color: "#bbb",
-    fontStyle: "italic",
-    padding: "6px 12px",
-    marginBottom: "8px",
-    background: "rgba(0,0,0,0.15)",
-    borderRadius: 12,
-    minHeight: "22px",
-    border: `1px solid ${config.accent}11`,
-  };
-}
-
-function modalCloseButtonStyle(config) {
-  return {
-    background: "linear-gradient(145deg, #f7d97c, #d6a12e)",
-    border: "none",
-    fontWeight: "700",
-    fontSize: "0.9rem",
-    padding: "10px 24px",
-    borderRadius: 50,
-    boxShadow: "0 4px 0 #7a4c1a, 0 0 30px rgba(255,215,0,0.1)",
-    color: "#2e241f",
-    width: "100%",
-    transition: "all 0.2s ease",
-    marginTop: "4px",
-    letterSpacing: "0.5px",
-    position: "relative",
-    overflow: "hidden",
-  };
-}
-
-function winnerBadgeStyle() {
-  return {
-    marginTop: "4px",
-    fontSize: "1.2rem",
-    animation: "bounce 1s ease-in-out infinite",
-  };
-}
-
-function loserBadgeStyle() {
-  return {
-    marginTop: "4px",
-    fontSize: "1.2rem",
-    opacity: 0.6,
-  };
-}
-
-function tieBadgeStyle() {
-  return {
-    marginTop: "4px",
-    fontSize: "1.2rem",
-    animation: "pulse 1.5s ease-in-out infinite",
-  };
 }

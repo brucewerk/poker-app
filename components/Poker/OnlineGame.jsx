@@ -1,4 +1,4 @@
-// components/Poker/OnlineGame.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
+// components/Poker/OnlineGame.jsx - COMPLETO CORRIGIDO (MODO CLARO LEGÍVEL)
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -51,7 +51,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   const leaveTimeoutRef = useRef(null);
   const closeSummaryTimeoutRef = useRef(null);
 
-  // 🔥 ADICIONAR ESTILOS GLOBAIS
   useEffect(() => {
     if (
       typeof window !== "undefined" &&
@@ -83,7 +82,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     };
   }, []);
 
-  // 🔥 Sincronizar estado de ready
   const syncReadyState = useCallback(
     (playersList) => {
       if (!playersList || !socket || !isMounted.current) return;
@@ -95,7 +93,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     [socket],
   );
 
-  // 🔥 Verificar se todos estão prontos
   const checkAllReady = useCallback((playersList) => {
     if (!playersList || playersList.length < 2) return false;
     return playersList.every((p) => p.isReady === true);
@@ -107,7 +104,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     console.log("🔄 OnlineGame montado, socket:", socket?.id);
     console.log(`📋 RoomId: ${roomId}, Player: ${playerName}`);
 
-    // 🔥 LIMPAR TODOS OS LISTENERS ANTIGOS
     socket.off("room-update");
     socket.off("game-started");
     socket.off("game-update");
@@ -118,7 +114,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     socket.off("summary-progress");
     socket.off("error");
 
-    // 🔥 LISTENER: ATUALIZAÇÃO DA SALA
     const onRoomUpdate = (data) => {
       if (!isMounted.current) return;
       console.log("📡 room-update:", data);
@@ -134,7 +129,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
-    // 🔥 LISTENER: JOGO INICIADO
     const onGameStarted = (data) => {
       if (!isMounted.current) return;
       console.log("📡 game-started:", data);
@@ -150,7 +144,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
-    // 🔥 LISTENER: ATUALIZAÇÃO DO JOGO
     const onGameUpdate = (data) => {
       if (!isMounted.current) return;
       console.log("📡 game-update:", data);
@@ -161,14 +154,12 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
-    // 🔥 LISTENER: VEZ DO JOGADOR
     const onPlayerTurn = (data) => {
       if (!isMounted.current) return;
       console.log("📡 player-turn:", data);
       setIsMyTurn(data.playerId === socket.id);
     };
 
-    // 🔥 LISTENER: RODADA TERMINADA
     const onRoundEnded = (data) => {
       if (!isMounted.current) return;
       console.log("📡 ROUND-ENDED recebido!");
@@ -190,7 +181,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       );
     };
 
-    // 🔥 LISTENER: PROGRESSO DO RESUMO
     const onSummaryProgress = (data) => {
       if (!isMounted.current) return;
       console.log("📡 summary-progress:", data);
@@ -208,7 +198,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
-    // 🔥 LISTENER: RESUMO FECHADO
     const onSummaryClosed = (data) => {
       if (!isMounted.current) return;
       console.log("📡 summary-closed:", data);
@@ -231,7 +220,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
-    // 🔥 LISTENER: RESET DO JOGO
     const onGameReset = () => {
       if (!isMounted.current) return;
       console.log("📡 game-reset recebido!");
@@ -241,7 +229,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       setHasClosed(false);
     };
 
-    // 🔥 LISTENER: ERRO - CORRIGIDO
     const onError = (data) => {
       if (!isMounted.current) return;
       console.error("❌ Erro do servidor:", data);
@@ -253,7 +240,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       setTimeout(() => setGameError(""), 5000);
     };
 
-    // 🔥 REGISTRAR LISTENERS
     socket.on("room-update", onRoomUpdate);
     socket.on("game-started", onGameStarted);
     socket.on("game-update", onGameUpdate);
@@ -264,7 +250,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     socket.on("game-reset", onGameReset);
     socket.on("error", onError);
 
-    // 🔥 SOLICITAR ATUALIZAÇÃO INICIAL
     socket.emit("list-rooms");
 
     return () => {
@@ -281,7 +266,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     };
   }, [socket, roomId, playerName, syncReadyState, checkAllReady, isStarting]);
 
-  // 🔥 FECHAR RESUMO
   const handleCloseSummary = () => {
     if (isClosingRef.current) return;
     if (resultClosedRef.current) return;
@@ -319,14 +303,12 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     }, 5000);
   };
 
-  // 🔥 AÇÕES DO JOGADOR
   const handleAction = (action, amount = 0) => {
     if (!socket || !isMounted.current) return;
     console.log(`📤 Enviando ação: ${action}`, { roomId, action, amount });
     socket.emit("player-action", { roomId, action, amount });
   };
 
-  // 🔥 ALTERNAR PRONTO
   const toggleReady = useCallback(() => {
     if (!socket || !isMounted.current) return;
 
@@ -349,7 +331,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     console.log(`✅ Ready toggled para: ${newReadyState}`);
   }, [socket, roomId, playerName, isReady]);
 
-  // 🔥 SAIR DA SALA
   const leaveRoom = useCallback(async () => {
     if (isLeaving) return;
     setIsLeaving(true);
@@ -411,16 +392,14 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           <div style={resultPotStyle()}>💰 Pote: {resultData.pot} fichas</div>
 
           <div style={resultCommunityStyle()}>
-            <span style={{ color: "var(--text-muted)", marginRight: "10px" }}>
-              Cartas da mesa:
-            </span>
+            <span style={resultCommunityLabelStyle()}>Cartas da mesa:</span>
             {resultData.communityCards &&
             resultData.communityCards.length > 0 ? (
               resultData.communityCards.map((card, i) => (
                 <CardDisplay key={i} card={card} />
               ))
             ) : (
-              <span style={{ color: "var(--text-muted)" }}>(nenhuma)</span>
+              <span style={resultCommunityEmptyStyle()}>(nenhuma)</span>
             )}
           </div>
 
@@ -449,10 +428,10 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           </div>
 
           <div style={resultStatusStyle()}>
-            <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+            <span style={resultStatusTextStyle()}>
               👥 {closed}/{total} jogadores já fecharam
             </span>
-            <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>
+            <span style={resultStatusHintStyle()}>
               ⏳ Fechamento automático em 25s
             </span>
           </div>
@@ -611,6 +590,11 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   const canCall = callAmount > 0 && currentPlayer?.chips >= callAmount;
   const canRaise = currentPlayer?.chips > callAmount + 50;
 
+  // 🔥 COR DO TEMA
+  const isDarkTheme =
+    typeof window !== "undefined" &&
+    document.documentElement.getAttribute("data-theme") === "dark";
+
   return (
     <div style={gameStyle()}>
       <div style={headerStyle()}>
@@ -620,29 +604,19 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
         </button>
       </div>
 
-      <div style={tableStyle()}>
+      <div style={tableStyle(isDarkTheme)}>
         <div style={potStyle()}>
-          💰 Pote: <span style={{ color: "gold" }}>{gameState.pot}</span>
+          💰 Pote: <span style={potValueStyle()}>{gameState.pot}</span>
         </div>
 
-        <div style={communityStyle()}>
-          <span
-            style={{
-              color: "var(--text-muted)",
-              fontSize: "0.8rem",
-              marginRight: "10px",
-            }}
-          >
-            Mesa:
-          </span>
+        <div style={communityStyle(isDarkTheme)}>
+          <span style={communityLabelStyle()}>Mesa:</span>
           {gameState.communityCards && gameState.communityCards.length > 0 ? (
             gameState.communityCards.map((card, i) => (
               <CardDisplay key={i} card={card} />
             ))
           ) : (
-            <span style={{ color: "var(--text-muted)" }}>
-              Aguardando cartas...
-            </span>
+            <span style={communityEmptyStyle()}>Aguardando cartas...</span>
           )}
         </div>
 
@@ -653,10 +627,17 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             return (
               <motion.div
                 key={index}
-                style={playerGameStyle(isCurrent, player.isFolded, isTurn)}
+                style={playerGameStyle(
+                  isCurrent,
+                  player.isFolded,
+                  isTurn,
+                  isDarkTheme,
+                )}
                 whileHover={{ scale: isCurrent ? 1.02 : 1 }}
               >
-                <div style={playerNameGameStyle()}>
+                <div
+                  style={playerNameGameStyle(isTurn, isCurrent, isDarkTheme)}
+                >
                   {player.name}
                   {isCurrent && " 👈"}
                   {isTurn && " 🔥"}
@@ -669,7 +650,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
                       <CardDisplay key={i} card={card} faceDown={!isCurrent} />
                     ))
                   ) : (
-                    <span style={{ color: "var(--text-muted)" }}>🔒</span>
+                    <span style={playerNoCardsStyle()}>🔒</span>
                   )}
                 </div>
                 <div style={playerChipsStyle()}>💰 {player.chips}</div>
@@ -681,17 +662,17 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           })}
         </div>
 
-        <div style={turnIndicatorStyle()}>
+        <div style={turnIndicatorStyle(isDarkTheme)}>
           {isCurrentPlayerMe && !currentPlayer?.isFolded ? (
             <motion.span
-              style={{ color: "#4caf50", fontWeight: "bold" }}
+              style={turnActiveStyle()}
               animate={{ scale: [1, 1.05, 1] }}
               transition={{ duration: 1, repeat: Infinity }}
             >
               🎯 É SUA VEZ!
             </motion.span>
           ) : (
-            <span style={{ color: "#ff9800" }}>
+            <span style={turnWaitingStyle()}>
               ⏳ Aguardando {currentPlayer?.name || "jogador"}...
             </span>
           )}
@@ -761,14 +742,14 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
 }
 
 // ============================================================
-// 🎨 ESTILOS
+// 🎨 ESTILOS - CORRIGIDOS PARA TEMA CLARO
 // ============================================================
 
 function resultOverlayStyle() {
   return {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.95)",
+    background: "rgba(0,0,0,0.85)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -786,10 +767,10 @@ function resultModalStyle() {
     maxWidth: 500,
     width: "100%",
     color: "var(--text-primary)",
-    border: "3px solid var(--border-gold)",
+    border: "2px solid var(--border-gold)",
     maxHeight: "80vh",
     overflowY: "auto",
-    boxShadow: "0 20px 60px var(--shadow-dark)",
+    boxShadow: "var(--modal-shadow)",
     transition: "var(--transition-theme)",
   };
 }
@@ -799,7 +780,7 @@ function resultTitleStyle() {
     textAlign: "center",
     color: "var(--text-primary)",
     margin: "0 0 15px",
-    fontSize: "1.8rem",
+    fontSize: "1.6rem",
     fontWeight: "800",
     transition: "var(--transition-theme)",
   };
@@ -808,7 +789,7 @@ function resultTitleStyle() {
 function resultPotStyle() {
   return {
     textAlign: "center",
-    fontSize: "1.3rem",
+    fontSize: "1.2rem",
     color: "#ffd700",
     marginBottom: "15px",
   };
@@ -818,9 +799,25 @@ function resultCommunityStyle() {
   return {
     textAlign: "center",
     padding: "10px",
-    background: "rgba(0,0,0,0.3)",
+    background: "rgba(0,0,0,0.12)",
     borderRadius: 15,
     marginBottom: "15px",
+  };
+}
+
+function resultCommunityLabelStyle() {
+  return {
+    color: "var(--text-muted)",
+    marginRight: "10px",
+    fontSize: "0.85rem",
+    transition: "var(--transition-theme)",
+  };
+}
+
+function resultCommunityEmptyStyle() {
+  return {
+    color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -840,16 +837,18 @@ function resultPlayerItemStyle(isWinner) {
     alignItems: "center",
     padding: "10px 15px",
     borderRadius: 10,
-    background: isWinner ? "rgba(255,215,0,0.15)" : "rgba(255,255,255,0.05)",
-    border: isWinner ? "1px solid gold" : "1px solid rgba(255,255,255,0.1)",
+    background: isWinner ? "rgba(255,215,0,0.10)" : "rgba(255,255,255,0.04)",
+    border: isWinner
+      ? "1px solid rgba(255,215,0,0.25)"
+      : "1px solid rgba(255,255,255,0.06)",
   };
 }
 
 function resultPlayerNameStyle(isWinner) {
   return {
     fontWeight: "bold",
-    color: isWinner ? "gold" : "var(--text-primary)",
-    fontSize: "1rem",
+    color: isWinner ? "#ffd700" : "var(--text-primary)",
+    fontSize: "0.95rem",
     transition: "var(--transition-theme)",
   };
 }
@@ -857,18 +856,18 @@ function resultPlayerNameStyle(isWinner) {
 function resultPlayerHandStyle(isWinner) {
   return {
     color: isWinner ? "#4caf50" : "var(--text-muted)",
-    fontSize: "0.9rem",
+    fontSize: "0.85rem",
     transition: "var(--transition-theme)",
   };
 }
 
 function resultWinnerBadgeStyle() {
   return {
-    background: "gold",
-    color: "#1a3a2a",
+    background: "#ffd700",
+    color: "#1a1a1a",
     padding: "2px 10px",
     borderRadius: 12,
-    fontSize: "0.7rem",
+    fontSize: "0.65rem",
     fontWeight: "bold",
   };
 }
@@ -876,9 +875,9 @@ function resultWinnerBadgeStyle() {
 function resultWinnerStyle() {
   return {
     textAlign: "center",
-    fontSize: "1.1rem",
+    fontSize: "1rem",
     color: "#ffd700",
-    marginBottom: "20px",
+    marginBottom: "16px",
   };
 }
 
@@ -888,7 +887,7 @@ function resultStatusStyle() {
     justifyContent: "space-between",
     alignItems: "center",
     padding: "8px 12px",
-    background: "rgba(0,0,0,0.3)",
+    background: "rgba(0,0,0,0.12)",
     borderRadius: 10,
     marginBottom: "10px",
     flexWrap: "wrap",
@@ -896,11 +895,27 @@ function resultStatusStyle() {
   };
 }
 
+function resultStatusTextStyle() {
+  return {
+    color: "var(--text-muted)",
+    fontSize: "0.85rem",
+    transition: "var(--transition-theme)",
+  };
+}
+
+function resultStatusHintStyle() {
+  return {
+    color: "var(--text-muted)",
+    fontSize: "0.75rem",
+    transition: "var(--transition-theme)",
+  };
+}
+
 function progressBarContainerStyle() {
   return {
     width: "100%",
     height: "6px",
-    background: "rgba(255,255,255,0.1)",
+    background: "rgba(255,255,255,0.08)",
     borderRadius: 5,
     overflow: "hidden",
     marginBottom: "15px",
@@ -910,7 +925,7 @@ function progressBarContainerStyle() {
 function progressBarFillStyle() {
   return {
     height: "100%",
-    background: "linear-gradient(90deg, #4caf50, gold)",
+    background: "linear-gradient(90deg, #4caf50, #ffd700)",
     borderRadius: 5,
     transition: "width 0.5s ease",
   };
@@ -927,7 +942,7 @@ function resultButtonsStyle() {
 
 function resultButtonStyle() {
   return {
-    background: "radial-gradient(#f7d97c,#d6a12e)",
+    background: "radial-gradient(#f7d97c, #d6a12e)",
     border: "none",
     fontWeight: "bold",
     fontSize: "1rem",
@@ -958,7 +973,7 @@ function resultLockedStyle() {
     color: "#4caf50",
     marginTop: "10px",
     paddingTop: "10px",
-    borderTop: "1px solid rgba(76,175,80,0.3)",
+    borderTop: "1px solid rgba(76,175,80,0.2)",
   };
 }
 
@@ -1009,15 +1024,16 @@ function titleStyle() {
   return {
     color: "var(--text-primary)",
     margin: 0,
-    fontSize: "1.5rem",
+    fontSize: "1.4rem",
+    fontWeight: "700",
     transition: "var(--transition-theme)",
   };
 }
 
 function leaveButtonStyle() {
   return {
-    background: "rgba(244,67,54,0.3)",
-    border: "1px solid #f44336",
+    background: "rgba(244,67,54,0.12)",
+    border: "1px solid rgba(244,67,54,0.25)",
     borderRadius: 20,
     padding: "8px 16px",
     color: "var(--text-primary)",
@@ -1028,7 +1044,7 @@ function leaveButtonStyle() {
 
 function errorStyle() {
   return {
-    background: "rgba(244,67,54,0.2)",
+    background: "rgba(244,67,54,0.10)",
     border: "1px solid #f44336",
     borderRadius: 12,
     padding: "10px 14px",
@@ -1061,7 +1077,7 @@ function playersListStyle() {
 function playersListTitleStyle() {
   return {
     margin: "0 0 12px 0",
-    fontSize: "1rem",
+    fontSize: "0.95rem",
     color: "var(--text-muted)",
     transition: "var(--transition-theme)",
   };
@@ -1083,9 +1099,11 @@ function playerItemStyle(isReady) {
     alignItems: "center",
     padding: "10px 15px",
     marginBottom: "8px",
-    background: isReady ? "rgba(76,175,80,0.2)" : "rgba(255,255,255,0.05)",
+    background: isReady ? "rgba(76,175,80,0.10)" : "rgba(255,255,255,0.03)",
     borderRadius: 10,
-    border: isReady ? "1px solid #4caf50" : "1px solid rgba(255,255,255,0.1)",
+    border: isReady
+      ? "1px solid rgba(76,175,80,0.20)"
+      : "1px solid rgba(255,255,255,0.05)",
   };
 }
 
@@ -1100,7 +1118,7 @@ function playerNameTextStyle() {
 
 function youBadgeStyle() {
   return {
-    color: "gold",
+    color: "#ffd700",
     fontSize: "0.75rem",
     marginLeft: "4px",
   };
@@ -1117,14 +1135,14 @@ function playerStatusStyle(isReady) {
 function readyButtonStyle(isReady) {
   return {
     background: isReady
-      ? "rgba(255,152,0,0.2)"
-      : "radial-gradient(#f7d97c,#d6a12e)",
-    border: isReady ? "1px solid #ff9800" : "none",
+      ? "rgba(255,152,0,0.12)"
+      : "radial-gradient(#f7d97c, #d6a12e)",
+    border: isReady ? "1px solid rgba(255,152,0,0.25)" : "none",
     fontWeight: "bold",
     fontSize: "1rem",
     padding: "12px 20px",
     borderRadius: 60,
-    cursor: isReady ? "pointer" : "pointer",
+    cursor: "pointer",
     boxShadow: isReady ? "none" : "0 4px 0 #7a4c1a",
     color: isReady ? "#ff9800" : "#2e241f",
     width: "100%",
@@ -1139,10 +1157,10 @@ function startingStyle() {
     justifyContent: "center",
     gap: "12px",
     padding: "12px 20px",
-    background: "rgba(255,215,0,0.1)",
+    background: "rgba(255,215,0,0.06)",
     borderRadius: 60,
-    border: "1px solid gold",
-    color: "gold",
+    border: "1px solid rgba(255,215,0,0.15)",
+    color: "#ffd700",
     fontWeight: "bold",
     fontSize: "1rem",
     marginBottom: "12px",
@@ -1154,8 +1172,8 @@ function spinnerStyle() {
     display: "inline-block",
     width: 20,
     height: 20,
-    border: "2px solid rgba(255,215,0,0.2)",
-    borderTop: "2px solid gold",
+    border: "2px solid rgba(255,215,0,0.15)",
+    borderTop: "2px solid #ffd700",
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   };
@@ -1177,7 +1195,7 @@ function waitingHintStyle() {
     justifyContent: "center",
     gap: "8px",
     padding: "10px",
-    background: "rgba(255,215,0,0.05)",
+    background: "rgba(255,215,0,0.03)",
     borderRadius: 10,
     marginTop: "10px",
     color: "var(--text-muted)",
@@ -1186,9 +1204,10 @@ function waitingHintStyle() {
   };
 }
 
-function tableStyle() {
+// 🔥 ESTILOS DA MESA - COM SUPORTE A TEMA
+function tableStyle(isDarkTheme) {
   return {
-    background: "rgba(0,20,0,0.3)",
+    background: isDarkTheme ? "rgba(0,20,0,0.25)" : "rgba(13,31,21,0.05)",
     borderRadius: 30,
     padding: "20px",
     minHeight: "300px",
@@ -1198,22 +1217,46 @@ function tableStyle() {
 function potStyle() {
   return {
     textAlign: "center",
-    fontSize: "1.3rem",
+    fontSize: "1.2rem",
     marginBottom: "15px",
     color: "var(--text-primary)",
     transition: "var(--transition-theme)",
   };
 }
 
-function communityStyle() {
+function potValueStyle() {
+  return {
+    color: "#ffd700",
+    fontWeight: "bold",
+  };
+}
+
+function communityStyle(isDarkTheme) {
   return {
     textAlign: "center",
-    fontSize: "2rem",
+    fontSize: "1.8rem",
     marginBottom: "20px",
     padding: "15px",
-    background: "rgba(0,0,0,0.2)",
+    background: isDarkTheme ? "rgba(0,0,0,0.15)" : "rgba(13,31,21,0.04)",
     borderRadius: 15,
     minHeight: "60px",
+  };
+}
+
+function communityLabelStyle() {
+  return {
+    color: "var(--text-muted)",
+    fontSize: "0.8rem",
+    marginRight: "10px",
+    transition: "var(--transition-theme)",
+  };
+}
+
+function communityEmptyStyle() {
+  return {
+    color: "var(--text-muted)",
+    fontSize: "0.9rem",
+    transition: "var(--transition-theme)",
   };
 }
 
@@ -1226,18 +1269,22 @@ function playersTableStyle() {
   };
 }
 
-function playerGameStyle(isCurrent, isFolded, isTurn) {
+function playerGameStyle(isCurrent, isFolded, isTurn, isDarkTheme) {
   return {
     background: isCurrent
-      ? "rgba(255,215,0,0.2)"
+      ? "rgba(255,215,0,0.12)"
       : isTurn
-        ? "rgba(76,175,80,0.1)"
-        : "rgba(255,255,255,0.05)",
+        ? "rgba(76,175,80,0.06)"
+        : isDarkTheme
+          ? "rgba(255,255,255,0.03)"
+          : "rgba(13,31,21,0.02)",
     border: isCurrent
-      ? "2px solid gold"
+      ? "2px solid rgba(255,215,0,0.35)"
       : isTurn
-        ? "2px solid #4caf50"
-        : "1px solid rgba(255,255,255,0.1)",
+        ? "2px solid rgba(76,175,80,0.25)"
+        : isDarkTheme
+          ? "1px solid rgba(255,255,255,0.05)"
+          : "1px solid rgba(13,31,21,0.06)",
     borderRadius: 15,
     padding: "15px",
     minWidth: "150px",
@@ -1246,12 +1293,12 @@ function playerGameStyle(isCurrent, isFolded, isTurn) {
   };
 }
 
-function playerNameGameStyle() {
+function playerNameGameStyle(isTurn, isCurrent, isDarkTheme) {
   return {
     fontWeight: "bold",
     marginBottom: "8px",
     fontSize: "0.9rem",
-    color: "var(--text-primary)",
+    color: isCurrent ? "#ffd700" : isTurn ? "#4caf50" : "var(--text-primary)",
     transition: "var(--transition-theme)",
   };
 }
@@ -1262,27 +1309,48 @@ function playerCardsStyle() {
   };
 }
 
+function playerNoCardsStyle() {
+  return {
+    color: "var(--text-muted)",
+    transition: "var(--transition-theme)",
+  };
+}
+
 function playerChipsStyle() {
   return {
     color: "#4caf50",
+    fontSize: "0.9rem",
   };
 }
 
 function playerBetStyle() {
   return {
     color: "#ff9800",
-    fontSize: "0.8rem",
+    fontSize: "0.75rem",
   };
 }
 
-function turnIndicatorStyle() {
+function turnIndicatorStyle(isDarkTheme) {
   return {
     textAlign: "center",
     padding: "15px",
     marginTop: "15px",
-    background: "rgba(0,0,0,0.3)",
+    background: isDarkTheme ? "rgba(0,0,0,0.15)" : "rgba(13,31,21,0.04)",
     borderRadius: 15,
-    fontSize: "1.2rem",
+    fontSize: "1.1rem",
+  };
+}
+
+function turnActiveStyle() {
+  return {
+    color: "#4caf50",
+    fontWeight: "bold",
+  };
+}
+
+function turnWaitingStyle() {
+  return {
+    color: "#ff9800",
   };
 }
 
@@ -1306,6 +1374,8 @@ function actionButtonStyle(color) {
     fontWeight: "bold",
     cursor: "pointer",
     transition: "all 0.3s ease",
+    fontSize: "0.85rem",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
   };
 }
 
@@ -1314,24 +1384,27 @@ function cardStyle(isRed, isFaceDown) {
     return {
       display: "inline-block",
       padding: "10px 15px",
-      margin: "0 5px",
+      margin: "0 4px",
       background: "#2b5797",
       borderRadius: 8,
       color: "white",
       fontWeight: "bold",
-      fontSize: "1.2rem",
-      minWidth: "50px",
+      fontSize: "1.1rem",
+      minWidth: "45px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
     };
   }
   return {
     display: "inline-block",
     padding: "10px 15px",
-    margin: "0 5px",
-    background: "white",
+    margin: "0 4px",
+    background: "#ffffff",
     borderRadius: 8,
     color: isRed ? "#c33" : "#1f2a2f",
     fontWeight: "bold",
-    fontSize: "1.2rem",
-    minWidth: "50px",
+    fontSize: "1.1rem",
+    minWidth: "45px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+    border: "1px solid #ddd",
   };
 }

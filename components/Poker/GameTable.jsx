@@ -1,4 +1,4 @@
-// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO
+// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO (MODO CLARO LEGÍVEL)
 "use client";
 
 import { useState, useEffect, useMemo, memo, useRef } from "react";
@@ -88,7 +88,6 @@ const GameTable = memo(function GameTable({
       chips.push(
         <motion.div
           key={`chip-${chipKeyCounter.current}-${i}`}
-          className="game-table-chip"
           initial={{ scale: 0, rotate: 0, y: -20 }}
           animate={{
             scale: 1,

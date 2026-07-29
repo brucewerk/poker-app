@@ -1,4 +1,4 @@
-// components/Poker/ActionButtons.jsx - CORRIGIDO
+// components/Poker/ActionButtons.jsx - COMPLETO COM TEMA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,7 +16,6 @@ export default function ActionButtons({
   cpuAction,
 }) {
   const [actionHistory, setActionHistory] = useState([]);
-  const [isHovering, setIsHovering] = useState(null);
 
   const addActionToHistory = (action, amount = 0) => {
     const newAction = {
