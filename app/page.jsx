@@ -281,6 +281,17 @@ export default function PokerGame() {
   const saveChips = useCallback(
     async (user, chips, force = false) => {
       if (!user) return;
+
+      // 🔥 FICHAS GLOBAIS: no modo 2 Jogadores (local, mesmo dispositivo),
+      // só o assento do dono da conta (índice 0) pode gravar no saldo
+      // global — caso contrário, o saldo do convidado (Jogador 2)
+      // sobrescreveria a conta real do usuário logado.
+      const isHotseatGuestTurn =
+        isMultiplayer && multiplayerModeActive && currentPlayerIndex !== 0;
+      if (isHotseatGuestTurn) {
+        return;
+      }
+
       if (isSaving && !force) {
         pendingSaveRef.current = true;
         return;
@@ -327,6 +338,9 @@ export default function PokerGame() {
       currentChips,
       session,
       refreshUserChips,
+      isMultiplayer,
+      multiplayerModeActive,
+      currentPlayerIndex,
     ],
   );
 
@@ -1031,6 +1045,32 @@ export default function PokerGame() {
   }
 
   // ====================== FECHAR MODAL ======================
+  // ====================== ALTERNAR JOGADOR ======================
+  const switchToNextPlayer = useCallback(() => {
+    if (
+      isMultiplayer &&
+      multiplayerModeActive &&
+      multiplayerPlayers.length > 1
+    ) {
+      const nextIndex = (currentPlayerIndex + 1) % multiplayerPlayers.length;
+      setCurrentPlayerIndex(nextIndex);
+      const playerName = multiplayerPlayers[nextIndex]?.name || "Jogador";
+      const playerChips = multiplayerPlayers[nextIndex]?.chips || 0;
+      showNotification(`🎯 Vez de ${playerName} (💰 ${playerChips} fichas)!`, false);
+      // 🔥 Retorna o índice diretamente: setCurrentPlayerIndex é assíncrono,
+      // então quem chama isso e em seguida usa `currentPlayerIndex` no mesmo
+      // tick ainda veria o valor antigo — usar o retorno evita essa corrida.
+      return nextIndex;
+    }
+    return false;
+  }, [
+    isMultiplayer,
+    multiplayerModeActive,
+    multiplayerPlayers,
+    currentPlayerIndex,
+    showNotification,
+  ]);
+
   const closeResultModal = useCallback(() => {
     if (!resultModalOpen) return;
 
@@ -1059,36 +1099,50 @@ export default function PokerGame() {
 
     requestAnimationFrame(() => {
       const refreshChipsAfterModal = async () => {
-        await refreshUserChips();
-        const chips = currentChips || 1000;
+        const scheduleNextHand = (delay) => {
+          startNewHandTimeoutRef.current = setTimeout(async () => {
+            // 🔥 Troca de jogador PRIMEIRO — usamos o índice retornado
+            // diretamente (não o state, que ainda não teria re-renderizado
+            // neste mesmo tick) para decidir de onde vêm as fichas da
+            // próxima mão.
+            let nextIndex = currentPlayerIndex;
+            if (isMultiplayer && multiplayerModeActive) {
+              const switched = switchToNextPlayer();
+              if (typeof switched === "number") nextIndex = switched;
+            }
 
-        if (chips <= 0) {
-          setWaitingForNewHand(true);
-          showNotification(
-            "💔 Você está sem fichas! Clique em RENOVAR FICHAS para recarregar.",
-            true,
-          );
-          return;
-        }
+            const nextIsHotseatGuest =
+              isMultiplayer && multiplayerModeActive && nextIndex !== 0;
+
+            let chips;
+            if (nextIsHotseatGuest) {
+              chips = multiplayerPlayers[nextIndex]?.chips ?? 0;
+            } else {
+              await refreshUserChips();
+              const freshChips = await fetchChipsFromDB();
+              chips = freshChips !== null ? freshChips : currentChips || 1000;
+            }
+
+            if (chips <= 0) {
+              setWaitingForNewHand(true);
+              showNotification(
+                "💔 Você está sem fichas! Clique em RENOVAR FICHAS para recarregar.",
+                true,
+              );
+              startNewHandTimeoutRef.current = null;
+              return;
+            }
+
+            const u = currentUser;
+            startNewHand(u, chips, nextIndex);
+            startNewHandTimeoutRef.current = null;
+          }, delay);
+        };
 
         if (data && data.winner !== "tie") {
-          const u = currentUser;
-          startNewHandTimeoutRef.current = setTimeout(() => {
-            if (isMultiplayer && multiplayerModeActive) {
-              switchToNextPlayer();
-            }
-            startNewHand(u, chips);
-            startNewHandTimeoutRef.current = null;
-          }, getDelays().nextHandDelay);
+          scheduleNextHand(getDelays().nextHandDelay);
         } else {
-          const u = currentUser;
-          startNewHandTimeoutRef.current = setTimeout(() => {
-            if (isMultiplayer && multiplayerModeActive) {
-              switchToNextPlayer();
-            }
-            startNewHand(u, chips);
-            startNewHandTimeoutRef.current = null;
-          }, 300);
+          scheduleNextHand(300);
         }
       };
 
@@ -1101,31 +1155,12 @@ export default function PokerGame() {
     currentChips,
     isMultiplayer,
     multiplayerModeActive,
-    refreshUserChips,
-    getDelays,
-    showNotification,
-  ]);
-
-  // ====================== ALTERNAR JOGADOR ======================
-  const switchToNextPlayer = useCallback(() => {
-    if (
-      isMultiplayer &&
-      multiplayerModeActive &&
-      multiplayerPlayers.length > 1
-    ) {
-      const nextIndex = (currentPlayerIndex + 1) % multiplayerPlayers.length;
-      setCurrentPlayerIndex(nextIndex);
-      const playerName = multiplayerPlayers[nextIndex]?.name || "Jogador";
-      const playerChips = multiplayerPlayers[nextIndex]?.chips || 0;
-      showNotification(`🎯 Vez de ${playerName} (💰 ${playerChips} fichas)!`, false);
-      return true;
-    }
-    return false;
-  }, [
-    isMultiplayer,
-    multiplayerModeActive,
-    multiplayerPlayers,
     currentPlayerIndex,
+    multiplayerPlayers,
+    switchToNextPlayer,
+    refreshUserChips,
+    fetchChipsFromDB,
+    getDelays,
     showNotification,
   ]);
 
@@ -1176,7 +1211,7 @@ export default function PokerGame() {
   }
 
   // ====================== INICIAR MÃO ======================
-function startNewHand(user, initialMoney) {
+function startNewHand(user, initialMoney, playerIndexOverride) {
   if (isProcessingAction.current) return;
 
   console.log("🔍 [startNewHand] Iniciando nova mão!", { user, initialMoney });
@@ -1189,8 +1224,30 @@ function startNewHand(user, initialMoney) {
 
   // 🔥 BUSCAR FICHAS ATUALIZADAS DO BANCO ANTES DE INICIAR
   const checkAndStart = async () => {
-    const freshChips = await fetchChipsFromDB();
-    const playerMoney = freshChips !== null ? freshChips : currentChips || session?.user?.chips || 1000;
+    // 🔥 FICHAS GLOBAIS: só buscamos o saldo persistido (DB) quando é a vez
+    // do dono da conta. No modo 2 Jogadores, o convidado (assento != 0) usa
+    // sua própria pilha local (multiplayerPlayers) — do contrário ele
+    // herdaria (e sobrescreveria) o saldo global do dono da conta.
+    // Usamos `playerIndexOverride` quando disponível (ex.: logo após trocar
+    // de jogador) pois `currentPlayerIndex` do state ainda não teria sido
+    // atualizado nesse mesmo tick.
+    const effectiveIndex =
+      typeof playerIndexOverride === "number"
+        ? playerIndexOverride
+        : currentPlayerIndex;
+    const isHotseatGuestTurn =
+      isMultiplayer && multiplayerModeActive && effectiveIndex !== 0;
+
+    let playerMoney;
+    if (isHotseatGuestTurn) {
+      playerMoney =
+        typeof initialMoney === "number"
+          ? initialMoney
+          : (multiplayerPlayers[effectiveIndex]?.chips ?? 0);
+    } else {
+      const freshChips = await fetchChipsFromDB();
+      playerMoney = freshChips !== null ? freshChips : currentChips || session?.user?.chips || 1000;
+    }
 
     console.log(`🔍 [startNewHand] Fichas verificadas: ${playerMoney}`);
 
@@ -1702,25 +1759,88 @@ function resetSession() {
   // ====================== MULTIPLAYER ======================
   const handleMultiplayerStart = useCallback(
     (config) => {
-      const playersWithChips = config.players.map((p) => ({
+      // 🔥 FICHAS GLOBAIS: o Jogador 1 (dono da conta logada) sempre entra
+      // no modo 2 Jogadores com o MESMO saldo que tinha no modo CPU — as
+      // fichas nunca são um "reset" para 1000. Os demais assentos (convidados
+      // sem conta, jogando no mesmo dispositivo) usam o valor configurado.
+      const ownerChips =
+        currentChips ?? session?.user?.chips ?? game.playerMoney ?? 1000;
+
+      const playersWithChips = config.players.map((p, idx) => ({
         ...p,
-        chips: p.chips || 1000,
+        chips: idx === 0 ? ownerChips : p.chips || 1000,
       }));
-      
+
       setMultiplayerPlayers(playersWithChips);
       setIsMultiplayer(true);
       setMultiplayerModeActive(true);
       setCurrentPlayerIndex(0);
       setShowMultiplayerModal(false);
-      showNotification(`👥 Modo 2 Jogadores ativado!`, false);
-      
+      showNotification(
+        `👥 Modo 2 Jogadores ativado! Você entra com ${ownerChips} fichas.`,
+        false,
+      );
+
       const firstPlayer = playersWithChips[0];
       setTimeout(() => {
         startNewHand(currentUser, firstPlayer.chips);
       }, 100);
     },
-    [currentUser],
+    [currentUser, currentChips, session, game.playerMoney],
   );
+
+  // ====================== SAIR DO MULTIPLAYER (2 JOGADORES) ======================
+  // 🔥 Reconcilia o saldo do dono da conta (Jogador 1) de volta ao saldo
+  // GLOBAL persistido, e retoma o modo CPU exatamente com esse valor —
+  // é assim que "ganhar 5000 no multiplayer" reflete ao sair dele.
+  const handleExitMultiplayer = useCallback(() => {
+    if (!isMultiplayer && !multiplayerModeActive) return;
+
+    if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
+    if (startNewHandTimeoutRef.current) {
+      clearTimeout(startNewHandTimeoutRef.current);
+      startNewHandTimeoutRef.current = null;
+    }
+
+    const ownerFinalChips =
+      multiplayerPlayers[0]?.chips ?? currentChips ?? game.playerMoney ?? 1000;
+
+    setIsMultiplayer(false);
+    setMultiplayerModeActive(false);
+    setMultiplayerPlayers([]);
+    setCurrentPlayerIndex(0);
+    setShowMultiplayerModal(false);
+
+    showNotification(
+      `👋 Saiu do Modo 2 Jogadores. Voltando com ${ownerFinalChips} fichas.`,
+      false,
+    );
+
+    // 🔥 PERSISTE O SALDO FINAL DO DONO DA CONTA NO BANCO (fonte global)
+    saveChips(currentUser, ownerFinalChips, true);
+    setCurrentChips(ownerFinalChips);
+
+    isProcessingAction.current = false;
+
+    setGame({
+      ...INITIAL_GAME,
+      playerMoney: ownerFinalChips,
+      cpuMoney: 1000,
+      handActive: false,
+      gameOver: false,
+    });
+
+    setWaitingForNewHand(true);
+  }, [
+    isMultiplayer,
+    multiplayerModeActive,
+    multiplayerPlayers,
+    currentChips,
+    game.playerMoney,
+    currentUser,
+    saveChips,
+    showNotification,
+  ]);
 
   const handleSwitchPlayer = useCallback(
     (index) => {
@@ -2047,7 +2167,11 @@ function resetSession() {
         <ToolbarButtons
           isTurbo={isTurbo}
           onTurboToggle={handleTurboToggle}
-          onMultiplayerClick={() => setShowMultiplayerModal(true)}
+          onMultiplayerClick={() =>
+            multiplayerModeActive
+              ? handleExitMultiplayer()
+              : setShowMultiplayerModal(true)
+          }
           isMultiplayerActive={multiplayerModeActive}
           onOnlineClick={() => setShowOnline(true)}
           isOnlineActive={!!onlineGame}

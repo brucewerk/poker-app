@@ -6,7 +6,7 @@ export default function MultiplayerButton({ onClick, isActive = false }) {
     <button
       onClick={onClick}
       className={`toolbar-btn ${isActive ? "toolbar-btn-active" : ""}`}
-      title="Modo 2 Jogadores"
+      title={isActive ? "Sair do Modo 2 Jogadores" : "Modo 2 Jogadores"}
     >
       👥
       {isActive && <span className="toolbar-dot toolbar-dot-green" />}

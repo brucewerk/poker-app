@@ -1,19 +1,14 @@
-// app/api/save-chips/route.js
+// app/api/public/save-chips/route.js
+// 🔥 ROTA PÚBLICA (sem sessão) — chamada pelo socket-server.js (processo
+// separado, sem cookies de sessão) para persistir as fichas globais do
+// jogador após partidas de multiplayer online. NÃO exige autenticação de
+// propósito, assim como /api/public/get-chips.
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import dbConnect from "@/lib/mongoose";
 import User from "@/lib/models/User";
 
 export async function POST(request) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: "Não autorizado" },
-        { status: 401 },
-      );
-    }
-
     const { username, chips } = await request.json();
 
     if (!username) {

@@ -169,6 +169,51 @@ async function saveChipsToDatabase(playerName, chips) {
   }
 }
 
+// 🔥 ESTATÍSTICAS E HISTÓRICO GLOBAIS — para que o multiplayer online
+// alimente os MESMOS dados do modo CPU (fichas, estatísticas e histórico
+// são únicos por conta, independente do modo de jogo).
+async function updateStatsInDatabase(playerName, result, chips, handName, wasAllIn) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/public/update-stats`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: playerName,
+        result,
+        chips,
+        handName,
+        wasAllIn: !!wasAllIn,
+      }),
+    });
+    const data = await response.json();
+    if (!data.success) {
+      console.log(`⚠️ Falha ao atualizar estatísticas de ${playerName}: ${data.error}`);
+    }
+    return data.success === true;
+  } catch (error) {
+    console.error(`❌ Erro ao atualizar estatísticas de ${playerName}:`, error.message);
+    return false;
+  }
+}
+
+async function saveHandHistoryToDatabase(playerName, handData) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/public/save-hand-history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: playerName, handData }),
+    });
+    const data = await response.json();
+    if (!data.success) {
+      console.log(`⚠️ Falha ao salvar histórico de ${playerName}: ${data.error}`);
+    }
+    return data.success === true;
+  } catch (error) {
+    console.error(`❌ Erro ao salvar histórico de ${playerName}:`, error.message);
+    return false;
+  }
+}
+
 // ====================== FUNÇÃO PARA CLONAR GAMESTATE ======================
 function sanitizeGameState(gameState) {
   if (!gameState) return null;
@@ -687,6 +732,7 @@ io.on("connection", (socket) => {
         name: p.name,
         cards: [],
         chips: p.chips,
+        handStartChips: p.chips,
         bet: 0,
         isFolded: false,
         isAllIn: false,
@@ -1253,6 +1299,48 @@ async function endRound(roomId) {
     for (const p of gameState.players) {
       await saveChipsToDatabase(p.name, p.chips);
       console.log(`💰 ${p.name}: ${p.chips} fichas salvas (endRound)`);
+    }
+
+    // 🔥 SALVAR ESTATÍSTICAS E HISTÓRICO GLOBAIS (mesmo destino do modo CPU)
+    const handId = `${roomId}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const winnerResult = results.find((r) => r.isWinner);
+    const winnerHandName = winnerResult?.hand || "Fold dos outros";
+
+    for (const p of gameState.players) {
+      const isWinner = p.name === winner.name;
+      const playerResult = results.find((r) => r.name === p.name);
+      const startChips = typeof p.handStartChips === "number" ? p.handStartChips : p.chips;
+
+      if (isWinner) {
+        const chipsWon = Math.max(0, p.chips - startChips);
+        await updateStatsInDatabase(p.name, "win", chipsWon, winnerHandName, !!p.isAllIn);
+        await saveHandHistoryToDatabase(p.name, {
+          id: `${handId}_${p.name}`,
+          result: "win",
+          playerHand: winnerHandName,
+          pot: gameState.pot,
+          chipsWon,
+          playerCards: p.cards,
+          communityCards: gameState.communityCards,
+          wasAllIn: !!p.isAllIn,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        const chipsLost = Math.max(0, startChips - p.chips);
+        await updateStatsInDatabase(p.name, "loss", chipsLost, winnerHandName, !!p.isAllIn);
+        await saveHandHistoryToDatabase(p.name, {
+          id: `${handId}_${p.name}`,
+          result: "loss",
+          playerHand: playerResult?.hand || (p.isFolded ? "Fold" : "?"),
+          cpuHand: winnerHandName,
+          pot: gameState.pot,
+          chipsLost,
+          playerCards: p.cards,
+          communityCards: gameState.communityCards,
+          wasAllIn: !!p.isAllIn,
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     room.isSummaryVisible = true;
