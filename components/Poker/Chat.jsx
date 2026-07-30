@@ -1,8 +1,9 @@
-// components/Poker/Chat.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
+// components/Poker/Chat.jsx - CORREÇÃO DO SCROLL AO MAXIMIZAR
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { soundManager } from "@/lib/sound";
 
 // 🔥 EMOJIS PARA O CHAT
 const EMOJIS = [
@@ -29,38 +30,54 @@ const EMOJIS = [
   { emoji: "👑", label: "Coroa" },
 ];
 
-export default function Chat({ socket, roomId, playerName }) {
+export default function Chat({ 
+  socket, 
+  roomId, 
+  playerName,
+  onNewMessage,
+  onUnreadChange
+}) {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isMinimized, setIsMinimized] = useState(false);
   const [showEmojis, setShowEmojis] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isFocused, setIsFocused] = useState(true);
+  const [notificationSound, setNotificationSound] = useState(true);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const unreadTimeoutRef = useRef(null);
+  const hasScrolledRef = useRef(false);
 
-  // 🔥 ADICIONAR ESTILOS GLOBAIS NO CLIENTE APENAS
+  // 🔥 DETECTAR FOCO DA JANELA
   useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      !document.getElementById("chat-styles")
-    ) {
-      const styleSheet = document.createElement("style");
-      styleSheet.id = "chat-styles";
-      styleSheet.textContent = `
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `;
-      document.head.appendChild(styleSheet);
-    }
+    const handleFocus = () => setIsFocused(true);
+    const handleBlur = () => setIsFocused(false);
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+    };
   }, []);
 
+  // 🔥 ATUALIZAR CONTAGEM DE NÃO LIDAS
+  useEffect(() => {
+    if (onUnreadChange) {
+      onUnreadChange(unreadCount);
+    }
+  }, [unreadCount, onUnreadChange]);
+
+  // 🔥 RECEBER MENSAGENS
   useEffect(() => {
     if (!socket) return;
 
     const handleChatMessage = (data) => {
+      const isOwnMessage = data.player === playerName;
+      
       setMessages((prev) => {
         const newMessages = [...prev, data];
         if (newMessages.length > 100) {
@@ -69,96 +86,345 @@ export default function Chat({ socket, roomId, playerName }) {
         return newMessages;
       });
 
-      if (isMinimized && data.player !== playerName) {
-        setUnreadCount((prev) => prev + 1);
+      if (!isOwnMessage) {
+        if (notificationSound) {
+          try {
+            soundManager.playSound("deal", { volume: 0.15 });
+          } catch (e) {}
+        }
+
+        if (onNewMessage) {
+          onNewMessage({
+            from: data.player,
+            message: data.message,
+            timestamp: data.timestamp,
+          });
+        }
+
+        if (isMinimized || !isFocused) {
+          setUnreadCount((prev) => {
+            const newCount = prev + 1;
+            if (newCount > 0) {
+              document.title = `💬 (${newCount}) Poker by BruCe`;
+            }
+            return newCount;
+          });
+
+          if (unreadTimeoutRef.current) {
+            clearTimeout(unreadTimeoutRef.current);
+          }
+
+          unreadTimeoutRef.current = setTimeout(() => {
+            setUnreadCount(0);
+            document.title = "Poker by BruCe";
+          }, 30000);
+        }
       }
+
+      // 🔥 ROLAR PARA O FINAL SEMPRE QUE RECEBE MENSAGEM
+      setTimeout(() => scrollChatToBottom(), 100);
     };
 
     socket.on("chat-message", handleChatMessage);
 
     return () => {
       socket.off("chat-message", handleChatMessage);
+      if (unreadTimeoutRef.current) {
+        clearTimeout(unreadTimeoutRef.current);
+      }
     };
-  }, [socket, isMinimized, playerName]);
+  }, [socket, playerName, isMinimized, isFocused, notificationSound, onNewMessage]);
 
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+  // 🔥 SCROLL PARA O FINAL (FORÇADO)
+  const scrollChatToBottom = useCallback((force = false) => {
+    if (force) {
+      hasScrolledRef.current = true;
     }
-  }, [messages]);
+    
+    // 🔥 TENTAR VÁRIAS FORMAS DE ROLAR
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+      return;
+    }
 
-  const sendMessage = (e) => {
+    if (chatContainerRef.current) {
+      const container = chatContainerRef.current.querySelector('.chat-messages-scroll');
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+        return;
+      }
+    }
+
+    // 🔥 FALLBACK: SCROLL DO CONTAINER PAI
+    const container = document.querySelector(".chat-messages-scroll");
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, []);
+
+  // 🔥 ENVIAR MENSAGEM
+  const sendMessage = useCallback((e) => {
     e.preventDefault();
     if (!inputMessage.trim() || !socket) return;
 
+    const message = inputMessage.trim();
+    setInputMessage("");
+
     socket.emit("send-chat-message", {
       roomId: roomId,
-      message: inputMessage.trim(),
+      message: message,
     });
 
-    setInputMessage("");
-    setShowEmojis(false);
-  };
+    const localMessage = {
+      player: playerName,
+      message: message,
+      timestamp: Date.now(),
+      isSystem: false,
+      isOwn: true,
+    };
 
-  const insertEmoji = (emoji) => {
+    setMessages((prev) => {
+      const newMessages = [...prev, localMessage];
+      if (newMessages.length > 100) {
+        return newMessages.slice(-100);
+      }
+      return newMessages;
+    });
+
+    setShowEmojis(false);
+    setTimeout(() => scrollChatToBottom(true), 50);
+    
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [inputMessage, socket, roomId, playerName, scrollChatToBottom]);
+
+  // 🔥 INSERIR EMOJI
+  const insertEmoji = useCallback((emoji) => {
     setInputMessage((prev) => prev + emoji);
     setShowEmojis(false);
-    inputRef.current?.focus();
-  };
-
-  const toggleMinimize = () => {
-    setIsMinimized(!isMinimized);
-    if (isMinimized) {
-      setUnreadCount(0);
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
-  };
+  }, []);
 
-  const formatTime = (timestamp) => {
+  // 🔥 ALTERNAR MINIMIZAR - COM AUTO-ROLAGEM AO MAXIMIZAR
+  const toggleMinimize = useCallback(() => {
+    const newMinimized = !isMinimized;
+    setIsMinimized(newMinimized);
+    
+    // 🔥 SE ESTIVER MAXIMIZANDO, ROLAR PARA O FINAL
+    if (newMinimized === false) {
+      setUnreadCount(0);
+      document.title = "Poker by BruCe";
+      if (unreadTimeoutRef.current) {
+        clearTimeout(unreadTimeoutRef.current);
+      }
+      // 🔥 FORÇAR SCROLL PARA O FINAL
+      setTimeout(() => scrollChatToBottom(true), 300);
+      setTimeout(() => scrollChatToBottom(true), 600);
+    }
+  }, [isMinimized, scrollChatToBottom]);
+
+  // 🔥 FORMATAR HORA
+  const formatTime = useCallback((timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
     return date.toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
+  }, []);
 
+  // 🔥 SOM DE NOTIFICAÇÃO
+  const toggleNotificationSound = useCallback(() => {
+    setNotificationSound((prev) => !prev);
+  }, []);
+
+  // ============================================================
+  // 🔥 RENDER: CHAT MINIMIZADO
+  // ============================================================
   if (isMinimized) {
     return (
       <motion.button
         onClick={toggleMinimize}
-        style={minimizedButtonStyle()}
+        style={{
+          position: "fixed",
+          bottom: "20px",
+          right: "20px",
+          background: "var(--bg-modal)",
+          border: `2px solid ${unreadCount > 0 ? "#4caf50" : "var(--border-gold)"}`,
+          borderRadius: "50px",
+          padding: "10px 20px",
+          color: "var(--text-primary)",
+          cursor: "pointer",
+          zIndex: 100,
+          boxShadow: "0 4px 16px var(--shadow-dark)",
+          fontSize: "0.9rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          transition: "var(--transition-theme)",
+        }}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
         💬 Chat
         {unreadCount > 0 && (
-          <span style={unreadBadgeStyle()}>{unreadCount}</span>
+          <motion.span
+            style={{
+              background: "#f44336",
+              color: "white",
+              borderRadius: "50%",
+              padding: "1px 8px",
+              fontSize: "0.7rem",
+              fontWeight: "bold",
+              minWidth: "20px",
+              textAlign: "center",
+            }}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+          >
+            {unreadCount}
+          </motion.span>
         )}
+        <span style={{ fontSize: "0.6rem", color: "var(--text-muted)" }}>
+          {unreadCount > 0 ? "🔔" : "💤"}
+        </span>
       </motion.button>
     );
   }
 
+  // ============================================================
+  // 🔥 RENDER: CHAT EXPANDIDO
+  // ============================================================
   return (
     <motion.div
-      style={containerStyle()}
+      style={{
+        background: "var(--bg-modal)",
+        borderRadius: "12px",
+        display: "flex",
+        flexDirection: "column",
+        height: "400px",
+        width: "100%",
+        maxWidth: "400px",
+        border: "2px solid var(--border-gold)",
+        position: "fixed",
+        bottom: "20px",
+        right: "20px",
+        zIndex: 100,
+        boxShadow: "0 8px 32px var(--shadow-dark)",
+        backdropFilter: "blur(8px)",
+        transition: "var(--transition-theme)",
+        overflow: "hidden",
+      }}
       ref={chatContainerRef}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.95 }}
     >
-      <div style={headerStyle()}>
-        <span>💬 Chat da Sala</span>
-        <div style={headerButtonsStyle()}>
-          <span style={messageCountStyle()}>{messages.length} msgs</span>
-          <button onClick={toggleMinimize} style={minimizeButtonStyle()}>
+      {/* HEADER */}
+      <div
+        style={{
+          padding: "10px 15px",
+          background: "rgba(255,215,0,0.08)",
+          borderBottom: "1px solid var(--border-gold)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          color: "var(--text-primary)",
+          fontWeight: "bold",
+          borderTopLeftRadius: "12px",
+          borderTopRightRadius: "12px",
+          transition: "var(--transition-theme)",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span>💬 Chat</span>
+          {unreadCount > 0 && (
+            <span
+              style={{
+                background: "#f44336",
+                color: "white",
+                borderRadius: "50%",
+                padding: "1px 8px",
+                fontSize: "0.6rem",
+                fontWeight: "bold",
+              }}
+            >
+              {unreadCount}
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <span style={{ fontSize: "0.6rem", color: "var(--text-muted)" }}>
+            {messages.length} msgs
+          </span>
+          <button
+            onClick={toggleNotificationSound}
+            style={{
+              background: "none",
+              border: "none",
+              color: notificationSound ? "var(--text-primary)" : "var(--text-muted)",
+              cursor: "pointer",
+              fontSize: "0.8rem",
+              padding: "2px 6px",
+              borderRadius: "4px",
+              opacity: notificationSound ? 1 : 0.5,
+            }}
+            title={notificationSound ? "Som ativado" : "Som desativado"}
+          >
+            {notificationSound ? "🔊" : "🔇"}
+          </button>
+          <button
+            onClick={toggleMinimize}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              fontSize: "1rem",
+              padding: "0 5px",
+              transition: "color 0.3s ease",
+            }}
+          >
             ➖
           </button>
         </div>
       </div>
 
-      <div style={messagesStyle()}>
+      {/* MENSAGENS */}
+      <div
+        className="chat-messages-scroll"
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+          padding: "12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+          minHeight: "200px",
+          maxHeight: "100%",
+        }}
+      >
         {messages.length === 0 && (
-          <div style={emptyMessagesStyle()}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              color: "var(--text-muted)",
+              gap: "4px",
+              transition: "var(--transition-theme)",
+            }}
+          >
             <span style={{ fontSize: "2rem" }}>💬</span>
             <p>Nenhuma mensagem ainda</p>
             <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
@@ -166,44 +432,125 @@ export default function Chat({ socket, roomId, playerName }) {
             </span>
           </div>
         )}
-        {messages.map((msg, index) => (
-          <motion.div
-            key={index}
-            style={{
-              ...messageStyle(msg.isSystem),
-              ...(msg.player === playerName ? ownMessageStyle() : {}),
-            }}
-            initial={{ opacity: 0, x: msg.player === playerName ? 20 : -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div style={messageHeaderStyle()}>
-              <span style={playerNameStyle(msg.isSystem)}>
-                {msg.isSystem ? "📢" : msg.player}
-              </span>
-              <span style={timestampStyle()}>{formatTime(msg.timestamp)}</span>
-            </div>
-            <div style={messageTextStyle(msg.isSystem)}>{msg.message}</div>
-          </motion.div>
-        ))}
+        {messages.map((msg, index) => {
+          const isOwn = msg.player === playerName || msg.isOwn === true;
+          const isSystem = msg.isSystem === true;
+          
+          return (
+            <motion.div
+              key={`msg_${index}_${msg.timestamp}`}
+              style={{
+                padding: "6px 10px",
+                borderRadius: "8px",
+                background: isSystem
+                  ? "rgba(255,215,0,0.05)"
+                  : isOwn
+                    ? "rgba(255,215,0,0.08)"
+                    : "rgba(255,255,255,0.03)",
+                borderLeft: isSystem
+                  ? "3px solid gold"
+                  : isOwn
+                    ? "3px solid #ffd700"
+                    : "3px solid transparent",
+                maxWidth: "100%",
+                alignSelf: isOwn ? "flex-end" : "flex-start",
+              }}
+              initial={{ opacity: 0, x: isOwn ? 20 : -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "2px",
+                }}
+              >
+                <span
+                  style={{
+                    color: isSystem ? "gold" : isOwn ? "#ffd700" : "#4caf50",
+                    fontWeight: "bold",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  {isSystem ? "📢" : isOwn ? "👤 Você" : msg.player}
+                </span>
+                <span
+                  style={{
+                    color: "var(--text-muted)",
+                    fontSize: "0.55rem",
+                    transition: "var(--transition-theme)",
+                  }}
+                >
+                  {formatTime(msg.timestamp)}
+                </span>
+              </div>
+              <div
+                style={{
+                  color: isSystem ? "var(--text-muted)" : "var(--text-primary)",
+                  fontSize: "0.85rem",
+                  wordBreak: "break-word",
+                  transition: "var(--transition-theme)",
+                }}
+              >
+                {msg.message}
+              </div>
+            </motion.div>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
-      <div style={inputContainerStyle()}>
+      {/* INPUT */}
+      <div
+        style={{
+          borderTop: "1px solid var(--border-light)",
+          position: "relative",
+          flexShrink: 0,
+        }}
+      >
         <AnimatePresence>
           {showEmojis && (
             <motion.div
-              style={emojisContainerStyle()}
+              style={{
+                position: "absolute",
+                bottom: "100%",
+                left: 0,
+                right: 0,
+                background: "var(--bg-modal)",
+                border: "1px solid var(--border-gold)",
+                borderRadius: "8px 8px 0 0",
+                padding: "8px",
+                maxHeight: "150px",
+                overflowY: "auto",
+                transition: "var(--transition-theme)",
+              }}
               initial={{ opacity: 0, y: 10, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.9 }}
             >
-              <div style={emojisGridStyle()}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(8, 1fr)",
+                  gap: "4px",
+                }}
+              >
                 {EMOJIS.map(({ emoji, label }) => (
                   <button
                     key={emoji}
                     onClick={() => insertEmoji(emoji)}
-                    style={emojiButtonStyle()}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      fontSize: "1.2rem",
+                      cursor: "pointer",
+                      padding: "4px",
+                      borderRadius: "4px",
+                      transition: "background 0.2s ease",
+                      textAlign: "center",
+                    }}
                     title={label}
                   >
                     {emoji}
@@ -214,11 +561,28 @@ export default function Chat({ socket, roomId, playerName }) {
           )}
         </AnimatePresence>
 
-        <form onSubmit={sendMessage} style={inputFormStyle()}>
+        <form
+          onSubmit={sendMessage}
+          style={{
+            display: "flex",
+            gap: "6px",
+            padding: "8px 10px",
+            alignItems: "center",
+          }}
+        >
           <button
             type="button"
             onClick={() => setShowEmojis(!showEmojis)}
-            style={emojiToggleStyle()}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: "1.2rem",
+              cursor: "pointer",
+              padding: "4px 8px",
+              borderRadius: "4px",
+              color: "var(--text-muted)",
+              transition: "color 0.3s ease",
+            }}
           >
             😊
           </button>
@@ -228,12 +592,42 @@ export default function Chat({ socket, roomId, playerName }) {
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             placeholder="Digite uma mensagem..."
-            style={inputStyle()}
+            style={{
+              flex: 1,
+              padding: "6px 12px",
+              borderRadius: "20px",
+              border: "1px solid var(--border-input)",
+              background: "var(--bg-input)",
+              color: "var(--text-primary)",
+              fontSize: "0.85rem",
+              outline: "none",
+              transition: "border-color 0.3s ease",
+            }}
             maxLength={500}
+            onFocus={() => {
+              setUnreadCount(0);
+              document.title = "Poker by BruCe";
+              if (unreadTimeoutRef.current) {
+                clearTimeout(unreadTimeoutRef.current);
+              }
+              // 🔥 ROLAR PARA O FINAL AO FOCAR
+              setTimeout(() => scrollChatToBottom(true), 200);
+            }}
           />
           <motion.button
             type="submit"
-            style={sendButtonStyle()}
+            style={{
+              padding: "6px 16px",
+              borderRadius: "20px",
+              border: "none",
+              background: "radial-gradient(#f7d97c,#d6a12e)",
+              color: "#2e241f",
+              fontWeight: "bold",
+              cursor: "pointer",
+              fontSize: "0.75rem",
+              transition: "all 0.3s ease",
+              whiteSpace: "nowrap",
+            }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -243,273 +637,4 @@ export default function Chat({ socket, roomId, playerName }) {
       </div>
     </motion.div>
   );
-}
-
-// ====================== ESTILOS ======================
-function containerStyle() {
-  return {
-    background: "var(--bg-modal)",
-    borderRadius: "12px",
-    display: "flex",
-    flexDirection: "column",
-    height: "350px",
-    width: "100%",
-    maxWidth: "400px",
-    border: "1px solid var(--border-gold)",
-    position: "fixed",
-    bottom: "20px",
-    right: "20px",
-    zIndex: 100,
-    boxShadow: "0 8px 32px var(--shadow-dark)",
-    backdropFilter: "blur(8px)",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function headerStyle() {
-  return {
-    padding: "10px 15px",
-    background: "rgba(255,215,0,0.08)",
-    borderBottom: "1px solid var(--border-gold)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    color: "var(--text-primary)",
-    fontWeight: "bold",
-    borderTopLeftRadius: "12px",
-    borderTopRightRadius: "12px",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function headerButtonsStyle() {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  };
-}
-
-function messageCountStyle() {
-  return {
-    fontSize: "0.65rem",
-    color: "var(--text-muted)",
-    fontWeight: "normal",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function minimizeButtonStyle() {
-  return {
-    background: "none",
-    border: "none",
-    color: "var(--text-muted)",
-    cursor: "pointer",
-    fontSize: "1rem",
-    padding: "0 5px",
-    transition: "color 0.3s ease",
-  };
-}
-
-function minimizedButtonStyle() {
-  return {
-    position: "fixed",
-    bottom: "20px",
-    right: "20px",
-    background: "var(--bg-modal)",
-    border: "1px solid var(--border-gold)",
-    borderRadius: "50px",
-    padding: "10px 20px",
-    color: "var(--text-primary)",
-    cursor: "pointer",
-    zIndex: 100,
-    boxShadow: "0 4px 16px var(--shadow-dark)",
-    fontSize: "0.9rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function unreadBadgeStyle() {
-  return {
-    background: "#f44336",
-    color: "white",
-    borderRadius: "50%",
-    padding: "1px 6px",
-    fontSize: "0.7rem",
-    fontWeight: "bold",
-    minWidth: "18px",
-    textAlign: "center",
-  };
-}
-
-function messagesStyle() {
-  return {
-    flex: 1,
-    overflowY: "auto",
-    padding: "10px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  };
-}
-
-function emptyMessagesStyle() {
-  return {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    height: "100%",
-    color: "var(--text-muted)",
-    gap: "4px",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function messageStyle(isSystem) {
-  return {
-    padding: "6px 10px",
-    borderRadius: "8px",
-    background: isSystem ? "rgba(255,215,0,0.05)" : "rgba(255,255,255,0.03)",
-    borderLeft: isSystem ? "3px solid gold" : "3px solid transparent",
-    maxWidth: "100%",
-  };
-}
-
-function ownMessageStyle() {
-  return {
-    background: "rgba(255,215,0,0.08)",
-    borderLeft: "3px solid #ffd700",
-  };
-}
-
-function messageHeaderStyle() {
-  return {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "2px",
-  };
-}
-
-function playerNameStyle(isSystem) {
-  return {
-    color: isSystem ? "gold" : "#4caf50",
-    fontWeight: "bold",
-    fontSize: "0.75rem",
-  };
-}
-
-function timestampStyle() {
-  return {
-    color: "var(--text-muted)",
-    fontSize: "0.55rem",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function messageTextStyle(isSystem) {
-  return {
-    color: isSystem ? "var(--text-muted)" : "var(--text-primary)",
-    fontSize: "0.85rem",
-    wordBreak: "break-word",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function inputContainerStyle() {
-  return {
-    borderTop: "1px solid var(--border-light)",
-    position: "relative",
-  };
-}
-
-function emojisContainerStyle() {
-  return {
-    position: "absolute",
-    bottom: "100%",
-    left: 0,
-    right: 0,
-    background: "var(--bg-modal)",
-    border: "1px solid var(--border-gold)",
-    borderRadius: "8px 8px 0 0",
-    padding: "8px",
-    maxHeight: "150px",
-    overflowY: "auto",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function emojisGridStyle() {
-  return {
-    display: "grid",
-    gridTemplateColumns: "repeat(8, 1fr)",
-    gap: "4px",
-  };
-}
-
-function emojiButtonStyle() {
-  return {
-    background: "none",
-    border: "none",
-    fontSize: "1.2rem",
-    cursor: "pointer",
-    padding: "4px",
-    borderRadius: "4px",
-    transition: "background 0.2s ease",
-    textAlign: "center",
-  };
-}
-
-function emojiToggleStyle() {
-  return {
-    background: "none",
-    border: "none",
-    fontSize: "1.2rem",
-    cursor: "pointer",
-    padding: "4px 8px",
-    borderRadius: "4px",
-    color: "var(--text-muted)",
-    transition: "color 0.3s ease",
-  };
-}
-
-function inputFormStyle() {
-  return {
-    display: "flex",
-    gap: "6px",
-    padding: "8px 10px",
-    alignItems: "center",
-  };
-}
-
-function inputStyle() {
-  return {
-    flex: 1,
-    padding: "6px 12px",
-    borderRadius: "20px",
-    border: "1px solid var(--border-input)",
-    background: "var(--bg-input)",
-    color: "var(--text-primary)",
-    fontSize: "0.85rem",
-    outline: "none",
-    transition: "border-color 0.3s ease",
-  };
-}
-
-function sendButtonStyle() {
-  return {
-    padding: "6px 16px",
-    borderRadius: "20px",
-    border: "none",
-    background: "radial-gradient(#f7d97c,#d6a12e)",
-    color: "#2e241f",
-    fontWeight: "bold",
-    cursor: "pointer",
-    fontSize: "0.75rem",
-    transition: "all 0.3s ease",
-  };
 }

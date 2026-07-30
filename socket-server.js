@@ -1,4 +1,4 @@
-// socket-server.js - COMPLETO CORRIGIDO COM BROADCAST FUNCIONAL E SALAS VISÍVEIS
+// socket-server.js - COMPLETO CORRIGIDO (SALVAMENTO DE FICHAS NO MULTIPLAYER)
 const { Server } = require("socket.io");
 
 // ====================== ESTADO ======================
@@ -206,7 +206,71 @@ function sanitizeGameState(gameState) {
   };
 }
 
-// ====================== BROADCAST LISTA DE SALAS - CORRIGIDO ======================
+// ====================== LIMPEZA DE SALAS DE CONVITE ======================
+function cleanupInviteRooms() {
+  let removed = 0;
+  const now = Date.now();
+  
+  for (const [roomId, room] of rooms) {
+    if (roomId.startsWith("ROOM_INVITE_")) {
+      const isEmpty = !room.players || room.players.length === 0;
+      const isInactive = room.lastActivity && (now - room.lastActivity > 60000);
+      const hasNoGame = !room.gameState;
+      
+      if (isEmpty || (isInactive && hasNoGame)) {
+        const reason = isEmpty ? 'vazia' : 'inativa';
+        const message = reason === 'vazia' 
+          ? `🏠 Sala ${roomId} foi fechada (sem jogadores)`
+          : `⏰ Sala ${roomId} foi fechada por inatividade`;
+          
+        const creator = room.createdBy || (room.players && room.players.length > 0 ? room.players[0]?.name : null);
+        if (creator) {
+          for (const [id, user] of onlineUsers) {
+            if (user.username === creator) {
+              user.socket.emit("chat-message", {
+                player: "Sistema",
+                message: message,
+                timestamp: Date.now(),
+                isSystem: true,
+              });
+              break;
+            }
+          }
+        }
+        
+        if (room.players && room.players.length > 0) {
+          room.players.forEach((player) => {
+            if (player && player.name && player.name !== creator) {
+              for (const [id, user] of onlineUsers) {
+                if (user.username === player.name) {
+                  user.socket.emit("chat-message", {
+                    player: "Sistema",
+                    message: `🏠 A sala ${roomId} foi fechada${reason === 'vazia' ? ' (sem jogadores)' : ' (inatividade)'}`,
+                    timestamp: Date.now(),
+                    isSystem: true,
+                  });
+                  break;
+                }
+              }
+            }
+          });
+        }
+        
+        rooms.delete(roomId);
+        removed++;
+        console.log(`🗑️ Sala de convite ${roomId} removida (${reason}) - Notificações enviadas`);
+      }
+    }
+  }
+  
+  if (removed > 0) {
+    broadcastRoomList();
+  }
+}
+
+setInterval(cleanupInviteRooms, 15000);
+
+// ====================== BROADCAST LISTA DE SALAS ======================
 async function broadcastRoomList() {
   const roomList = [];
 
@@ -221,7 +285,27 @@ async function broadcastRoomList() {
       continue;
     }
 
-    // 🔥 NÃO PULAR SALAS COM PREFIXO - MOSTRAR TODAS AS SALAS ATIVAS
+    const isInviteRoom = roomId.startsWith("ROOM_INVITE_");
+    const hasGameState = !!room.gameState;
+    const allPlayersLeft = room.players.length === 0;
+
+    if (isInviteRoom && (allPlayersLeft || !hasGameState)) {
+      const activePlayers = room.players.filter((p) => p.id && p.name);
+      if (activePlayers.length === 0) {
+        rooms.delete(roomId);
+        console.log(`🗑️ Sala de convite ${roomId} removida (inativa)`);
+        continue;
+      }
+    }
+
+    if (room.lastActivity) {
+      const inactiveTime = Date.now() - room.lastActivity;
+      if (inactiveTime > 30 * 60 * 1000) {
+        rooms.delete(roomId);
+        console.log(`🗑️ Sala ${roomId} removida (inativa por 30min+)`);
+        continue;
+      }
+    }
 
     const updatedPlayers = [];
     for (const player of room.players) {
@@ -250,13 +334,14 @@ async function broadcastRoomList() {
       maxPlayers: room.maxPlayers || 6,
       isGameActive: !!room.gameState,
       hasAvailableSlot: updatedPlayers.length < (room.maxPlayers || 6),
+      isInviteRoom: isInviteRoom,
     });
   }
 
   console.log(`📡 Enviando ${roomList.length} salas para todos os clientes`);
   roomList.forEach((room) => {
     console.log(
-      `  🏠 ${room.roomId} - ${room.playerCount}/${room.maxPlayers} jogadores`,
+      `  🏠 ${room.roomId} - ${room.playerCount}/${room.maxPlayers} jogadores${room.isInviteRoom ? ' [CONVITE]' : ''}`,
     );
   });
 
@@ -270,7 +355,6 @@ io.on("connection", (socket) => {
   // ====================== AMIGO ONLINE ======================
   socket.on("friend-online", (data) => {
     const { username } = data;
-
     if (!username) return;
 
     console.log(`🟢 ${username} está online (socket: ${socket.id})`);
@@ -300,7 +384,7 @@ io.on("connection", (socket) => {
     const { inviteId, from, players, message, roomId } = data;
     console.log(`📤 ${from} convidou ${players.length} amigos:`, players);
 
-    const finalRoomId = roomId || `ROOM_${inviteId}`;
+    const finalRoomId = roomId || `ROOM_INVITE_${inviteId}`;
 
     let sentCount = 0;
     for (const [id, user] of onlineUsers) {
@@ -332,6 +416,25 @@ io.on("connection", (socket) => {
     const { inviteId, from } = data;
     console.log(`✅ ${from} aceitou o convite ${inviteId}`);
 
+    const roomId = `ROOM_INVITE_${inviteId}`;
+    const room = rooms.get(roomId);
+    if (room) {
+      const creator = room.createdBy || (room.players && room.players.length > 0 ? room.players[0]?.name : null);
+      if (creator && creator !== from) {
+        for (const [id, user] of onlineUsers) {
+          if (user.username === creator) {
+            user.socket.emit("chat-message", {
+              player: "Sistema",
+              message: `✅ ${from} aceitou o convite! Entrando na sala...`,
+              timestamp: Date.now(),
+              isSystem: true,
+            });
+            break;
+          }
+        }
+      }
+    }
+
     io.emit("invite-accepted", {
       inviteId,
       from,
@@ -343,6 +446,31 @@ io.on("connection", (socket) => {
   socket.on("decline-invite", (data) => {
     const { inviteId, from } = data;
     console.log(`❌ ${from} recusou o convite ${inviteId}`);
+
+    const roomId = `ROOM_INVITE_${inviteId}`;
+    const room = rooms.get(roomId);
+    
+    if (room) {
+      const creator = room.createdBy || (room.players && room.players.length > 0 ? room.players[0]?.name : null);
+      if (creator && creator !== from) {
+        for (const [id, user] of onlineUsers) {
+          if (user.username === creator) {
+            user.socket.emit("chat-message", {
+              player: "Sistema",
+              message: `❌ ${from} recusou o convite - Sala ${roomId} removida`,
+              timestamp: Date.now(),
+              isSystem: true,
+            });
+            break;
+          }
+        }
+      }
+      
+      rooms.delete(roomId);
+      console.log(`🗑️ Sala de convite ${roomId} removida (recusada)`);
+      
+      broadcastRoomList();
+    }
 
     io.emit("invite-declined", {
       inviteId,
@@ -414,6 +542,10 @@ io.on("connection", (socket) => {
       maxPlayers: Math.min(Math.max(maxPlayers, 2), 6),
       chatMessages: [],
       invitedPlayers: invitedPlayers || [],
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
+      isInviteRoom: roomId.startsWith("ROOM_INVITE_"),
+      createdBy: playerName,
     });
 
     socket.join(roomId);
@@ -1047,6 +1179,19 @@ io.on("connection", (socket) => {
           isSystem: true,
         });
 
+        if (room.isInviteRoom) {
+          setTimeout(() => {
+            if (rooms.has(normalizedRoomId)) {
+              const currentRoom = rooms.get(normalizedRoomId);
+              if (currentRoom && currentRoom.players.length === 0) {
+                rooms.delete(normalizedRoomId);
+                console.log(`🗑️ Sala de convite ${normalizedRoomId} removida (jogo finalizado)`);
+                broadcastRoomList();
+              }
+            }
+          }, 5000);
+        }
+
         await broadcastRoomList();
 
         console.log(
@@ -1057,138 +1202,154 @@ io.on("connection", (socket) => {
   });
 
   // ====================== ENCERRAR RODADA ======================
-  async function endRound(roomId) {
-    const room = rooms.get(roomId);
-    if (!room || !room.gameState) return;
+async function endRound(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || !room.gameState) return;
 
-    const gameState = room.gameState;
-    const playersInHand = gameState.players.filter((p) => !p.isFolded);
+  const gameState = room.gameState;
+  const playersInHand = gameState.players.filter((p) => !p.isFolded);
 
-    let winner = null;
-    let bestScore = -1;
-    let results = [];
+  let winner = null;
+  let bestScore = -1;
+  let results = [];
 
-    if (playersInHand.length === 1) {
-      winner = playersInHand[0];
+  if (playersInHand.length === 1) {
+    winner = playersInHand[0];
+    results.push({
+      name: winner.name,
+      hand: "Fold dos outros",
+      score: 0,
+      isWinner: true,
+    });
+  } else {
+    for (const player of playersInHand) {
+      const score = evaluateBestHand(player.cards, gameState.communityCards);
+      const handName = getHandName(score);
       results.push({
-        name: winner.name,
-        hand: "Fold dos outros",
-        score: 0,
-        isWinner: true,
+        name: player.name,
+        hand: handName,
+        score: score,
+        isWinner: false,
       });
-    } else {
-      for (const player of playersInHand) {
-        const score = evaluateBestHand(player.cards, gameState.communityCards);
-        const handName = getHandName(score);
-        results.push({
-          name: player.name,
-          hand: handName,
-          score: score,
-          isWinner: false,
-        });
-        if (score > bestScore) {
-          bestScore = score;
-          winner = player;
-        }
+      if (score > bestScore) {
+        bestScore = score;
+        winner = player;
       }
-      results = results.map((r) => ({
-        ...r,
-        isWinner: r.name === winner.name,
-      }));
+    }
+    results = results.map((r) => ({
+      ...r,
+      isWinner: r.name === winner.name,
+    }));
+  }
+
+  if (winner) {
+    winner.chips += gameState.pot;
+
+    console.log(
+      `💾 Salvando fichas de ${gameState.players.length} jogadores...`,
+    );
+
+    // 🔥 SALVAR FICHAS DE TODOS OS JOGADORES IMEDIATAMENTE
+    for (const p of gameState.players) {
+      await saveChipsToDatabase(p.name, p.chips);
+      console.log(`💰 ${p.name}: ${p.chips} fichas salvas (endRound)`);
     }
 
-    if (winner) {
-      winner.chips += gameState.pot;
+    room.isSummaryVisible = true;
 
-      console.log(
-        `💾 Salvando fichas de ${gameState.players.length} jogadores...`,
-      );
+    room.players.forEach((p) => {
+      p.hasClosedSummary = false;
+    });
+    gameState.players.forEach((p) => {
+      p.hasClosedSummary = false;
+    });
 
-      for (const p of gameState.players) {
-        await saveChipsToDatabase(p.name, p.chips);
-      }
+    io.to(roomId).emit("chat-message", {
+      player: "Sistema",
+      message: `🏆 ${winner.name} venceu ${gameState.pot} fichas com ${results.find((r) => r.isWinner)?.hand || "boa mão"}!`,
+      timestamp: Date.now(),
+      isSystem: true,
+    });
 
-      room.isSummaryVisible = true;
+    const roundEndData = {
+      winner: {
+        name: winner.name,
+        chips: winner.chips,
+      },
+      pot: gameState.pot,
+      results: results,
+      communityCards: gameState.communityCards,
+      players: gameState.players.map((p) => ({
+        name: p.name,
+        chips: p.chips,
+        hasClosedSummary: p.hasClosedSummary || false,
+      })),
+    };
 
-      room.players.forEach((p) => {
-        p.hasClosedSummary = false;
-      });
-      gameState.players.forEach((p) => {
-        p.hasClosedSummary = false;
-      });
+    io.to(roomId).emit("round-ended", roundEndData);
 
-      io.to(roomId).emit("chat-message", {
-        player: "Sistema",
-        message: `🏆 ${winner.name} venceu ${gameState.pot} fichas com ${results.find((r) => r.isWinner)?.hand || "boa mão"}!`,
-        timestamp: Date.now(),
-        isSystem: true,
-      });
+    console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
 
-      const roundEndData = {
-        winner: {
-          name: winner.name,
-          chips: winner.chips,
-        },
-        pot: gameState.pot,
-        results: results,
-        communityCards: gameState.communityCards,
-        players: gameState.players.map((p) => ({
-          name: p.name,
-          chips: p.chips,
-          hasClosedSummary: p.hasClosedSummary || false,
-        })),
-      };
+    if (room.summaryTimer) {
+      clearTimeout(room.summaryTimer);
+    }
 
-      io.to(roomId).emit("round-ended", roundEndData);
+    room.summaryTimer = setTimeout(async () => {
+      if (room.isSummaryVisible) {
+        console.log(
+          `⏰ Timer de 25s - Fechando resumo da sala ${roomId} (fallback)`,
+        );
 
-      console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
+        io.to(roomId).emit("summary-closed", {
+          roomId: roomId,
+          forced: true,
+        });
 
-      if (room.summaryTimer) {
-        clearTimeout(room.summaryTimer);
-      }
+        if (room.gameState) {
+          // 🔥 SALVAR FICHAS NO TIMEOUT TAMBÉM
+          for (const p of room.gameState.players) {
+            await saveChipsToDatabase(p.name, p.chips);
+          }
 
-      room.summaryTimer = setTimeout(async () => {
-        if (room.isSummaryVisible) {
-          console.log(
-            `⏰ Timer de 25s - Fechando resumo da sala ${roomId} (fallback)`,
-          );
+          room.gameState = null;
+          room.isSummaryVisible = false;
 
-          io.to(roomId).emit("summary-closed", {
-            roomId: roomId,
-            forced: true,
+          room.players.forEach((p) => {
+            p.isReady = false;
+            p.cards = [];
+            p.bet = 0;
+            p.isFolded = false;
+            p.isAllIn = false;
+            p.isActive = true;
+            p.hasActed = false;
+            p.hasClosedSummary = false;
           });
 
-          if (room.gameState) {
-            for (const p of room.gameState.players) {
-              await saveChipsToDatabase(p.name, p.chips);
-            }
+          io.to(roomId).emit("room-update", room);
+          io.to(roomId).emit("game-reset");
 
-            room.gameState = null;
-            room.isSummaryVisible = false;
-
-            room.players.forEach((p) => {
-              p.isReady = false;
-              p.cards = [];
-              p.bet = 0;
-              p.isFolded = false;
-              p.isAllIn = false;
-              p.isActive = true;
-              p.hasActed = false;
-              p.hasClosedSummary = false;
-            });
-
-            io.to(roomId).emit("room-update", room);
-            io.to(roomId).emit("game-reset");
-
-            await broadcastRoomList();
-
-            console.log(`🔄 Jogo resetado na sala ${roomId} (timer fallback)`);
+          if (room.isInviteRoom) {
+            setTimeout(() => {
+              if (rooms.has(roomId)) {
+                const currentRoom = rooms.get(roomId);
+                if (currentRoom && currentRoom.players.length === 0) {
+                  rooms.delete(roomId);
+                  console.log(`🗑️ Sala de convite ${roomId} removida (timeout)`);
+                  broadcastRoomList();
+                }
+              }
+            }, 3000);
           }
+
+          await broadcastRoomList();
+
+          console.log(`🔄 Jogo resetado na sala ${roomId} (timer fallback)`);
         }
-        room.summaryTimer = null;
-      }, 25000);
-    }
+      }
+      room.summaryTimer = null;
+    }, 25000);
   }
+}
 
   // ====================== SAIR ======================
   socket.on("leave-room", async (data) => {
@@ -1198,10 +1359,26 @@ io.on("connection", (socket) => {
     if (!room) return;
 
     const player = room.players.find((p) => p.id === socket.id);
+    const playerName = player?.name || 'Jogador';
+    
     if (player) {
-      await saveChipsToDatabase(player.name, player.chips);
+      // 🔥 CORREÇÃO: Se houver gameState, usar as fichas do gameState
+      let chipsToSave = player.chips;
+      
+      if (room.gameState) {
+        const gamePlayer = room.gameState.players.find((p) => p.id === socket.id);
+        if (gamePlayer) {
+          chipsToSave = gamePlayer.chips;
+          // 🔥 Atualizar o player da sala com as fichas do gameState
+          player.chips = gamePlayer.chips;
+          console.log(`🔄 ${player.name}: sincronizando fichas do gameState: ${chipsToSave}`);
+        }
+      }
+      
+      // 🔥 SALVAR AS FICHAS CORRETAS NO BANCO
+      await saveChipsToDatabase(player.name, chipsToSave);
       console.log(
-        `💾 Fichas de ${player.name} salvas ao sair: ${player.chips}`,
+        `💾 Fichas de ${player.name} salvas ao sair: ${chipsToSave}`,
       );
 
       io.to(normalizedRoomId).emit("chat-message", {
@@ -1220,6 +1397,24 @@ io.on("connection", (socket) => {
         clearTimeout(room.summaryTimer);
         room.summaryTimer = null;
       }
+      
+      if (normalizedRoomId.startsWith("ROOM_INVITE_")) {
+        const creator = room.createdBy || (room.players && room.players.length > 0 ? room.players[0]?.name : null);
+        if (creator && creator !== playerName) {
+          for (const [id, user] of onlineUsers) {
+            if (user.username === creator) {
+              user.socket.emit("chat-message", {
+                player: "Sistema",
+                message: `🏠 Sala ${normalizedRoomId} fechada (todos saíram)`,
+                timestamp: Date.now(),
+                isSystem: true,
+              });
+              break;
+            }
+          }
+        }
+      }
+      
       rooms.delete(normalizedRoomId);
       console.log(`🗑️ Sala ${normalizedRoomId} removida`);
     } else {
@@ -1249,12 +1444,7 @@ io.on("connection", (socket) => {
     if (user) {
       console.log(`🔴 ${user.username} desconectou`);
       onlineUsers.delete(socket.id);
-      const onlineList = Array.from(onlineUsers.values()).map(
-        (u) => u.username,
-      );
-      console.log(
-        `📡 Broadcast friends-online após desconexão: ${onlineList.length} usuários online`,
-      );
+      const onlineList = Array.from(onlineUsers.values()).map((u) => u.username);
       io.emit("friends-online", { online: onlineList });
     }
 
@@ -1262,9 +1452,22 @@ io.on("connection", (socket) => {
       const idx = room.players.findIndex((p) => p.id === socket.id);
       if (idx !== -1) {
         const player = room.players[idx];
+        const isInviteRoom = roomId.startsWith("ROOM_INVITE_");
+        
+        // 🔥 SALVAR FICHAS DO JOGADOR ANTES DE REMOVER
+        if (player && room.gameState) {
+          const gamePlayer = room.gameState.players.find((p) => p.id === socket.id);
+          if (gamePlayer) {
+            saveChipsToDatabase(player.name, gamePlayer.chips);
+            console.log(`💾 Fichas de ${player.name} salvas na desconexão: ${gamePlayer.chips}`);
+          } else {
+            saveChipsToDatabase(player.name, player.chips);
+          }
+        }
+        
         io.to(roomId).emit("chat-message", {
           player: "Sistema",
-          message: `👋 ${player.name} desconectou`,
+          message: `👋 ${player.name} desconectou${isInviteRoom ? ' - Sala será fechada' : ''}`,
           timestamp: Date.now(),
           isSystem: true,
         });
@@ -1275,6 +1478,24 @@ io.on("connection", (socket) => {
             clearTimeout(room.summaryTimer);
             room.summaryTimer = null;
           }
+          
+          if (isInviteRoom) {
+            const creator = room.createdBy || player.name;
+            if (creator && creator !== player.name) {
+              for (const [id, user] of onlineUsers) {
+                if (user.username === creator) {
+                  user.socket.emit("chat-message", {
+                    player: "Sistema",
+                    message: `🏠 Sala ${roomId} fechada (desconexão de ${player.name})`,
+                    timestamp: Date.now(),
+                    isSystem: true,
+                  });
+                  break;
+                }
+              }
+            }
+          }
+          
           rooms.delete(roomId);
           console.log(`🗑️ Sala ${roomId} removida`);
         } else {
@@ -1304,9 +1525,7 @@ console.log(`   ✅ Cada jogador fecha o resumo individualmente`);
 console.log(`   ✅ Timer de 25 segundos como fallback`);
 console.log(`   ✅ Indicador de progresso (quem já fechou)`);
 console.log(`   ✅ Convites múltiplos para amigos`);
-console.log(
-  `   ✅ Redirecionamento automático para o lobby ao aceitar convite`,
-);
+console.log(`   ✅ Redirecionamento automático para o lobby ao aceitar convite`);
 console.log(`   ✅ Suporte a roomId customizado nos convites`);
 console.log(`   ✅ Criação de sala antes do envio de convites`);
 console.log(`   ✅ Logs detalhados para debug`);
@@ -1315,3 +1534,13 @@ console.log(`   ✅ Reset automático do estado do lobby ao sair`);
 console.log(`   ✅ LISTA DE SALAS ATUALIZADA EM TEMPO REAL`);
 console.log(`   ✅ SALAS DISPONÍVEIS NO LOBBY CORRETAMENTE`);
 console.log(`   ✅ FEEDBACK "SAIU DA SALA" FECHA SOZINHO`);
+console.log(`   ✅ SALAS DE CONVITE REMOVIDAS AUTOMATICAMENTE`);
+console.log(`   ✅ LIMPEZA DE SALAS INATIVAS (30min+)`);
+console.log(`   ✅ LIMPEZA DE SALAS DE CONVITE A CADA 15s`);
+console.log(`   ✅ REMOÇÃO IMEDIATA AO RECUSAR CONVITE`);
+console.log(`   ✅ FEEDBACKS VISUAIS: CONVITE RECUSADO/ACEITO/EXPIRADO`);
+console.log(`   ✅ NOTIFICAÇÕES DE SALAS FECHADAS`);
+console.log(`   ✅ SALAS DE CONVITE FILTRADAS NO LOBBY`);
+console.log(`   ✅ SALVAMENTO DE FICHAS CORRETO AO SAIR DA SALA`);
+console.log(`   ✅ SINCRONIZAÇÃO DE FICHAS DO GAMESTATE AO SAIR`);
+console.log(`   ✅ SALVAMENTO DE FICHAS NA DESCONEXÃO`);

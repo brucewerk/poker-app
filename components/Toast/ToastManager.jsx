@@ -54,7 +54,7 @@ export const TOAST_CONFIGS = {
     borderColor: "#2196f3",
     glowColor: "rgba(33, 150, 243, 0.2)",
     textColor: "#64b5f6",
-    duration: 4000,
+    duration: 5000,
   },
   [TOAST_TYPES.SUCCESS]: {
     icon: "✅",
@@ -130,7 +130,6 @@ export function ToastProvider({ children }) {
         },
       ]);
 
-      // Auto-remover após duração
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
       }, toastDuration + 500);
@@ -148,7 +147,7 @@ export function ToastProvider({ children }) {
     setToasts([]);
   }, []);
 
-  // Funções de conveniência
+  // 🔥 FUNÇÕES DE CONVENIÊNCIA
   const toast = useCallback(
     {
       levelUp: (msg) => showToast(msg, TOAST_TYPES.LEVEL_UP),
@@ -168,7 +167,7 @@ export function ToastProvider({ children }) {
     [showToast, removeToast, clearAllToasts],
   );
 
-  // Expor globalmente
+  // 🔥 EXPOR GLOBALMENTE
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.__toast = toast;
@@ -196,12 +195,40 @@ function ToastRenderer({ toasts, removeToast }) {
   if (toasts.length === 0) return null;
 
   return (
-    <div style={containerStyle()}>
+    <div
+      style={{
+        position: "fixed",
+        top: 80,
+        right: 20,
+        zIndex: 9999,
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+        maxWidth: "400px",
+        width: "100%",
+        pointerEvents: "none",
+      }}
+    >
       <AnimatePresence>
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
-            style={toastStyle(toast.config)}
+            style={{
+              pointerEvents: "auto",
+              background: toast.config.bgGradient,
+              border: `1px solid ${toast.config.borderColor}`,
+              borderRadius: 16,
+              padding: "14px 18px",
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+              boxShadow: `0 8px 32px rgba(0,0,0,0.3), 0 0 40px ${toast.config.glowColor}`,
+              backdropFilter: "blur(12px)",
+              position: "relative",
+              overflow: "hidden",
+              minWidth: "280px",
+              maxWidth: "400px",
+            }}
             initial={{ opacity: 0, x: 50, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 50, scale: 0.9 }}
@@ -213,14 +240,56 @@ function ToastRenderer({ toasts, removeToast }) {
             }}
             layout
           >
-            <div style={toastIconStyle(toast.config)}>{toast.config.icon}</div>
-            <div style={toastContentStyle()}>
-              <span style={toastMessageStyle(toast.config)}>
+            <div
+              style={{
+                fontSize: "2rem",
+                flexShrink: 0,
+                width: "44px",
+                height: "44px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(255,255,255,0.05)",
+                borderRadius: "50%",
+                border: `1px solid ${toast.config.borderColor}44`,
+              }}
+            >
+              {toast.config.icon}
+            </div>
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <span
+                style={{
+                  color: toast.config.textColor,
+                  fontSize: "0.9rem",
+                  fontWeight: "600",
+                  lineHeight: "1.4",
+                  display: "block",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.2)",
+                }}
+              >
                 {toast.message}
               </span>
-              <div style={toastProgressBarStyle()}>
+              <div
+                style={{
+                  width: "100%",
+                  height: "3px",
+                  background: "rgba(255,255,255,0.06)",
+                  borderRadius: 2,
+                  marginTop: "6px",
+                  overflow: "hidden",
+                }}
+              >
                 <motion.div
-                  style={toastProgressFillStyle(toast.config)}
+                  style={{
+                    height: "100%",
+                    background: `linear-gradient(90deg, ${toast.config.borderColor}, ${toast.config.textColor})`,
+                    borderRadius: 2,
+                  }}
                   initial={{ width: "100%" }}
                   animate={{ width: "0%" }}
                   transition={{
@@ -232,8 +301,19 @@ function ToastRenderer({ toasts, removeToast }) {
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              style={toastCloseStyle()}
-              className="toast-close"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "none",
+                color: "rgba(255,255,255,0.4)",
+                cursor: "pointer",
+                fontSize: "0.8rem",
+                padding: "4px 8px",
+                borderRadius: "50%",
+                transition: "all 0.3s ease",
+                flexShrink: 0,
+                lineHeight: 1,
+                marginLeft: "4px",
+              }}
             >
               ✕
             </button>
@@ -251,108 +331,4 @@ export function useToast() {
     throw new Error("useToast must be used within a ToastProvider");
   }
   return context;
-}
-
-// ====================== ESTILOS ======================
-
-function containerStyle() {
-  return {
-    position: "fixed",
-    top: 80,
-    right: 20,
-    zIndex: 9999,
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    maxWidth: "400px",
-    width: "100%",
-    pointerEvents: "none",
-  };
-}
-
-function toastStyle(config) {
-  return {
-    pointerEvents: "auto",
-    background: config.bgGradient,
-    border: `1px solid ${config.borderColor}`,
-    borderRadius: 16,
-    padding: "14px 18px",
-    display: "flex",
-    alignItems: "center",
-    gap: "14px",
-    boxShadow: `0 8px 32px rgba(0,0,0,0.3), 0 0 40px ${config.glowColor}`,
-    backdropFilter: "blur(12px)",
-    position: "relative",
-    overflow: "hidden",
-    minWidth: "280px",
-    maxWidth: "400px",
-  };
-}
-
-function toastIconStyle(config) {
-  return {
-    fontSize: "2rem",
-    flexShrink: 0,
-    width: "44px",
-    height: "44px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "rgba(255,255,255,0.05)",
-    borderRadius: "50%",
-    border: `1px solid ${config.borderColor}44`,
-  };
-}
-
-function toastContentStyle() {
-  return {
-    flex: 1,
-    minWidth: 0,
-  };
-}
-
-function toastMessageStyle(config) {
-  return {
-    color: config.textColor,
-    fontSize: "0.9rem",
-    fontWeight: "600",
-    lineHeight: "1.4",
-    display: "block",
-    textShadow: "0 1px 4px rgba(0,0,0,0.2)",
-  };
-}
-
-function toastProgressBarStyle() {
-  return {
-    width: "100%",
-    height: "3px",
-    background: "rgba(255,255,255,0.06)",
-    borderRadius: 2,
-    marginTop: "6px",
-    overflow: "hidden",
-  };
-}
-
-function toastProgressFillStyle(config) {
-  return {
-    height: "100%",
-    background: `linear-gradient(90deg, ${config.borderColor}, ${config.textColor})`,
-    borderRadius: 2,
-  };
-}
-
-function toastCloseStyle() {
-  return {
-    background: "rgba(255,255,255,0.05)",
-    border: "none",
-    color: "rgba(255,255,255,0.4)",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-    padding: "4px 8px",
-    borderRadius: "50%",
-    transition: "all 0.3s ease",
-    flexShrink: 0,
-    lineHeight: 1,
-    marginLeft: "4px",
-  };
 }

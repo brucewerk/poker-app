@@ -43,6 +43,10 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   const [isLeaving, setIsLeaving] = useState(false);
   const [hasClosed, setHasClosed] = useState(false);
 
+  // 🔥 ESTADOS PARA NOTIFICAÇÕES DE CHAT
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [chatNotifications, setChatNotifications] = useState([]);
+
   const resultLockedRef = useRef(false);
   const resultClosedRef = useRef(false);
   const isClosingRef = useRef(false);
@@ -80,6 +84,38 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
         closeSummaryTimeoutRef.current = null;
       }
     };
+  }, []);
+
+  // 🔥 FUNÇÃO PARA RECEBER NOVAS MENSAGENS DO CHAT
+  const handleNewChatMessage = useCallback((data) => {
+    const { from, message } = data;
+    
+    setChatNotifications((prev) => [
+      ...prev,
+      {
+        id: Date.now() + Math.random(),
+        from,
+        message: message.length > 50 ? message.substring(0, 50) + "..." : message,
+        timestamp: Date.now(),
+      }
+    ]);
+
+    setChatUnreadCount((prev) => prev + 1);
+
+    try {
+      soundManager.playSound("deal", { volume: 0.1 });
+    } catch (e) {}
+
+    if (chatUnreadCount + 1 > 0) {
+      document.title = `💬 (${chatUnreadCount + 1}) Poker by BruCe`;
+    }
+  }, [chatUnreadCount]);
+
+  // 🔥 FUNÇÃO PARA LIMPAR NOTIFICAÇÕES AO ABRIR CHAT
+  const handleChatOpen = useCallback(() => {
+    setChatUnreadCount(0);
+    setChatNotifications([]);
+    document.title = "Poker by BruCe";
   }, []);
 
   const syncReadyState = useCallback(
@@ -229,13 +265,30 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       setHasClosed(false);
     };
 
+    // 🔥 CORREÇÃO: Tratamento adequado de erros
     const onError = (data) => {
       if (!isMounted.current) return;
-      console.error("❌ Erro do servidor:", data);
+      
+      // 🔥 SE FOR ERRO VAZIO, IGNORAR SILENCIOSAMENTE
+      if (!data || Object.keys(data).length === 0) {
+        console.log("ℹ️ Erro vazio recebido, ignorando...");
+        return;
+      }
+      
+      // 🔥 SE FOR ERRO DE "JÁ ESTÁ NA SALA", IGNORAR
       if (data.message && data.message.includes("já está nesta sala")) {
         console.log("⚠️ Já está na sala, ignorando erro...");
         return;
       }
+      
+      // 🔥 SE FOR ERRO DE "Sala não encontrada", IGNORAR (já tratado no lobby)
+      if (data.message && data.message.includes("Sala não encontrada")) {
+        console.log("⚠️ Sala não encontrada, ignorando...");
+        return;
+      }
+      
+      // 🔥 LOGAR APENAS ERROS RELEVANTES
+      console.warn("⚠️ Erro do servidor:", data.message || data);
       setGameError(`❌ ${data.message || "Erro desconhecido"}`);
       setTimeout(() => setGameError(""), 5000);
     };
@@ -572,7 +625,13 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           </div>
         )}
 
-        <Chat socket={socket} roomId={roomId} playerName={playerName} />
+        <Chat
+          socket={socket}
+          roomId={roomId}
+          playerName={playerName}
+          onNewMessage={handleNewChatMessage}
+          onUnreadChange={setChatUnreadCount}
+        />
       </div>
     );
   }
@@ -590,7 +649,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   const canCall = callAmount > 0 && currentPlayer?.chips >= callAmount;
   const canRaise = currentPlayer?.chips > callAmount + 50;
 
-  // 🔥 COR DO TEMA
   const isDarkTheme =
     typeof window !== "undefined" &&
     document.documentElement.getAttribute("data-theme") === "dark";
@@ -736,13 +794,19 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           </div>
         )}
 
-      <Chat socket={socket} roomId={roomId} playerName={playerName} />
+      <Chat
+        socket={socket}
+        roomId={roomId}
+        playerName={playerName}
+        onNewMessage={handleNewChatMessage}
+        onUnreadChange={setChatUnreadCount}
+      />
     </div>
   );
 }
 
 // ============================================================
-// 🎨 ESTILOS - CORRIGIDOS PARA TEMA CLARO
+// 🎨 ESTILOS
 // ============================================================
 
 function resultOverlayStyle() {
@@ -1204,7 +1268,6 @@ function waitingHintStyle() {
   };
 }
 
-// 🔥 ESTILOS DA MESA - COM SUPORTE A TEMA
 function tableStyle(isDarkTheme) {
   return {
     background: isDarkTheme ? "rgba(0,20,0,0.25)" : "rgba(13,31,21,0.05)",

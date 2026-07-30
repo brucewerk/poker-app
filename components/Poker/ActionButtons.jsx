@@ -1,4 +1,4 @@
-// components/Poker/ActionButtons.jsx - COMPLETO COM TEMA
+// components/Poker/ActionButtons.jsx - VERSÃO FINAL COMPLETA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -13,6 +13,9 @@ export default function ActionButtons({
   onRaise,
   onAllIn,
   onReset,
+  onNewHand,
+  playerMoney,
+  isWaitingForNewHand,
   cpuAction,
 }) {
   const [actionHistory, setActionHistory] = useState([]);
@@ -33,7 +36,15 @@ export default function ActionButtons({
   }, [cpuAction]);
 
   const handleAction = (action, callback, amount = 0) => {
-    if (disabled) return;
+    // 🔥 SÓ BLOQUEIA SE FOR AÇÃO DE JOGO (NÃO BLOQUEIA NEW-HAND E RESET)
+    if (action !== "new-hand" && action !== "reset" && disabled) {
+      console.log(`🔍 [ActionButtons] Ação ${action} bloqueada - disabled=true`);
+      return;
+    }
+    if (!callback) {
+      console.log(`🔍 [ActionButtons] Ação ${action} - callback não definido!`);
+      return;
+    }
     addActionToHistory(action, amount);
     callback();
   };
@@ -57,45 +68,95 @@ export default function ActionButtons({
     );
   };
 
+  // 🔥 BOTÃO NOVA MÃO - SÓ APARECE QUANDO ESTÁ ESPERANDO
+  const showNewHand = isWaitingForNewHand === true;
+
   return (
     <div className="action-buttons-container">
-      <div className="action-buttons-grid">
-        {/* Botão FOLD */}
+      {/* 🔥 BOTÃO NOVA MÃO - SEMPRE VISÍVEL E CLICÁVEL (MESMO SEM FICHAS) */}
+      {showNewHand && (
         <button
-          onClick={() => handleAction("fold", onFold)}
-          disabled={disabled}
+          onClick={() => {
+            console.log(`🔍 [ActionButtons] Clique NOVA MÃO - playerMoney: ${playerMoney}`);
+            handleAction("new-hand", onNewHand);
+          }}
+          className="action-btn-reset"
+          style={{
+            width: "100%",
+            marginBottom: "10px",
+            padding: "14px 8px",
+            background: playerMoney > 0 
+              ? "radial-gradient(#f7d97c, #d6a12e)" 
+              : "radial-gradient(#888, #555)",
+            border: "none",
+            borderRadius: "12px",
+            fontWeight: "700",
+            fontSize: "0.9rem",
+            color: playerMoney > 0 ? "#2e241f" : "#ccc",
+            boxShadow: playerMoney > 0 ? "0 4px 0 #7a4c1a" : "0 4px 0 #444",
+            cursor: "pointer",
+            opacity: 1,
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <span style={{ fontSize: "1.2rem" }}>🃏</span>
+          NOVA MÃO
+          <span style={{ fontSize: "0.6rem", opacity: 0.7 }}>
+            ({playerMoney > 0 ? `${playerMoney} fichas` : "sem fichas"})
+          </span>
+        </button>
+      )}
+
+      {/* 🔥 BOTÕES DE AÇÃO - BLOQUEADOS SE disabled OU SEM FICHAS */}
+      <div className="action-buttons-grid">
+        <button
+          onClick={() => {
+            console.log("🔍 [ActionButtons] Clique FOLD");
+            handleAction("fold", onFold);
+          }}
+          disabled={disabled || playerMoney <= 0}
           className="action-btn action-btn-fold"
         >
           <span className="action-btn-icon">🏳️</span>
           DESISTIR
         </button>
 
-        {/* Botão CALL/CHECK */}
         <button
-          onClick={() =>
-            handleAction(toCall <= 0 ? "check" : "call", onCall, toCall)
-          }
-          disabled={disabled}
+          onClick={() => {
+            console.log(`🔍 [ActionButtons] Clique ${toCall <= 0 ? "CHECK" : "CALL"} - toCall: ${toCall}`);
+            handleAction(toCall <= 0 ? "check" : "call", onCall, toCall);
+          }}
+          disabled={disabled || playerMoney <= 0}
           className={`action-btn ${toCall <= 0 ? "action-btn-check" : "action-btn-call"}`}
         >
           <span className="action-btn-icon">{toCall <= 0 ? "✅" : "💰"}</span>
           {toCall <= 0 ? "CHECK" : `PAGAR ${toCall}`}
         </button>
 
-        {/* Botão RAISE */}
         <button
-          onClick={() => handleAction("raise", onRaise, nextRaise)}
-          disabled={!canRaise || disabled}
+          onClick={() => {
+            console.log(`🔍 [ActionButtons] Clique RAISE - nextRaise: ${nextRaise}`);
+            handleAction("raise", onRaise, nextRaise);
+          }}
+          disabled={!canRaise || disabled || playerMoney <= 0}
           className="action-btn action-btn-raise"
         >
           <span className="action-btn-icon">📈</span>
           AUMENTAR {nextRaise}
         </button>
 
-        {/* Botão ALL-IN */}
         <button
-          onClick={() => handleAction("all-in", onAllIn)}
-          disabled={disabled}
+          onClick={() => {
+            console.log("🔍 [ActionButtons] Clique ALL-IN");
+            handleAction("all-in", onAllIn);
+          }}
+          disabled={disabled || playerMoney <= 0}
           className="action-btn action-btn-allin"
         >
           <span className="action-btn-icon">⚡</span>
@@ -103,15 +164,37 @@ export default function ActionButtons({
         </button>
       </div>
 
-      {/* Botão RESET */}
+      {/* 🔥 BOTÃO RENOVAR FICHAS - SEMPRE CLICÁVEL */}
       <button
-        onClick={() => handleAction("reset", onReset)}
+        onClick={() => {
+          console.log("🔍 [ActionButtons] Clique RENOVAR FICHAS");
+          handleAction("reset", onReset);
+        }}
         className="action-btn-reset"
+        style={{
+          width: "100%",
+          marginTop: "10px",
+          padding: "14px 8px",
+          background: "radial-gradient(#f7d97c, #d6a12e)",
+          border: "none",
+          borderRadius: "12px",
+          fontWeight: "700",
+          fontSize: "0.9rem",
+          color: "#2e241f",
+          boxShadow: "0 4px 0 #7a4c1a",
+          cursor: "pointer",
+          textTransform: "uppercase",
+          letterSpacing: "0.5px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "10px",
+          transition: "all 0.2s ease",
+        }}
       >
         🔄 RENOVAR FICHAS
       </button>
 
-      {/* Histórico de ações */}
       <ActionHistory />
     </div>
   );

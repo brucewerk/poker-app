@@ -1,4 +1,4 @@
-// components/Poker/OnlineLobby.jsx - COMPLETO COM CORREÇÃO DE TEMA CLARO
+// components/Poker/OnlineLobby.jsx - COMPLETO CORRIGIDO (FILTRA SALAS DE CONVITE)
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -21,6 +21,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
   const roomListInterval = useRef(null);
   const isMounted = useRef(true);
   const fetchTimeoutRef = useRef(null);
+  const joinTimeoutRef = useRef(null);
 
   // ============================================================
   // 🔥 CONECTAR AO SOCKET (USANDO SINGLETON)
@@ -66,20 +67,23 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       setError("❌ Erro de conexão com o servidor");
     };
 
+    // 🔥 CORREÇÃO: FILTRAR SALAS DE CONVITE
     const onRoomList = (roomList) => {
-      console.log(
-        "📡 Lista de salas recebida:",
-        roomList?.length || 0,
-        "salas",
-      );
+      console.log("📡 Lista de salas recebida:", roomList?.length || 0, "salas");
+      
       if (isMounted.current) {
         if (roomList && Array.isArray(roomList)) {
+          // 🔥 FILTRAR SALAS DE CONVITE - NUNCA MOSTRAR NO LOBBY
           const validRooms = roomList.filter((room) => {
             const hasValidId = room.roomId && room.roomId.length > 0;
             const hasPlayers = room.players && room.players.length > 0;
-            return hasValidId && hasPlayers;
+            const isNotInviteRoom = !room.roomId?.startsWith("ROOM_INVITE_");
+            const hasAvailableSlot = room.hasAvailableSlot !== false;
+            
+            return hasValidId && hasPlayers && isNotInviteRoom && hasAvailableSlot;
           });
-          console.log("📡 Salas válidas:", validRooms.length);
+          
+          console.log("📡 Salas válidas (sem convites):", validRooms.length);
           setRooms(validRooms);
           setRefreshKey((prev) => prev + 1);
         } else {
@@ -101,11 +105,13 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
 
       setTimeout(() => {
         if (onJoinGame && isMounted.current) {
+          console.log(`📤 Entrando na sala criada: ${data.roomId}`);
           onJoinGame({
             roomId: data.roomId,
             playerName: currentUser,
             socket: socketClient.socket,
             isInviteCreator: true,
+            isInviteAccepted: true,
           });
         }
       }, 800);
@@ -187,12 +193,16 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       socketClient.off("invite-accepted");
       socketClient.off("error");
       if (roomListInterval.current) {
-        clearTimeout(roomListInterval.current);
+        clearInterval(roomListInterval.current);
         roomListInterval.current = null;
       }
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
         fetchTimeoutRef.current = null;
+      }
+      if (joinTimeoutRef.current) {
+        clearTimeout(joinTimeoutRef.current);
+        joinTimeoutRef.current = null;
       }
     };
   }, [currentUser, onJoinGame]);
@@ -238,11 +248,25 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         return;
       }
       const normalizedRoomId = roomIdToJoin.toUpperCase();
+      
+      // 🔥 VERIFICAR SE É SALA DE CONVITE (NUNCA DEVE APARECER NO LOBBY)
+      if (normalizedRoomId.startsWith("ROOM_INVITE_")) {
+        setError("❌ Esta sala é um convite e não está disponível no lobby.");
+        return;
+      }
+      
       const room = rooms.find((r) => r.roomId === normalizedRoomId);
       if (room) {
         const playerInRoom = room.players?.some((p) => p.name === currentUser);
         if (playerInRoom) {
-          setError(`❌ Você já está na sala ${normalizedRoomId}`);
+          if (onJoinGame) {
+            onJoinGame({
+              roomId: normalizedRoomId,
+              playerName: currentUser,
+              socket: socketClient.socket,
+              isInviteAccepted: true,
+            });
+          }
           return;
         }
         if (room.playerCount >= room.maxPlayers) {
@@ -260,36 +284,45 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         playerName: currentUser,
       });
 
-      const joinTimeout = setTimeout(() => {
+      if (joinTimeoutRef.current) {
+        clearTimeout(joinTimeoutRef.current);
+      }
+      joinTimeoutRef.current = setTimeout(() => {
         setJoining(false);
         if (onJoinGame && isMounted.current) {
           onJoinGame({
             roomId: normalizedRoomId,
             playerName: currentUser,
             socket: socketClient.socket,
+            isInviteAccepted: true,
           });
         }
+        joinTimeoutRef.current = null;
       }, 3000);
 
       const handleRoomUpdate = (data) => {
         if (data.players?.some((p) => p.name === currentUser)) {
           setJoining(false);
-          clearTimeout(joinTimeout);
+          if (joinTimeoutRef.current) {
+            clearTimeout(joinTimeoutRef.current);
+            joinTimeoutRef.current = null;
+          }
           if (onJoinGame && isMounted.current) {
             onJoinGame({
               roomId: normalizedRoomId,
               playerName: currentUser,
               socket: socketClient.socket,
+              isInviteAccepted: true,
             });
           }
           socketClient.off("room-update", handleRoomUpdate);
         }
       };
       socketClient.on("room-update", handleRoomUpdate);
-      return () => {
-        clearTimeout(joinTimeout);
+      
+      setTimeout(() => {
         socketClient.off("room-update", handleRoomUpdate);
-      };
+      }, 5000);
     },
     [currentUser, onJoinGame, rooms],
   );
@@ -521,6 +554,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
                               roomId: room.roomId,
                               playerName: currentUser,
                               socket: socketClient.socket,
+                              isInviteAccepted: true,
                             });
                           }
                         } else {

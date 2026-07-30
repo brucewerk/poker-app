@@ -1,21 +1,21 @@
-// components/Poker/FriendsList.jsx - CORREÇÃO FINAL
+// components/Poker/FriendsList.jsx - CORREÇÃO FINAL COM CHAT BIDIRECIONAL E FEEDBACKS
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
+import { soundManager } from "@/lib/sound";
 
-// 🔥 SINGLETON PARA O SOCKET (EVITA MÚLTIPLAS CONEXÕES)
+// 🔥 SINGLETON PARA O SOCKET
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
 let globalSocket = null;
-let globalSocketListeners = new Map();
 let globalOnlineUsers = [];
 
-export default function FriendsList({ username, onJoinGame }) {
+export default function FriendsList({ username, onJoinGame, onNewChatMessage }) {
   // ============================================================
-  // 🔥 TODOS OS HOOKS NO TOPO
+  // 🔥 HOOKS
   // ============================================================
 
   const [friends, setFriends] = useState([]);
@@ -48,7 +48,7 @@ export default function FriendsList({ username, onJoinGame }) {
   // 🔥 NOTIFICAÇÕES FLUTUANTES
   const [notifications, setNotifications] = useState([]);
 
-  // 🔥 CONTROLE PARA EVITAR DUPLICIDADE DE CONVITES
+  // 🔥 CONTROLE PARA EVITAR DUPLICIDADE
   const processedInvitesRef = useRef(new Set());
 
   // 🔥 FEEDBACKS NO CARD
@@ -58,7 +58,7 @@ export default function FriendsList({ username, onJoinGame }) {
   const cardFeedbackTimerRef = useRef(null);
   const feedbackTimeoutRef = useRef(null);
 
-  // 🔥 REFS PARA CONTROLE DE CONEXÃO
+  // 🔥 REFS
   const socketRef = useRef(null);
   const isConnectedRef = useRef(false);
   const isMounted = useRef(true);
@@ -69,9 +69,9 @@ export default function FriendsList({ username, onJoinGame }) {
   const onlineUsersRef = useRef([]);
   const chatEndRef = useRef(null);
   const chatInputRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const redirectTimeoutRef = useRef(null);
   const isChatOpenRef = useRef(false);
-  const messagesContainerRef = useRef(null);
   const resettingRef = useRef(false);
   const currentRoomIdRef = useRef(null);
 
@@ -88,7 +88,7 @@ export default function FriendsList({ username, onJoinGame }) {
   );
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA ADICIONAR NOTIFICAÇÃO FLUTUANTE
+  // 🔥 FUNÇÕES DE NOTIFICAÇÃO
   // ============================================================
   const addNotification = useCallback((type, title, message, action = null) => {
     const id = Date.now() + Math.random();
@@ -103,7 +103,7 @@ export default function FriendsList({ username, onJoinGame }) {
 
     setNotifications((prev) => [...prev, newNotif]);
 
-    if (type !== "invite_received") {
+    if (type !== "invite_received" && type !== "chat") {
       setTimeout(() => {
         setNotifications((prev) => prev.filter((n) => n.id !== id));
       }, 6000);
@@ -115,7 +115,7 @@ export default function FriendsList({ username, onJoinGame }) {
   }, []);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA ROLAR CHAT
+  // 🔥 SCROLL CHAT - AUTO-ROLAGEM
   // ============================================================
   const scrollChatToBottom = useCallback(() => {
     if (chatEndRef.current) {
@@ -125,14 +125,21 @@ export default function FriendsList({ username, onJoinGame }) {
       });
       return;
     }
+
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop =
         messagesContainerRef.current.scrollHeight;
+      return;
+    }
+
+    const container = document.querySelector(".chat-messages-container");
+    if (container) {
+      container.scrollTop = container.scrollHeight;
     }
   }, []);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA MOSTRAR FEEDBACK NO CARD
+  // 🔥 FUNÇÕES DE FEEDBACK
   // ============================================================
   const showCardFeedback = useCallback(
     (
@@ -193,7 +200,7 @@ export default function FriendsList({ username, onJoinGame }) {
   }, []);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA MOSTRAR CONVITE FLUTUANTE
+  // 🔥 CONVITES FLUTUANTES
   // ============================================================
   const showFloatingInviteCard = useCallback(
     (inviteData) => {
@@ -248,7 +255,7 @@ export default function FriendsList({ username, onJoinGame }) {
   }, [pendingInviteQueue, showFloatingInviteCard]);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA RESETAR ESTADO DO LOBBY
+  // 🔥 RESET LOBBY
   // ============================================================
   const resetLobbyState = useCallback(() => {
     if (resettingRef.current) return;
@@ -270,17 +277,15 @@ export default function FriendsList({ username, onJoinGame }) {
   }, [username, closeFloatingInvite, clearCardFeedback]);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA CONECTAR AO SOCKET (USANDO SINGLETON GLOBAL)
+  // 🔥 SOCKET CONNECTION
   // ============================================================
   const connectSocket = useCallback(() => {
-    // 🔥 SE JÁ EXISTE SOCKET GLOBAL, REUTILIZAR
     if (globalSocket && globalSocket.connected) {
       console.log("🔌 Socket global já conectado, reutilizando...");
       socketRef.current = globalSocket;
       return globalSocket;
     }
 
-    // 🔥 SE EXISTE SOCKET GLOBAL MAS ESTÁ DESCONECTADO, RECONECTAR
     if (globalSocket) {
       console.log("🔄 Reconectando socket global...");
       globalSocket.connect();
@@ -306,19 +311,14 @@ export default function FriendsList({ username, onJoinGame }) {
     return socket;
   }, [username]);
 
-  // ============================================================
-  // 🔥 FUNÇÃO PARA DESCONECTAR SOCKET
-  // ============================================================
   const disconnectSocket = useCallback(() => {
-    // 🔥 NUNCA DESCONECTAR O SOCKET GLOBAL AQUI
-    // Apenas limpar referências locais
     console.log("🔌 Limpando referências locais do socket");
     socketRef.current = null;
     isConnectedRef.current = false;
   }, []);
 
   // ============================================================
-  // 🔥 FUNÇÃO PARA ABRIR CHAT
+  // 🔥 CHAT
   // ============================================================
   const openChat = useCallback(
     (friendUsername) => {
@@ -345,21 +345,85 @@ export default function FriendsList({ username, onJoinGame }) {
           chatInputRef.current.focus();
         }
         scrollChatToBottom();
-      }, 200);
+      }, 300);
     },
     [scrollChatToBottom, clearCardFeedback],
   );
 
+  const closeChat = useCallback(() => {
+    setShowChat(false);
+    setSelectedChatFriend(null);
+    isChatOpenRef.current = false;
+    setChatInput("");
+
+    if (pendingInviteQueue.length > 0) {
+      setTimeout(() => {
+        const nextInvite = pendingInviteQueue[0];
+        setPendingInviteQueue((prev) => prev.slice(1));
+        showFloatingInviteCard(nextInvite);
+      }, 300);
+    }
+  }, [pendingInviteQueue, showFloatingInviteCard]);
+
+  const sendChatMessage = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (!chatInput.trim() || !selectedChatFriend) return;
+      if (!socketRef.current || !isConnected) {
+        showCardFeedback("❌ Servidor não disponível", true, 3000);
+        return;
+      }
+
+      const message = chatInput.trim();
+      setChatInput("");
+
+      setChatMessages((prev) => {
+        const friendMessages = prev[selectedChatFriend] || [];
+        return {
+          ...prev,
+          [selectedChatFriend]: [
+            ...friendMessages,
+            {
+              from: username,
+              message: message,
+              timestamp: new Date(),
+              isOwn: true,
+            },
+          ],
+        };
+      });
+
+      socketRef.current.emit("private-message", {
+        to: selectedChatFriend,
+        from: username,
+        message: message,
+      });
+
+      setTimeout(() => {
+        if (chatInputRef.current) {
+          chatInputRef.current.focus();
+        }
+        scrollChatToBottom();
+      }, 100);
+    },
+    [
+      chatInput,
+      selectedChatFriend,
+      username,
+      isConnected,
+      scrollChatToBottom,
+      showCardFeedback,
+    ],
+  );
+
   // ============================================================
-  // 🔥 useEffect - CONECTAR AO SOCKET (USANDO SINGLETON GLOBAL)
+  // 🔥 useEffect - SOCKET
   // ============================================================
   useEffect(() => {
     if (!username) return;
 
-    // 🔥 USAR SOCKET GLOBAL
     const socket = connectSocket();
 
-    // 🔥 TIMEOUT DE CONEXÃO
     const connectionTimeout = setTimeout(() => {
       if (!socket.connected) {
         console.warn("⏳ Timeout de conexão do socket");
@@ -376,7 +440,6 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     }, 5000);
 
-    // 🔥 REMOVER LISTENERS ANTIGOS (PARA EVITAR DUPLICIDADE)
     socket.off("connect");
     socket.off("disconnect");
     socket.off("connect_error");
@@ -431,7 +494,6 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
-    // 🔥 ATUALIZAR ONLINE USERS GLOBAL E LOCAL
     socket.on("friends-online", (data) => {
       console.log("📡 Friends online recebido:", data);
       const onlineList = data.online || [];
@@ -451,19 +513,6 @@ export default function FriendsList({ username, onJoinGame }) {
       });
     });
 
-    // 🔥 INICIALIZAR COM OS ONLINE USERS ATUAIS
-    if (socket.connected) {
-      clearTimeout(connectionTimeout);
-      socket.emit("friend-online", { username });
-      setIsConnected(true);
-      isConnectedRef.current = true;
-      // Usar os online users já armazenados
-      if (globalOnlineUsers.length > 0) {
-        onlineUsersRef.current = globalOnlineUsers;
-      }
-    }
-
-    // 🔥 RESTANTE DOS EVENTOS...
     socket.on("room-created", (data) => {
       console.log("📡 Sala criada com sucesso:", data);
       setIsCreatingRoom(false);
@@ -476,6 +525,7 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
+    // 🔥 GROUP INVITE
     socket.on("group-invite", (data) => {
       if (!data.players?.includes(username)) {
         console.log("📡 Convite não é para este usuário, ignorando");
@@ -498,7 +548,7 @@ export default function FriendsList({ username, onJoinGame }) {
         inviteId: data.inviteId,
         from: data.from,
         players: data.players || [],
-        roomId: data.roomId || `ROOM_${data.inviteId}`,
+        roomId: data.roomId || `ROOM_INVITE_${data.inviteId}`,
         message: data.message || `${data.from} te convidou para uma partida!`,
       };
 
@@ -535,6 +585,7 @@ export default function FriendsList({ username, onJoinGame }) {
       showFloatingInviteCard(inviteData);
     });
 
+    // 🔥 INVITE ACCEPTED
     socket.on("invite-accepted", (data) => {
       console.log("📡 Convite aceito:", data);
 
@@ -555,7 +606,7 @@ export default function FriendsList({ username, onJoinGame }) {
         );
 
         if (inviteData && onJoinGame) {
-          const roomId = inviteData.roomId || `ROOM_${data.inviteId}`;
+          const roomId = inviteData.roomId || `ROOM_INVITE_${data.inviteId}`;
 
           socket.emit("join-room", {
             roomId: roomId,
@@ -570,6 +621,7 @@ export default function FriendsList({ username, onJoinGame }) {
               socket: socket,
               invitedPlayers: inviteData.players || [],
               isInviteCreator: true,
+              isInviteAccepted: true,
             });
           }, 500);
 
@@ -586,6 +638,7 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     });
 
+    // 🔥 INVITE DECLINED - COM FEEDBACK
     socket.on("invite-declined", (data) => {
       console.log("📡 Convite recusado:", data);
 
@@ -593,30 +646,44 @@ export default function FriendsList({ username, onJoinGame }) {
         addNotification(
           "invite_declined",
           `❌ ${data.from} recusou`,
-          `${data.from} não pode jogar agora`,
+          `${data.from} não pode jogar agora - Sala removida`,
           null,
         );
 
-        showCardFeedback(`❌ ${data.from} recusou o convite.`, true, 3000);
+        showCardFeedback(`❌ ${data.from} recusou o convite. Sala fechada.`, true, 4000);
+        
         setPendingInvites((prev) =>
           prev.filter((n) => n.inviteId !== data.inviteId),
         );
+        
+        const roomId = `ROOM_INVITE_${data.inviteId}`;
+        if (isInLobby && currentRoomIdRef.current === roomId) {
+          socket.emit("leave-room", { roomId: roomId });
+          resetLobbyState();
+        }
       } else {
-        showCardFeedback(`❌ Convite recusado`, true, 2000);
+        showCardFeedback(`❌ Convite recusado - Sala removida`, true, 3000);
         closeFloatingInvite();
+        setIsWaitingForAccept(false);
+        setPendingInviteId(null);
+        setPendingInvites((prev) =>
+          prev.filter((n) => n.inviteId !== data.inviteId),
+        );
       }
     });
 
+    // 🔥 INVITE SENT - COM FEEDBACK
     socket.on("invite-sent", (data) => {
       console.log("📡 Convite enviado:", data);
       if (data.success) {
-        setSuccess(`✅ Convites enviados para ${data.players?.join(", ")}!`);
+        const playerList = data.players?.join(", ") || "";
+        setSuccess(`✅ Convites enviados para ${playerList}!`);
         setIsWaitingForAccept(true);
         setPendingInviteId(data.inviteId);
         showCardFeedback(
-          `✅ Convites enviados! Aguardando resposta...`,
+          `✅ Convites enviados para ${playerList}! Aguardando resposta...`,
           false,
-          4000,
+          5000,
         );
         setTimeout(() => setSuccess(""), 3000);
       } else {
@@ -625,12 +692,13 @@ export default function FriendsList({ username, onJoinGame }) {
         showCardFeedback(
           `❌ ${data.error || "Erro ao enviar convites"}`,
           true,
-          3000,
+          4000,
         );
         setTimeout(() => setError(""), 3000);
       }
     });
 
+    // 🔥 PRIVATE MESSAGE
     socket.on("private-message", (data) => {
       console.log(
         `📡 Mensagem privada recebida de ${data.from}:`,
@@ -653,11 +721,27 @@ export default function FriendsList({ username, onJoinGame }) {
         };
       });
 
-      if (selectedChatFriend !== data.from || !showChat) {
+      if (onNewChatMessage) {
+        onNewChatMessage({
+          from: data.from,
+          message: data.message,
+          timestamp: data.timestamp,
+        });
+      }
+
+      const isChatOpen = selectedChatFriend === data.from && showChat;
+
+      if (isChatOpen) {
+        setTimeout(() => scrollChatToBottom(), 100);
+      } else {
         setUnreadChats((prev) => ({
           ...prev,
           [data.from]: (prev[data.from] || 0) + 1,
         }));
+
+        try {
+          soundManager.playSound("deal", { volume: 0.12 });
+        } catch (e) {}
 
         addNotification(
           "chat",
@@ -675,11 +759,18 @@ export default function FriendsList({ username, onJoinGame }) {
           true,
           () => openChat(data.from),
         );
-      } else {
-        setTimeout(() => scrollChatToBottom(), 100);
+
+        const totalUnreadNow = Object.values(unreadChats).reduce(
+          (a, b) => a + b,
+          0
+        ) + 1;
+        if (totalUnreadNow > 0) {
+          document.title = `💬 (${totalUnreadNow}) Poker by BruCe`;
+        }
       }
     });
 
+    // 🔥 ROOM UPDATE
     socket.on("room-update", (data) => {
       if (data && data.players && !resettingRef.current) {
         const playerInRoom = data.players.some((p) => p.name === username);
@@ -743,7 +834,6 @@ export default function FriendsList({ username, onJoinGame }) {
       showCardFeedback(`❌ ${data.message || "Erro desconhecido"}`, true, 4000);
     });
 
-    // 🔥 SE JÁ ESTIVER CONECTADO, EMITIR EVENTO
     if (socket.connected) {
       clearTimeout(connectionTimeout);
       socket.emit("friend-online", { username });
@@ -753,8 +843,6 @@ export default function FriendsList({ username, onJoinGame }) {
 
     return () => {
       clearTimeout(connectionTimeout);
-      // 🔥 NÃO REMOVER TODOS OS LISTENERS DO SOCKET GLOBAL
-      // Apenas os que este componente adicionou
       socket.off("connect");
       socket.off("disconnect");
       socket.off("connect_error");
@@ -775,10 +863,11 @@ export default function FriendsList({ username, onJoinGame }) {
         redirectTimeoutRef.current = null;
       }
     };
-  }, [username, connectSocket, showCardFeedback]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, connectSocket, showCardFeedback, addNotification, openChat, resetLobbyState, onJoinGame, isInLobby, isProcessingInvite, isChatOpenRef, closeFloatingInvite, scrollChatToBottom, selectedChatFriend, showChat, unreadChats, onNewChatMessage]);
 
   // ============================================================
-  // 🔥 useEffect - LIMPAR REFERÊNCIAS AO DESMONTAR
+  // 🔥 useEffect - CLEANUP
   // ============================================================
   useEffect(() => {
     isMounted.current = true;
@@ -789,8 +878,6 @@ export default function FriendsList({ username, onJoinGame }) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      // 🔥 NÃO DESCONECTAR O SOCKET GLOBAL AQUI
-      // Apenas limpar referências locais
       disconnectSocket();
       clearCardFeedback();
     };
@@ -813,11 +900,9 @@ export default function FriendsList({ username, onJoinGame }) {
         const data = await res.json();
 
         if (data.success && isMounted.current) {
-          // 🔥 USAR globalOnlineUsers COMO FONTE DE VERDADE
-          const onlineNames =
-            globalOnlineUsers.length > 0
-              ? globalOnlineUsers
-              : onlineUsersRef.current;
+          const onlineNames = globalOnlineUsers.length > 0
+            ? globalOnlineUsers
+            : onlineUsersRef.current;
 
           const validFriends = (data.friends || []).map((friend) => ({
             username: friend.username || "Desconhecido",
@@ -851,12 +936,11 @@ export default function FriendsList({ username, onJoinGame }) {
   );
 
   // ============================================================
-  // 🔥 useEffect - CARREGAR AMIGOS INICIALMENTE
+  // 🔥 useEffect - CARREGAR AMIGOS
   // ============================================================
   useEffect(() => {
     isMounted.current = true;
     if (username) {
-      // Pequeno delay para garantir que o socket já tenha recebido os online users
       setTimeout(() => {
         fetchFriends();
       }, 300);
@@ -895,7 +979,7 @@ export default function FriendsList({ username, onJoinGame }) {
   }, [username, fetchFriends]);
 
   // ============================================================
-  // 🔥 useEffect - ROLAGEM AUTOMÁTICA DO CHAT
+  // 🔥 useEffect - AUTO-ROLAGEM DO CHAT
   // ============================================================
   useEffect(() => {
     if (showChat && selectedChatFriend) {
@@ -907,16 +991,7 @@ export default function FriendsList({ username, onJoinGame }) {
   }, [chatMessages, selectedChatFriend, showChat, scrollChatToBottom]);
 
   // ============================================================
-  // 🔥 useEffect - LIMPAR FEEDBACK QUANDO CHAT ABRE
-  // ============================================================
-  useEffect(() => {
-    if (showChat) {
-      clearCardFeedback();
-    }
-  }, [showChat, clearCardFeedback]);
-
-  // ============================================================
-  // 🔥 useCallback - SELECIONAR/DESELECIONAR AMIGO
+  // 🔥 FUNÇÕES DE CONVITE
   // ============================================================
   const toggleFriendSelection = useCallback((friendUsername) => {
     setFriends((prev) =>
@@ -934,9 +1009,6 @@ export default function FriendsList({ username, onJoinGame }) {
     });
   }, []);
 
-  // ============================================================
-  // 🔥 useCallback - ACEITAR CONVITE
-  // ============================================================
   const acceptGroupInvite = useCallback(
     (inviteId) => {
       if (isProcessingInvite) {
@@ -962,7 +1034,7 @@ export default function FriendsList({ username, onJoinGame }) {
         return;
       }
 
-      const roomId = inviteData.roomId || `ROOM_${inviteId}`;
+      const roomId = inviteData.roomId || `ROOM_INVITE_${inviteId}`;
 
       setIsProcessingInvite(true);
       closeFloatingInvite();
@@ -987,7 +1059,6 @@ export default function FriendsList({ username, onJoinGame }) {
       }
     },
     [
-      username,
       isConnected,
       pendingInvites,
       floatingInvite,
@@ -998,9 +1069,6 @@ export default function FriendsList({ username, onJoinGame }) {
     ],
   );
 
-  // ============================================================
-  // 🔥 useCallback - RECUSAR CONVITE
-  // ============================================================
   const declineGroupInvite = useCallback(
     (inviteId) => {
       if (isProcessingInvite) {
@@ -1014,16 +1082,24 @@ export default function FriendsList({ username, onJoinGame }) {
       }
 
       console.log(`❌ Recusando convite: ${inviteId}`);
+      
+      const inviteData = pendingInvites.find((n) => n.inviteId === inviteId);
+      const roomId = inviteData?.roomId || `ROOM_INVITE_${inviteId}`;
+
       socketRef.current.emit("decline-invite", {
         inviteId,
         from: username,
       });
 
-      const inviteData = pendingInvites.find((n) => n.inviteId === inviteId);
       if (inviteData) {
         setPendingInvites((prev) =>
           prev.filter((n) => n.inviteId !== inviteId),
         );
+      }
+
+      if (isInLobby && currentRoomIdRef.current === roomId) {
+        socketRef.current.emit("leave-room", { roomId: roomId });
+        resetLobbyState();
       }
 
       closeFloatingInvite();
@@ -1032,21 +1108,20 @@ export default function FriendsList({ username, onJoinGame }) {
         prev.filter((n) => n.type !== "invite_received"),
       );
 
-      showCardFeedback(`❌ Convite recusado`, true, 2000);
+      showCardFeedback(`❌ Convite recusado - Sala removida`, true, 3000);
     },
     [
       username,
       isConnected,
       pendingInvites,
       isProcessingInvite,
+      isInLobby,
       closeFloatingInvite,
       showCardFeedback,
+      resetLobbyState,
     ],
   );
 
-  // ============================================================
-  // 🔥 FUNÇÃO AUXILIAR PARA ENTRAR NA NOVA SALA
-  // ============================================================
   const enterNewRoom = useCallback(
     (roomId, inviteData) => {
       console.log(`📤 Entrando na nova sala ${roomId}...`);
@@ -1084,9 +1159,6 @@ export default function FriendsList({ username, onJoinGame }) {
     [username, onJoinGame],
   );
 
-  // ============================================================
-  // 🔥 useCallback - ENVIAR CONVITES MÚLTIPLOS
-  // ============================================================
   const sendGroupInvite = useCallback(() => {
     if (selectedFriends.length === 0) {
       showCardFeedback("❌ Selecione pelo menos um amigo!", true, 3000);
@@ -1099,7 +1171,7 @@ export default function FriendsList({ username, onJoinGame }) {
     }
 
     const inviteId = `invite_${Date.now()}`;
-    const roomId = `ROOM_${inviteId}`;
+    const roomId = `ROOM_INVITE_${inviteId}`;
 
     const inviteData = {
       inviteId,
@@ -1125,7 +1197,8 @@ export default function FriendsList({ username, onJoinGame }) {
     setError("");
     setSuccess("");
 
-    console.log(`📤 Criando sala ${roomId}...`);
+    console.log(`📤 Criando sala de convite ${roomId}...`);
+    
     socketRef.current.emit("create-room", {
       playerName: username,
       maxPlayers: selectedFriends.length + 1,
@@ -1134,7 +1207,7 @@ export default function FriendsList({ username, onJoinGame }) {
     });
 
     setTimeout(() => {
-      console.log(`📤 Enviando convites...`);
+      console.log(`📤 Enviando convites para ${selectedFriends.join(", ")}...`);
       socketRef.current.emit("group-invite", inviteData);
     }, 500);
 
@@ -1142,10 +1215,11 @@ export default function FriendsList({ username, onJoinGame }) {
     setFriends((prev) => prev.map((f) => ({ ...f, selected: false })));
     setShowInviteModal(false);
 
+    const playerList = selectedFriends.join(", ");
     showCardFeedback(
-      `✅ Convites enviados! Aguardando resposta...`,
+      `✅ Convites enviados para ${playerList}! Aguardando resposta...`,
       false,
-      4000,
+      5000,
     );
 
     if (redirectTimeoutRef.current) {
@@ -1155,6 +1229,11 @@ export default function FriendsList({ username, onJoinGame }) {
     redirectTimeoutRef.current = setTimeout(() => {
       setIsWaitingForAccept(false);
       setPendingInviteId(null);
+      
+      if (socketRef.current) {
+        socketRef.current.emit("leave-room", { roomId: roomId });
+      }
+      
       showCardFeedback(
         "⏰ Tempo esgotado. Ninguém aceitou o convite.",
         true,
@@ -1165,7 +1244,7 @@ export default function FriendsList({ username, onJoinGame }) {
   }, [selectedFriends, username, isConnected, showCardFeedback]);
 
   // ============================================================
-  // 🔥 useCallback - ADICIONAR AMIGO
+  // 🔥 FUNÇÕES DE AMIGOS
   // ============================================================
   const addFriend = useCallback(async () => {
     const friendName = newFriend.trim();
@@ -1270,9 +1349,6 @@ export default function FriendsList({ username, onJoinGame }) {
     }
   }, [newFriend, username, fetchFriends, showCardFeedback]);
 
-  // ============================================================
-  // 🔥 useCallback - REMOVER AMIGO
-  // ============================================================
   const removeFriend = useCallback(
     async (friendUsername) => {
       if (!confirm(`Remover ${friendUsername} da lista de amigos?`)) return;
@@ -1312,81 +1388,6 @@ export default function FriendsList({ username, onJoinGame }) {
     [fetchFriends, showCardFeedback],
   );
 
-  // ============================================================
-  // 🔥 useCallback - FECHAR CHAT
-  // ============================================================
-  const closeChat = useCallback(() => {
-    setShowChat(false);
-    setSelectedChatFriend(null);
-    isChatOpenRef.current = false;
-    setChatInput("");
-
-    if (pendingInviteQueue.length > 0) {
-      setTimeout(() => {
-        const nextInvite = pendingInviteQueue[0];
-        setPendingInviteQueue((prev) => prev.slice(1));
-        showFloatingInviteCard(nextInvite);
-      }, 300);
-    }
-  }, [pendingInviteQueue, showFloatingInviteCard]);
-
-  // ============================================================
-  // 🔥 useCallback - ENVIAR MENSAGEM
-  // ============================================================
-  const sendChatMessage = useCallback(
-    (e) => {
-      e.preventDefault();
-      if (!chatInput.trim() || !selectedChatFriend) return;
-      if (!socketRef.current || !isConnected) {
-        showCardFeedback("❌ Servidor não disponível", true, 3000);
-        return;
-      }
-
-      const message = chatInput.trim();
-      setChatInput("");
-
-      setChatMessages((prev) => {
-        const friendMessages = prev[selectedChatFriend] || [];
-        return {
-          ...prev,
-          [selectedChatFriend]: [
-            ...friendMessages,
-            {
-              from: username,
-              message: message,
-              timestamp: new Date(),
-              isOwn: true,
-            },
-          ],
-        };
-      });
-
-      socketRef.current.emit("private-message", {
-        to: selectedChatFriend,
-        from: username,
-        message: message,
-      });
-
-      setTimeout(() => {
-        if (chatInputRef.current) {
-          chatInputRef.current.focus();
-        }
-        scrollChatToBottom();
-      }, 100);
-    },
-    [
-      chatInput,
-      selectedChatFriend,
-      username,
-      isConnected,
-      scrollChatToBottom,
-      showCardFeedback,
-    ],
-  );
-
-  // ============================================================
-  // 🔥 useCallback - FECHAR MODAL DE CONVITE
-  // ============================================================
   const closeInviteModal = useCallback(() => {
     setShowInviteModal(false);
     setSelectedFriends([]);
@@ -1425,7 +1426,9 @@ export default function FriendsList({ username, onJoinGame }) {
                     ? "2px solid gold"
                     : notif.type === "invite_declined"
                       ? "1px solid rgba(244,67,54,0.3)"
-                      : "1px solid rgba(76,175,80,0.3)",
+                      : notif.type === "chat"
+                        ? "1px solid rgba(33,150,243,0.3)"
+                        : "1px solid rgba(76,175,80,0.3)",
                 borderRadius: "16px",
                 padding: "14px 18px",
                 boxShadow: "0 8px 32px var(--shadow-dark)",
@@ -1503,7 +1506,7 @@ export default function FriendsList({ username, onJoinGame }) {
                     style={{
                       display: "block",
                       fontSize: "0.6rem",
-                      color: "var(--text-muted)",
+                      color: "#2196f3",
                       marginTop: "2px",
                       fontStyle: "italic",
                     }}
@@ -1590,6 +1593,38 @@ export default function FriendsList({ username, onJoinGame }) {
                   </button>
                 </div>
               )}
+              {notif.type === "chat" && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    marginTop: "4px",
+                    paddingLeft: "32px",
+                  }}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const friendName = notif.title.replace("💬 ", "");
+                      openChat(friendName);
+                      removeNotification(notif.id);
+                    }}
+                    style={{
+                      padding: "2px 12px",
+                      borderRadius: "12px",
+                      border: "none",
+                      background: "rgba(33,150,243,0.2)",
+                      color: "#2196f3",
+                      cursor: "pointer",
+                      fontSize: "0.7rem",
+                      fontWeight: "bold",
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    Abrir Chat
+                  </button>
+                </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
@@ -1598,7 +1633,7 @@ export default function FriendsList({ username, onJoinGame }) {
   };
 
   // ============================================================
-  // 🔥 COMPONENTE DE CHAT
+  // 🔥 CHAT PANEL
   // ============================================================
   const ChatPanel = useMemo(() => {
     if (!showChat || !selectedChatFriend) return null;
@@ -1678,6 +1713,7 @@ export default function FriendsList({ username, onJoinGame }) {
           </div>
 
           <div
+            className="chat-messages-container"
             style={{
               flex: 1,
               overflowY: "auto",
@@ -1807,7 +1843,7 @@ export default function FriendsList({ username, onJoinGame }) {
   ]);
 
   // ============================================================
-  // 🔥 MODAL DE CONVITE
+  // 🔥 INVITE MODAL
   // ============================================================
   const InviteModal = () => {
     if (!showInviteModal) return null;
