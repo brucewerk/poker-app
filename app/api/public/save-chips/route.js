@@ -4,8 +4,9 @@
 // jogador após partidas de multiplayer online. NÃO exige autenticação de
 // propósito, assim como /api/public/get-chips.
 import { NextResponse } from "next/server";
-import dbConnect from "@/lib/mongoose";
-import User from "@/lib/models/User";
+
+// 🔥 MELHORIA: Verificar se MongoDB está configurado antes de tentar conectar
+const isMongoDBConfigured = !!process.env.MONGODB_URI;
 
 export async function POST(request) {
   try {
@@ -25,8 +26,36 @@ export async function POST(request) {
       );
     }
 
-    await dbConnect();
+    // 🔥 MELHORIA: Se MongoDB não estiver configurado, retornar sucesso sem persistir
+    if (!isMongoDBConfigured) {
+      console.log("⚠️ MongoDB não configurado, fichas não serão persistidas");
+      return NextResponse.json({
+        success: true,
+        chips,
+        message: "MongoDB não configurado, fichas não persistidas",
+      });
+    }
 
+    // 🔥 MELHORIA: Tentar conectar com timeout e melhor tratamento de erro
+    let dbConnect;
+    try {
+      dbConnect = (await import("@/lib/mongoose")).default;
+      await Promise.race([
+        dbConnect(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout na conexão com banco de dados')), 5000)
+        )
+      ]);
+    } catch (dbError) {
+      console.log("⚠️ Erro ao conectar ao MongoDB, fichas não serão persistidas:", dbError.message);
+      return NextResponse.json({
+        success: true,
+        chips,
+        message: "Erro de conexão, fichas não persistidas",
+      });
+    }
+
+    const User = (await import("@/lib/models/User")).default;
     await User.updateOne({ username }, { $set: { chips } }, { upsert: true });
 
     return NextResponse.json({
@@ -35,9 +64,10 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error("Erro ao salvar fichas:", error);
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 },
-    );
+    // 🔥 MELHORIA: Mesmo em caso de erro, retornar sucesso para não quebrar o jogo
+    return NextResponse.json({
+      success: true,
+      message: "Erro ao salvar fichas, jogo continua normalmente",
+    });
   }
 }

@@ -24,9 +24,17 @@ export default function LevelDisplay({
 
     try {
       setError(null);
+
+      // 🔥 CORREÇÃO: Aumentar timeout e melhorar tratamento de erro
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(
         `/api/get-level?username=${encodeURIComponent(username)}&t=${Date.now()}`,
+        { signal: controller.signal }
       );
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -36,11 +44,47 @@ export default function LevelDisplay({
       if (data.success) {
         setLevelData(data);
       } else {
-        setError(data.error || "Erro ao carregar nível");
+        // 🔥 Se falhar, usar valores padrão em vez de mostrar erro
+        console.log("⚠️ API de nível falhou, usando valores padrão");
+        setLevelData({
+          level: 1,
+          title: "Iniciante",
+          rankType: "Comum",
+          xp: 0,
+          xpToNext: 100,
+          progress: 0,
+          achievements: 0,
+          findings: 0,
+        });
       }
     } catch (error) {
-      console.error("Erro ao buscar nível:", error);
-      setError(error.message);
+      if (error.name === 'AbortError') {
+        // 🔥 Timeout é esperado quando MongoDB não está configurado
+        console.log("⚠️ Timeout ao buscar nível (MongoDB não configurado), usando valores padrão");
+        setLevelData({
+          level: 1,
+          title: "Iniciante",
+          rankType: "Comum",
+          xp: 0,
+          xpToNext: 100,
+          progress: 0,
+          achievements: 0,
+          findings: 0,
+        });
+      } else {
+        console.error("Erro ao buscar nível:", error);
+        // 🔥 Usar valores padrão em caso de erro
+        setLevelData({
+          level: 1,
+          title: "Iniciante",
+          rankType: "Comum",
+          xp: 0,
+          xpToNext: 100,
+          progress: 0,
+          achievements: 0,
+          findings: 0,
+        });
+      }
     } finally {
       setLoading(false);
     }

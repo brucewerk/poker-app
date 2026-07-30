@@ -9,6 +9,7 @@ import { checkAchievements } from "@/lib/achievements";
 
 export async function POST(request) {
   try {
+    // 🔥 CORREÇÃO: Adicionar timeout e melhorar error handling
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
@@ -27,7 +28,13 @@ export async function POST(request) {
       );
     }
 
-    await dbConnect();
+    // 🔥 CORREÇÃO: Adicionar timeout para conexão com banco
+    const dbConnection = await Promise.race([
+      dbConnect(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na conexão com banco de dados')), 10000)
+      )
+    ]);
 
     const user = await User.findOne({ username });
     if (!user) {

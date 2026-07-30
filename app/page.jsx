@@ -202,18 +202,35 @@ export default function PokerGame() {
   const fetchChipsFromDB = useCallback(async () => {
     if (!currentUser) return null;
     try {
+      // 🔥 MELHORIA: Reduzir timeout para 3 segundos e melhorar error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
       const res = await fetch("/api/public/get-chips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: currentUser }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        console.log("⚠️ API get-chips retornou status não-ok");
+        return null;
+      }
+
       const data = await res.json();
       if (data.success) {
         return data.chips;
       }
       return null;
     } catch (error) {
-      console.error("Erro ao buscar fichas:", error);
+      if (error.name === 'AbortError') {
+        console.log("⚠️ Timeout ao buscar fichas (3s)");
+      } else {
+        console.log("⚠️ Erro ao buscar fichas:", error.message);
+      }
       return null;
     }
   }, [currentUser]);
@@ -341,6 +358,7 @@ export default function PokerGame() {
       isMultiplayer,
       multiplayerModeActive,
       currentPlayerIndex,
+      currentUser,
     ],
   );
 
@@ -411,7 +429,7 @@ export default function PokerGame() {
     console.log("🔄 Restaurando jogo CPU...");
     
     const chips = await fetchChipsFromDB();
-    const finalChips = chips || currentChips || session?.user?.chips || 1000;
+    const finalChips = chips !== null ? chips : currentChips || session?.user?.chips || 0;
 
     console.log(`💰 Fichas restauradas: ${finalChips}`);
 
@@ -644,7 +662,7 @@ export default function PokerGame() {
           console.error("Erro ao recuperar estado:", error);
         }
 
-        const chips = currentChips || userChips || 1000;
+        const chips = currentChips || userChips || 0;
         setWaitingForNewHand(true);
         setGame((prev) => ({
           ...prev,
@@ -664,9 +682,19 @@ export default function PokerGame() {
   // ====================== ATUALIZAR ESTATÍSTICAS ======================
   const updateStats = useCallback(
     async (result, chips, handName, wasAllIn = false) => {
+      // 🔥 No multiplayer, só atualiza estatísticas globais para o dono da conta (índice 0)
+      if (isMultiplayer && multiplayerModeActive && currentPlayerIndex !== 0) {
+        console.log("🔍 [updateStats] Pulando atualização de estatísticas - não é dono da conta no multiplayer");
+        return;
+      }
+
       if (!currentUser) return;
 
       try {
+        // 🔥 CORREÇÃO: Adicionar timeout e melhorar error handling
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
         const res = await fetch("/api/update-stats", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -677,7 +705,15 @@ export default function PokerGame() {
             handName,
             wasAllIn,
           }),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          console.error("❌ Erro na resposta da API update-stats:", res.status, res.statusText);
+          return null;
+        }
 
         const data = await res.json();
 
@@ -723,6 +759,12 @@ export default function PokerGame() {
 
       const validResults = ["win", "loss", "tie"];
       if (!handData.result || !validResults.includes(handData.result)) return;
+
+      // 🔥 No multiplayer, só o dono da conta (índice 0) salva histórico globalmente
+      if (isMultiplayer && multiplayerModeActive && currentPlayerIndex !== 0) {
+        console.log("🔍 [saveHandHistory] Pulando histórico - não é dono da conta no multiplayer");
+        return;
+      }
 
       const handId =
         handData.id ||
@@ -894,10 +936,19 @@ export default function PokerGame() {
               timestamp: new Date().toISOString(),
             });
 
-            await saveChips(u, finalState.playerMoney, false);
-
             if (isMultiplayer && multiplayerModeActive) {
               updateMultiplayerChips(currentPlayerIndex, finalState.playerMoney);
+              // 🔥 Salvar fichas globalmente também no multiplayer
+              if (currentPlayerIndex === 0) {
+                await saveChips(u, finalState.playerMoney, false);
+                // 🔥 Atualizar estatísticas globalmente no multiplayer (empate)
+                await updateStats("tie", split, pName, state.playerAllin);
+              }
+            }
+
+            if (!isMultiplayer || !multiplayerModeActive) {
+              await saveChips(u, finalState.playerMoney, false);
+              await updateStats("tie", split, pName, state.playerAllin);
             }
 
             modalData = {
@@ -924,6 +975,10 @@ export default function PokerGame() {
 
             if (isMultiplayer && multiplayerModeActive) {
               updateMultiplayerChips(currentPlayerIndex, finalState.playerMoney);
+              // 🔥 Salvar fichas globalmente também no multiplayer
+              if (currentPlayerIndex === 0) {
+                await saveChips(u, finalState.playerMoney, false);
+              }
             }
 
             await updateStats("win", won, pName, state.playerAllin);
@@ -942,7 +997,9 @@ export default function PokerGame() {
               timestamp: new Date().toISOString(),
             });
 
-            await saveChips(u, finalState.playerMoney, false);
+            if (!isMultiplayer || !multiplayerModeActive) {
+              await saveChips(u, finalState.playerMoney, false);
+            }
 
             modalData = {
               winner: "player",
@@ -982,10 +1039,18 @@ export default function PokerGame() {
               timestamp: new Date().toISOString(),
             });
 
-            await saveChips(u, finalState.playerMoney, false);
-
             if (isMultiplayer && multiplayerModeActive) {
               updateMultiplayerChips(currentPlayerIndex, finalState.playerMoney);
+              // 🔥 Salvar fichas globalmente também no multiplayer
+              if (currentPlayerIndex === 0) {
+                await saveChips(u, finalState.playerMoney, false);
+                // 🔥 Atualizar estatísticas globalmente no multiplayer (derrota)
+                await updateStats("loss", lost, cName);
+              }
+            }
+
+            if (!isMultiplayer || !multiplayerModeActive) {
+              await saveChips(u, finalState.playerMoney, false);
             }
 
             if (finalState.playerMoney <= 0) {
@@ -1120,7 +1185,7 @@ export default function PokerGame() {
             } else {
               await refreshUserChips();
               const freshChips = await fetchChipsFromDB();
-              chips = freshChips !== null ? freshChips : currentChips || 1000;
+              chips = freshChips !== null ? freshChips : currentChips || 0;
             }
 
             if (chips <= 0) {
@@ -1246,7 +1311,7 @@ function startNewHand(user, initialMoney, playerIndexOverride) {
           : (multiplayerPlayers[effectiveIndex]?.chips ?? 0);
     } else {
       const freshChips = await fetchChipsFromDB();
-      playerMoney = freshChips !== null ? freshChips : currentChips || session?.user?.chips || 1000;
+      playerMoney = freshChips !== null ? freshChips : currentChips || session?.user?.chips || 0;
     }
 
     console.log(`🔍 [startNewHand] Fichas verificadas: ${playerMoney}`);
@@ -1267,7 +1332,8 @@ function startNewHand(user, initialMoney, playerIndexOverride) {
 
     setGame((prev) => {
       let playerMoneyLocal = playerMoney;
-      let cpuMoney = prev.cpuMoney <= 0 ? 1000 : prev.cpuMoney;
+      // 🔥 CPU não recebe fichas automaticamente - precisa de reset manual
+      let cpuMoney = prev.cpuMoney;
 
       const deck = createDeck();
 
@@ -1442,10 +1508,9 @@ function startNewHand(user, initialMoney, playerIndexOverride) {
               false,
             );
             saveChips(user || currentUser, state.playerMoney);
-            setTimeout(
-              () => startNewHand(user || currentUser, undefined),
-              1500,
-            );
+            // 🔥 REMOVIDO: Auto-start da nova mão - agora é manual
+            // setTimeout(() => startNewHand(user || currentUser, undefined), 1500);
+            setWaitingForNewHand(true);
             return state;
           }
         }
@@ -1460,7 +1525,9 @@ function startNewHand(user, initialMoney, playerIndexOverride) {
         if (!result.handActive && result.winnerMsg) {
           const u = user || currentUser;
           saveChips(u, result.playerMoney);
-          setTimeout(() => startNewHand(u, undefined), 1500);
+          // 🔥 REMOVIDO: Auto-start da nova mão - agora é manual
+          // setTimeout(() => startNewHand(u, undefined), 1500);
+          setWaitingForNewHand(true);
         }
 
         return result;
@@ -1531,7 +1598,9 @@ function startNewHand(user, initialMoney, playerIndexOverride) {
         if (isMultiplayer && multiplayerModeActive) {
           switchToNextPlayer();
         }
-        startNewHand(currentUser, undefined);
+        // 🔥 REMOVIDO: Auto-start da nova mão - agora é manual
+        // startNewHand(currentUser, undefined);
+        setWaitingForNewHand(true);
       }, 1500);
       return state;
     });
@@ -1764,11 +1833,11 @@ function resetSession() {
       // fichas nunca são um "reset" para 1000. Os demais assentos (convidados
       // sem conta, jogando no mesmo dispositivo) usam o valor configurado.
       const ownerChips =
-        currentChips ?? session?.user?.chips ?? game.playerMoney ?? 1000;
+        currentChips ?? session?.user?.chips ?? game.playerMoney ?? 0;
 
       const playersWithChips = config.players.map((p, idx) => ({
         ...p,
-        chips: idx === 0 ? ownerChips : p.chips || 1000,
+        chips: idx === 0 ? ownerChips : p.chips || 0,
       }));
 
       setMultiplayerPlayers(playersWithChips);
@@ -1803,7 +1872,7 @@ function resetSession() {
     }
 
     const ownerFinalChips =
-      multiplayerPlayers[0]?.chips ?? currentChips ?? game.playerMoney ?? 1000;
+      multiplayerPlayers[0]?.chips ?? currentChips ?? game.playerMoney ?? 0;
 
     setIsMultiplayer(false);
     setMultiplayerModeActive(false);
@@ -1839,7 +1908,6 @@ function resetSession() {
     game.playerMoney,
     currentUser,
     saveChips,
-    showNotification,
   ]);
 
   const handleSwitchPlayer = useCallback(
@@ -1911,7 +1979,7 @@ function resetSession() {
     
     // 🔥 FORÇAR ATUALIZAÇÃO DO ESTADO DO JOGO CONTRA CPU
     const chips = await fetchChipsFromDB();
-    const finalChips = chips !== null ? chips : currentChips || session?.user?.chips || 1000;
+    const finalChips = chips !== null ? chips : currentChips || session?.user?.chips || 0;
     
     console.log(`💰 Fichas após sair do multiplayer: ${finalChips}`);
     
@@ -2324,11 +2392,41 @@ function resetSession() {
             {isMultiplayer &&
               multiplayerModeActive &&
               multiplayerPlayers.length > 0 && (
-                <PlayerSelector
-                  players={multiplayerPlayers}
-                  currentPlayer={currentPlayerIndex}
-                  onSelectPlayer={handleSwitchPlayer}
-                />
+                <>
+                  <PlayerSelector
+                    players={multiplayerPlayers}
+                    currentPlayer={currentPlayerIndex}
+                    onSelectPlayer={handleSwitchPlayer}
+                  />
+                  {/* 🔥 Botão de renovar fichas no multiplayer */}
+                  {(multiplayerPlayers[currentPlayerIndex]?.chips ?? 0) <= 0 && (
+                    <motion.button
+                      onClick={resetSession}
+                      style={{
+                        background: "radial-gradient(#f7d97c, #d6a12e)",
+                        border: "none",
+                        borderRadius: "20px",
+                        padding: "8px 16px",
+                        fontWeight: "700",
+                        fontSize: "0.8rem",
+                        color: "#2e241f",
+                        boxShadow: "0 4px 0 #7a4c1a",
+                        cursor: "pointer",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        transition: "all 0.2s ease",
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <span style={{ fontSize: "1rem" }}>🔄</span>
+                      RENOVAR FICHAS (1000)
+                    </motion.button>
+                  )}
+                </>
               )}
 
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>

@@ -2,9 +2,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import dbConnect from "@/lib/mongoose";
-import User from "@/lib/models/User";
 import { ACHIEVEMENTS } from "@/lib/achievements";
+
+// 🔥 MELHORIA: Verificar se MongoDB está configurado antes de tentar conectar
+const isMongoDBConfigured = !!process.env.MONGODB_URI;
 
 // 🔥 MÉTRICAS AVANÇADAS DE POKER
 export async function GET(request) {
@@ -27,7 +28,82 @@ export async function GET(request) {
       );
     }
 
-    await dbConnect();
+    // 🔥 MELHORIA: Se MongoDB não estiver configurado, retornar valores padrão
+    if (!isMongoDBConfigured) {
+      console.log("⚠️ MongoDB não configurado, retornando estatísticas padrão");
+      return NextResponse.json({
+        success: true,
+        stats: {
+          handsPlayed: 0,
+          handsWon: 0,
+          totalChipsWon: 0,
+          biggestWin: 0,
+          bestStreak: 0,
+          bestHand: "",
+          allInWins: 0,
+          winRate: 0,
+          handsLost: 0,
+          handsTied: 0,
+          currentStreak: 0,
+          totalChips: 1000,
+        },
+        achievements: [],
+        level: 1,
+        xp: 0,
+        newAchievements: [],
+        advancedStats: {
+          vpip: 0,
+          pfr: 0,
+          aggressionFactor: 0,
+          winRateByPosition: {},
+          handDistribution: {},
+          monthlyProgress: [],
+        },
+      });
+    }
+
+    let dbConnect, User;
+    try {
+      dbConnect = (await import("@/lib/mongoose")).default;
+      User = (await import("@/lib/models/User")).default;
+      await Promise.race([
+        dbConnect(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout na conexão com banco de dados')), 5000)
+        )
+      ]);
+    } catch (dbError) {
+      console.log("⚠️ Erro ao conectar ao MongoDB, retornando estatísticas padrão:", dbError.message);
+      return NextResponse.json({
+        success: true,
+        stats: {
+          handsPlayed: 0,
+          handsWon: 0,
+          totalChipsWon: 0,
+          biggestWin: 0,
+          bestStreak: 0,
+          bestHand: "",
+          allInWins: 0,
+          winRate: 0,
+          handsLost: 0,
+          handsTied: 0,
+          currentStreak: 0,
+          totalChips: 1000,
+        },
+        achievements: [],
+        level: 1,
+        xp: 0,
+        newAchievements: [],
+        advancedStats: {
+          vpip: 0,
+          pfr: 0,
+          aggressionFactor: 0,
+          winRateByPosition: {},
+          handDistribution: {},
+          monthlyProgress: [],
+        },
+      });
+    }
 
     const user = await User.findOne({ username });
 
@@ -43,7 +119,6 @@ export async function GET(request) {
           bestHand: "",
           allInWins: 0,
           winRate: 0,
-          // 🔥 NOVAS MÉTRICAS
           handsLost: 0,
           handsTied: 0,
           currentStreak: 0,
@@ -53,7 +128,6 @@ export async function GET(request) {
         level: 1,
         xp: 0,
         newAchievements: [],
-        // 🔥 MÉTRICAS AVANÇADAS
         advancedStats: {
           vpip: 0,
           pfr: 0,

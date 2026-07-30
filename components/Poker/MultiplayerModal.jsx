@@ -10,7 +10,7 @@ export default function MultiplayerModal({ onStart, onClose }) {
   const handleStart = () => {
     onStart({
       players: [
-        { name: player1Name || "Jogador 1", chips: 1000 },
+        { name: player1Name || "Jogador 1", chips: 0 }, // 🔥 Usará fichas do usuário logado
         { name: player2Name || "Jogador 2", chips: 1000 },
       ],
     });

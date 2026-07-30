@@ -25,6 +25,10 @@ const GameTable = memo(function GameTable({
   onSwitchPlayer,
   currentUser,
 }) {
+  // 🔥 Otimização: Evitar re-renders desnecessários
+  const memoizedCommunityCards = useMemo(() => communityCards, [communityCards]);
+  const memoizedPlayerCards = useMemo(() => playerCards, [playerCards]);
+  const memoizedCpuCards = useMemo(() => cpuCards, [cpuCards]);
   const [potAnimationKey, setPotAnimationKey] = useState(0);
   const [showPotEffect, setShowPotEffect] = useState(false);
   const chipKeyCounter = useRef(0);
@@ -77,6 +81,8 @@ const GameTable = memo(function GameTable({
 
   const renderChips = useMemo(() => {
     const chipCount = Math.min(Math.floor(pot / 25), 20);
+    if (chipCount === 0) return null;
+    
     const chips = [];
     for (let i = 0; i < chipCount; i++) {
       chipKeyCounter.current += 1;
@@ -451,15 +457,16 @@ function dealerAreaStyle() {
     left: "50%",
     transform: "translateX(-50%)",
     background: "var(--bg-element)",
-    padding: "4px 20px",
-    borderRadius: 20,
+    padding: "6px 24px",
+    borderRadius: 24,
     border: "1px solid var(--border-element)",
-    backdropFilter: "blur(4px)",
-    boxShadow: "0 2px 8px var(--shadow-element)",
+    backdropFilter: "blur(8px)",
+    boxShadow: "0 4px 12px var(--shadow-element), 0 2px 6px rgba(0,0,0,0.05)",
     transition: "var(--transition-theme)",
     display: "flex",
     alignItems: "center",
-    gap: "4px",
+    gap: "6px",
+    zIndex: 100,
   };
 }
 

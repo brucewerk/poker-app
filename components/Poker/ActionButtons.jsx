@@ -85,14 +85,15 @@ export default function ActionButtons({
             width: "100%",
             marginBottom: "10px",
             padding: "14px 8px",
-            background: playerMoney > 0 
-              ? "radial-gradient(#f7d97c, #d6a12e)" 
+            background: playerMoney > 0
+              ? "radial-gradient(#f7d97c, #d6a12e)"
               : "radial-gradient(#888, #555)",
             border: "none",
             borderRadius: "12px",
             fontWeight: "700",
             fontSize: "0.9rem",
-            color: playerMoney > 0 ? "#2e241f" : "#ccc",
+            color: playerMoney > 0 ? "#2e241f" : "#ffffff",
+            textShadow: playerMoney > 0 ? "none" : "0 1px 2px rgba(0,0,0,0.5)",
             boxShadow: playerMoney > 0 ? "0 4px 0 #7a4c1a" : "0 4px 0 #444",
             cursor: "pointer",
             opacity: 1,
@@ -107,7 +108,7 @@ export default function ActionButtons({
         >
           <span style={{ fontSize: "1.2rem" }}>🃏</span>
           NOVA MÃO
-          <span style={{ fontSize: "0.6rem", opacity: 0.7 }}>
+          <span style={{ fontSize: "0.6rem", opacity: 0.7, color: playerMoney > 0 ? "#2e241f" : "#ffffff" }}>
             ({playerMoney > 0 ? `${playerMoney} fichas` : "sem fichas"})
           </span>
         </button>
