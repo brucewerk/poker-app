@@ -36,6 +36,7 @@ import ToolbarButtons from "@/components/Poker/ToolbarButtons.jsx";
 import GameTable from "@/components/Poker/GameTable.jsx";
 import TournamentLobby from "@/components/Poker/TournamentLobby.jsx";
 import ResultModal from "@/components/Poker/ResultModal.jsx";
+import MobileMenu from "@/components/Poker/MobileMenu.jsx";
 import { useToast } from "@/components/Toast/ToastManager";
 
 // ====================== ESTADO INICIAL ======================
@@ -2279,6 +2280,14 @@ function resetSession() {
             </motion.button>
           </div>
         )}
+
+        <MobileMenu
+          onOpenAchievements={() => setShowAchievementsModal(true)}
+          onOpenFindings={() => setShowFindingsModal(true)}
+          onOpenFriends={() => { /* Friends functionality */ }}
+          onOpenMissions={() => { /* Missions functionality */ }}
+          onOpenHistory={() => { /* History functionality */ }}
+        />
 
         <ToolbarButtons
           isTurbo={isTurbo}

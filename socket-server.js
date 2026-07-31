@@ -345,9 +345,10 @@ async function broadcastRoomList() {
 
     if (room.lastActivity) {
       const inactiveTime = Date.now() - room.lastActivity;
-      if (inactiveTime > 30 * 60 * 1000) {
+      // 🔥 Aumentar timeout para 2 horas para não fechar salas ativas
+      if (inactiveTime > 2 * 60 * 60 * 1000) {
         rooms.delete(roomId);
-        console.log(`🗑️ Sala ${roomId} removida (inativa por 30min+)`);
+        console.log(`🗑️ Sala ${roomId} removida (inativa por 2h+)`);
         continue;
       }
     }
@@ -556,19 +557,24 @@ io.on("connection", (socket) => {
       roomId: customRoomId,
     } = data;
 
+    console.log(`📤 create-room recebido de ${socket.id}:`, { playerName, maxPlayers, customRoomId });
+
     let roomId = customRoomId;
     if (!roomId) {
       roomId = generateRoomId();
     }
 
     roomId = roomId.toUpperCase();
+    console.log(`📋 RoomId normalizado: ${roomId}`);
 
     if (rooms.has(roomId)) {
+      console.log(`❌ Sala ${roomId} já existe!`);
       socket.emit("error", { message: `Sala ${roomId} já existe!` });
       return;
     }
 
     const userChips = await getChipsFromDatabase(playerName);
+    console.log(`💰 Fichas do usuário ${playerName}: ${userChips}`);
 
     rooms.set(roomId, {
       players: [
@@ -593,12 +599,23 @@ io.on("connection", (socket) => {
       createdBy: playerName,
     });
 
+    console.log(`📡 Socket ${socket.id} entrando na sala ${roomId} (criador)`);
     socket.join(roomId);
-    console.log(`📡 Socket ${socket.id} entrou na sala ${roomId} (criador)`);
     console.log(`📡 Socket ${socket.id} rooms após join:`, Array.from(socket.rooms));
+    
+    // 🔥 VERIFICAR SE O SOCKET ESTÁ NA SALA
+    const socketInRoom = socket.rooms.has(roomId);
+    console.log(`📡 Socket ${socket.id} está na sala ${roomId}:`, socketInRoom);
+    
+    if (!socketInRoom) {
+      console.error(`❌ ERRO CRÍTICO: Socket ${socket.id} NÃO está na sala ${roomId} após join!`);
+    }
+
     socket.emit("room-created", { roomId });
+    console.log(`📤 room-created emitido para ${socket.id}`);
 
     io.to(roomId).emit("room-update", rooms.get(roomId));
+    console.log(`📡 room-update emitido para sala ${roomId}`);
 
     setTimeout(async () => {
       await broadcastRoomList();
@@ -615,7 +632,7 @@ io.on("connection", (socket) => {
     const normalizedRoomId = roomId.toUpperCase();
 
     console.log(
-      `📤 Tentando entrar na sala ${normalizedRoomId} por ${playerName}`,
+      `📤 join-room recebido de ${socket.id}:`, { roomId: normalizedRoomId, playerName },
     );
 
     const room = rooms.get(normalizedRoomId);
@@ -641,6 +658,7 @@ io.on("connection", (socket) => {
     }
 
     const userChips = await getChipsFromDatabase(playerName);
+    console.log(`💰 Fichas do usuário ${playerName}: ${userChips}`);
 
     room.players.push({
       id: socket.id,
@@ -653,21 +671,31 @@ io.on("connection", (socket) => {
     
     console.log(`📡 Socket ${socket.id} entrando na sala ${normalizedRoomId}`);
     socket.join(normalizedRoomId);
-    console.log(`✅ Socket ${socket.id} entrou na sala ${normalizedRoomId}`);
     console.log(`📡 Socket ${socket.id} rooms após join:`, Array.from(socket.rooms));
+    
+    // 🔥 VERIFICAR SE O SOCKET ESTÁ NA SALA
+    const socketInRoom = socket.rooms.has(normalizedRoomId);
+    console.log(`📡 Socket ${socket.id} está na sala ${normalizedRoomId}:`, socketInRoom);
+    
+    if (!socketInRoom) {
+      console.error(`❌ ERRO CRÍTICO: Socket ${socket.id} NÃO está na sala ${normalizedRoomId} após join!`);
+    }
 
     console.log(
       `✅ ${playerName} entrou na sala ${normalizedRoomId} (${userChips} fichas)`,
     );
 
+    // 🔥 EMITIR CHAT-MESSAGE DE TESTE PARA VERIFICAR QUEM RECEBE
     io.to(normalizedRoomId).emit("chat-message", {
       player: "Sistema",
       message: `🎉 ${playerName} entrou na sala!`,
       timestamp: Date.now(),
       isSystem: true,
     });
+    console.log(`📡 Chat de entrada emitido para sala ${normalizedRoomId}`);
 
     io.to(normalizedRoomId).emit("room-update", room);
+    console.log(`📡 room-update emitido para sala ${normalizedRoomId}`);
 
     setTimeout(async () => {
       await broadcastRoomList();
@@ -700,6 +728,8 @@ io.on("connection", (socket) => {
     console.log(
       `🔄 ${player.name} ${player.isReady ? "✅ pronto" : "⏸️ não pronto"} na sala ${normalizedRoomId}`,
     );
+    console.log(`📋 Room gameState:`, !!room.gameState);
+    console.log(`📋 Room isSummaryVisible:`, room.isSummaryVisible);
 
     io.to(normalizedRoomId).emit("room-update", room);
 
@@ -714,7 +744,7 @@ io.on("connection", (socket) => {
     console.log(`🔍 Verificando se todos estão prontos: ${allReady} (${room.players.length} jogadores)`);
     console.log(`📋 Status dos jogadores:`, room.players.map(p => ({ name: p.name, isReady: p.isReady })));
     
-    if (allReady && room.players.length >= 2) {
+    if (allReady && room.players.length >= 2 && !room.gameState) {
       console.log(
         `🚀 Todos prontos na sala ${normalizedRoomId}! Iniciando...`,
       );
@@ -725,6 +755,8 @@ io.on("connection", (socket) => {
         isSystem: true,
       });
       startGame(normalizedRoomId);
+    } else if (room.gameState) {
+      console.log(`⚠️ Já existe um gameState ativo na sala ${normalizedRoomId}`);
     }
   });
 

@@ -170,6 +170,11 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       }
     };
 
+    // 🔥 LISTENER DE CHAT PARA DEBUG NO LOBBY
+    const onChatMessage = (data) => {
+      console.log("📡 OnlineLobby: Chat message recebido:", data);
+    };
+
     socketClient.on("connect", onConnect);
     socketClient.on("disconnect", onDisconnect);
     socketClient.on("connect_error", onConnectError);
@@ -179,6 +184,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
     socketClient.on("group-invite", onGroupInvite);
     socketClient.on("invite-accepted", onInviteAccepted);
     socketClient.on("error", onError);
+    socketClient.on("chat-message", onChatMessage);
 
     roomListInterval.current = setInterval(() => {
       if (isConnected && isMounted.current) {
@@ -197,6 +203,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       socketClient.off("group-invite");
       socketClient.off("invite-accepted");
       socketClient.off("error");
+      socketClient.off("chat-message", onChatMessage);
       if (roomListInterval.current) {
         clearInterval(roomListInterval.current);
         roomListInterval.current = null;
@@ -306,7 +313,9 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       }, 3000);
 
       const handleRoomUpdate = (data) => {
+        console.log("📡 OnlineLobby: room-update recebido:", data);
         if (data.players?.some((p) => p.name === currentUser)) {
+          console.log("✅ OnlineLobby: Jogador está na sala");
           setJoining(false);
           if (joinTimeoutRef.current) {
             clearTimeout(joinTimeoutRef.current);
@@ -584,6 +593,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
               socket={socketClient.socket}
               roomId={currentRoomId}
               playerName={currentUser}
+              key={`chat-${currentRoomId}-${socketClient.socket.id}`}
             />
           </div>
         )}

@@ -21,18 +21,20 @@ export default function ToolbarButtons({
 }) {
   return (
     <div className="toolbar-buttons-container">
-      <ThemeToggle />
-      <SoundToggle />
-      <TurboButton onToggle={onTurboToggle} isTurbo={isTurbo} />
-      <FullscreenButton />
+      <ThemeToggle className="toolbar-theme" />
+      <SoundToggle className="toolbar-sound" />
+      <TurboButton onToggle={onTurboToggle} isTurbo={isTurbo} className="toolbar-turbo" />
+      <FullscreenButton className="toolbar-fullscreen" />
       <MultiplayerButton
         onClick={onMultiplayerClick}
         isActive={isMultiplayerActive}
+        className="toolbar-multiplayer"
       />
-      <OnlineButton onClick={onOnlineClick} isActive={isOnlineActive} />
+      <OnlineButton onClick={onOnlineClick} isActive={isOnlineActive} className="toolbar-online" />
       <TournamentButton
         onClick={onTournamentClick}
         isActive={isTournamentActive}
+        className="toolbar-tournament"
       />
     </div>
   );

@@ -67,9 +67,15 @@ export default function Chat({
       const inRoom = socket.rooms && socket.rooms.has(roomId);
       console.log(`📡 Chat: Socket está na sala ${roomId}:`, inRoom);
       
-      // 🔥 NÃO TENTAR JOIN AQUI - DEIXAR PARA O SERVIDOR/ONLINEGAME
-      if (!inRoom) {
-        console.warn(`⚠️ Chat: Socket NÃO está na sala ${roomId} - será tratado pelo OnlineGame`);
+      // 🔥 SE NÃO ESTIVER NA SALA, TENTAR ENTRAR VIA CLIENT-SIDE
+      if (!inRoom && typeof socket.join === 'function') {
+        console.warn(`⚠️ Chat: Socket NÃO está na sala ${roomId}, tentando entrar via client-side...`);
+        socket.join(roomId);
+        setTimeout(() => {
+          console.log(`📡 Chat: Socket rooms após join:`, socket.rooms ? Array.from(socket.rooms || []) : "N/A");
+        }, 100);
+      } else if (!inRoom) {
+        console.warn(`⚠️ Chat: Socket NÃO está na sala ${roomId} e não tem método join`);
       }
     }
   }, [socket, roomId, playerName]);
