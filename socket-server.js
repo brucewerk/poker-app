@@ -594,6 +594,8 @@ io.on("connection", (socket) => {
     });
 
     socket.join(roomId);
+    console.log(`📡 Socket ${socket.id} entrou na sala ${roomId} (criador)`);
+    console.log(`📡 Socket ${socket.id} rooms após join:`, Array.from(socket.rooms));
     socket.emit("room-created", { roomId });
 
     io.to(roomId).emit("room-update", rooms.get(roomId));
@@ -648,7 +650,11 @@ io.on("connection", (socket) => {
       hasClosedSummary: false,
       position: room.players.length,
     });
+    
+    console.log(`📡 Socket ${socket.id} entrando na sala ${normalizedRoomId}`);
     socket.join(normalizedRoomId);
+    console.log(`✅ Socket ${socket.id} entrou na sala ${normalizedRoomId}`);
+    console.log(`📡 Socket ${socket.id} rooms após join:`, Array.from(socket.rooms));
 
     console.log(
       `✅ ${playerName} entrou na sala ${normalizedRoomId} (${userChips} fichas)`,
@@ -672,8 +678,11 @@ io.on("connection", (socket) => {
   socket.on("player-ready", (data) => {
     const { roomId } = data;
     const normalizedRoomId = roomId.toUpperCase();
+    console.log(`🔄 player-ready recebido de ${socket.id} para sala ${normalizedRoomId}`);
+    
     const room = rooms.get(normalizedRoomId);
     if (!room) {
+      console.log(`❌ Sala não encontrada: ${normalizedRoomId}`);
       socket.emit("error", {
         message: `Sala não encontrada: ${normalizedRoomId}`,
       });
@@ -681,34 +690,41 @@ io.on("connection", (socket) => {
     }
 
     const player = room.players.find((p) => p.id === socket.id);
-    if (player) {
-      player.isReady = !player.isReady;
+    if (!player) {
+      console.log(`❌ Jogador ${socket.id} não encontrado na sala ${normalizedRoomId}`);
+      console.log(`📋 Jogadores na sala:`, room.players.map(p => ({ id: p.id, name: p.name })));
+      return;
+    }
+
+    player.isReady = !player.isReady;
+    console.log(
+      `🔄 ${player.name} ${player.isReady ? "✅ pronto" : "⏸️ não pronto"} na sala ${normalizedRoomId}`,
+    );
+
+    io.to(normalizedRoomId).emit("room-update", room);
+
+    io.to(normalizedRoomId).emit("chat-message", {
+      player: "Sistema",
+      message: `${player.name} ${player.isReady ? "✅ está pronto!" : "⏸️ não está mais pronto"}`,
+      timestamp: Date.now(),
+      isSystem: true,
+    });
+
+    const allReady = room.players.every((p) => p.isReady);
+    console.log(`🔍 Verificando se todos estão prontos: ${allReady} (${room.players.length} jogadores)`);
+    console.log(`📋 Status dos jogadores:`, room.players.map(p => ({ name: p.name, isReady: p.isReady })));
+    
+    if (allReady && room.players.length >= 2) {
       console.log(
-        `🔄 ${player.name} ${player.isReady ? "✅ pronto" : "⏸️ não pronto"} na sala ${normalizedRoomId}`,
+        `🚀 Todos prontos na sala ${normalizedRoomId}! Iniciando...`,
       );
-
-      io.to(normalizedRoomId).emit("room-update", room);
-
       io.to(normalizedRoomId).emit("chat-message", {
         player: "Sistema",
-        message: `${player.name} ${player.isReady ? "✅ está pronto!" : "⏸️ não está mais pronto"}`,
+        message: "🚀 Todos prontos! Iniciando partida...",
         timestamp: Date.now(),
         isSystem: true,
       });
-
-      const allReady = room.players.every((p) => p.isReady);
-      if (allReady && room.players.length >= 2) {
-        console.log(
-          `🚀 Todos prontos na sala ${normalizedRoomId}! Iniciando...`,
-        );
-        io.to(normalizedRoomId).emit("chat-message", {
-          player: "Sistema",
-          message: "🚀 Todos prontos! Iniciando partida...",
-          timestamp: Date.now(),
-          isSystem: true,
-        });
-        startGame(normalizedRoomId);
-      }
+      startGame(normalizedRoomId);
     }
   });
 
@@ -943,8 +959,13 @@ io.on("connection", (socket) => {
   socket.on("send-chat-message", (data) => {
     const { roomId, message } = data;
     const normalizedRoomId = roomId.toUpperCase();
+    console.log(`📤 Chat: Mensagem recebida de ${socket.id} para sala ${normalizedRoomId}:`, message);
+    console.log(`📡 Socket ${socket.id} rooms:`, Array.from(socket.rooms));
+    
     const room = rooms.get(normalizedRoomId);
     if (!room) {
+      console.log(`❌ Sala não encontrada: ${normalizedRoomId}`);
+      console.log(`📋 Salas disponíveis:`, Array.from(rooms.keys()));
       socket.emit("error", {
         message: `Sala não encontrada: ${normalizedRoomId}`,
       });
@@ -952,7 +973,11 @@ io.on("connection", (socket) => {
     }
 
     const player = room.players.find((p) => p.id === socket.id);
-    if (!player) return;
+    if (!player) {
+      console.log(`❌ Jogador ${socket.id} não encontrado na sala ${normalizedRoomId}`);
+      console.log(`📋 Jogadores na sala:`, room.players.map(p => ({ id: p.id, name: p.name })));
+      return;
+    }
 
     if (message.length > 500) {
       socket.emit("error", { message: "Mensagem muito longa!" });
@@ -972,7 +997,17 @@ io.on("connection", (socket) => {
       room.chatMessages = room.chatMessages.slice(-100);
     }
 
-    io.to(normalizedRoomId).emit("chat-message", chatMessage);
+    console.log(`📡 Chat: Enviando mensagem para sala ${normalizedRoomId}`);
+    console.log(`📋 Jogadores na sala:`, room.players.map(p => ({ id: p.id, name: p.name })));
+    
+    // 🔥 VERIFICAR QUEM ESTÁ NA SALA
+    const roomSockets = io.sockets.adapter.rooms.get(normalizedRoomId);
+    console.log(`📡 Sockets na sala ${normalizedRoomId}:`, roomSockets ? Array.from(roomSockets) : "Nenhum");
+    
+    // 🔥 ENVIAR PARA TODOS NA SALA
+    const result = io.to(normalizedRoomId).emit("chat-message", chatMessage);
+    console.log(`✅ Chat: Mensagem enviada. Resultado:`, result);
+    console.log(`📡 io.to(${normalizedRoomId}) enviou para ${result} sockets`);
   });
 
   // ====================== AVANÇAR JOGO ======================

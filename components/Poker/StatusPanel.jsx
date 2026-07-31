@@ -1,21 +1,22 @@
-// components/Poker/StatusPanel.jsx - COMPLETO COM TÍTULO PADRONIZADO
+// components/Poker/StatusPanel.jsx
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, memo } from "framer-motion";
 
-export default function StatusPanel({
-  stage,
-  pot,
-  currentBet,
-  playerBet,
-  cpuBet,
-  nextRaise,
-  notification,
-  stageNames,
-  gameStatus,
-  winnerMsg,
-  isTurbo,
-}) {
+const StatusPanel = memo(function StatusPanel(props) {
+  const {
+    stage = "preflop",
+    pot = 0,
+    currentBet = 0,
+    playerBet = 0,
+    cpuBet = 0,
+    nextRaise = 0,
+    notification = { msg: "", isError: false, visible: false },
+    stageNames = {},
+    gameStatus = "",
+    winnerMsg = "",
+    isTurbo = false,
+  } = props || {};
   const statusItems = [
     {
       id: "stage",
@@ -103,7 +104,7 @@ export default function StatusPanel({
             key={item.id}
             className="status-item"
             style={{
-              background: "var(--bg-status-item, rgba(255,255,255,0.05))",
+              background: "var(--bg-status-item)",
               padding: "6px 8px",
               borderRadius: 10,
               textAlign: "center",
@@ -151,11 +152,11 @@ export default function StatusPanel({
         style={{
           display: "flex",
           justifyContent: "space-between",
-          marginTop: "8px",
-          fontSize: "0.75rem",
+          marginTop: "10px",
+          fontSize: "0.8rem",
           color: "var(--text-muted)",
           flexWrap: "wrap",
-          gap: "4px",
+          gap: "6px",
           transition: "var(--transition-theme)",
         }}
       >
@@ -163,12 +164,14 @@ export default function StatusPanel({
           key={`playerBet-${playerBet}`}
           className="status-bet"
           style={{
-            background: "var(--bg-status-item, rgba(255,255,255,0.05))",
-            padding: "2px 10px",
-            borderRadius: 10,
+            background: "var(--bg-status-item)",
+            padding: "4px 12px",
+            borderRadius: 12,
             display: "inline-block",
             border: "1px solid var(--border-light)",
             transition: "var(--transition-theme)",
+            fontWeight: 600,
+            textShadow: "0 1px 2px rgba(0,0,0,0.1)",
           }}
           initial={{ scale: 0.8 }}
           animate={{ scale: 1 }}
@@ -180,12 +183,14 @@ export default function StatusPanel({
           key={`cpuBet-${cpuBet}`}
           className="status-bet"
           style={{
-            background: "var(--bg-status-item, rgba(255,255,255,0.05))",
-            padding: "2px 10px",
-            borderRadius: 10,
+            background: "var(--bg-status-item)",
+            padding: "4px 12px",
+            borderRadius: 12,
             display: "inline-block",
             border: "1px solid var(--border-light)",
             transition: "var(--transition-theme)",
+            fontWeight: 600,
+            textShadow: "0 1px 2px rgba(0,0,0,0.1)",
           }}
           initial={{ scale: 0.8 }}
           animate={{ scale: 1 }}
@@ -198,12 +203,13 @@ export default function StatusPanel({
             key="nextRaise"
             style={{
               background: "var(--gold-dim)",
-              padding: "2px 10px",
-              borderRadius: 10,
+              padding: "4px 12px",
+              borderRadius: 12,
               color: "gold",
-              fontSize: "0.7rem",
-              fontWeight: "600",
+              fontSize: "0.75rem",
+              fontWeight: "700",
               transition: "var(--transition-theme)",
+              textShadow: "0 1px 2px rgba(0,0,0,0.2)",
             }}
           >
             Próximo aumento: ${nextRaise}
@@ -217,15 +223,17 @@ export default function StatusPanel({
             key="gameStatus"
             className="status-game-status"
             style={{
-              marginTop: "8px",
-              padding: "6px 10px",
-              background: "rgba(0,0,0,0.2)",
-              borderRadius: 10,
-              fontSize: "0.8rem",
+              marginTop: "10px",
+              padding: "8px 12px",
+              background: "rgba(0,0,0,0.25)",
+              borderRadius: 12,
+              fontSize: "0.85rem",
               textAlign: "center",
               color: "var(--text-secondary)",
               transition: "var(--transition-theme)",
               border: "1px solid var(--border-light)",
+              fontWeight: 600,
+              textShadow: "0 1px 2px rgba(0,0,0,0.1)",
             }}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -265,4 +273,6 @@ export default function StatusPanel({
       </AnimatePresence>
     </motion.div>
   );
-}
+});
+
+export default StatusPanel;

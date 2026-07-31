@@ -2,9 +2,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 
-export default function Card({
+const Card = memo(function Card({
   card,
   faceDown = false,
   delay = 0,
@@ -85,7 +85,7 @@ export default function Card({
       border: isDarkTheme ? "1px solid #ddd" : "1px solid #c4b8ae",
       boxShadow: isDarkTheme
         ? "0 4px 12px rgba(0,0,0,0.25)"
-        : "0 4px 12px rgba(0,0,0,0.08)",
+        : "0 6px 16px rgba(0,0,0,0.12)",
       color: isRed ? "#cc0000" : "#1f2a2f",
     };
   };
@@ -279,4 +279,6 @@ export default function Card({
       )}
     </motion.div>
   );
-}
+});
+
+export default Card;

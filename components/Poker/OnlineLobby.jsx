@@ -159,10 +159,15 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       console.error("❌ Erro do servidor:", data);
       if (data && data.message) {
         setError(`❌ ${data.message}`);
+      } else if (typeof data === 'string') {
+        setError(`❌ ${data}`);
       } else {
-        setError("❌ Erro desconhecido");
+        console.warn("Erro do servidor sem mensagem detalhada:", data);
+        // Não mostrar erro genérico se não houver mensagem específica
       }
-      setTimeout(() => setError(""), 5000);
+      if (data && (data.message || typeof data === 'string')) {
+        setTimeout(() => setError(""), 5000);
+      }
     };
 
     socketClient.on("connect", onConnect);

@@ -192,6 +192,12 @@ export async function POST(request) {
         user.stats,
         user.achievements || [],
       );
+      console.log("🔍 [update-stats] Conquistas verificadas:", {
+        stats: user.stats,
+        currentAchievements: user.achievements,
+        newAchievements: newAchievements.map(a => a.id),
+      });
+      
       if (newAchievements && newAchievements.length > 0) {
         newAchievements.forEach((ach) => {
           if (!user.achievements.find((a) => a === ach.id)) {
@@ -200,6 +206,7 @@ export async function POST(request) {
             if (ach.xpBonus) {
               user.xp = (user.xp || 0) + ach.xpBonus;
             }
+            console.log(`🏆 [update-stats] Nova conquista desbloqueada: ${ach.id} - ${ach.name}`);
           }
         });
       }

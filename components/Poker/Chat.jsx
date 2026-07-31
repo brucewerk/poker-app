@@ -49,11 +49,41 @@ export default function Chat({
   const inputRef = useRef(null);
   const unreadTimeoutRef = useRef(null);
   const hasScrolledRef = useRef(false);
+  const isMinimizedRef = useRef(false);
+  const isFocusedRef = useRef(true);
+
+  // 🔥 LOG AO MONTAR PARA DEBUG
+  useEffect(() => {
+    console.log("🔌 Chat: Componente montado");
+    console.log(`📋 Chat: RoomId: ${roomId}, PlayerName: ${playerName}`);
+    console.log(`📡 Chat: Socket disponível:`, !!socket);
+    if (socket) {
+      console.log(`📡 Chat: Socket ID: ${socket.id}`);
+      console.log(`📡 Chat: Socket type:`, typeof socket);
+      console.log(`📡 Chat: Socket has join:`, typeof socket.join);
+      console.log(`📡 Chat: Socket rooms:`, socket.rooms ? Array.from(socket.rooms || []) : "N/A");
+      
+      // 🔥 VERIFICAR SE ESTÁ NA SALA CORRETA
+      const inRoom = socket.rooms && socket.rooms.has(roomId);
+      console.log(`📡 Chat: Socket está na sala ${roomId}:`, inRoom);
+      
+      // 🔥 NÃO TENTAR JOIN AQUI - DEIXAR PARA O SERVIDOR/ONLINEGAME
+      if (!inRoom) {
+        console.warn(`⚠️ Chat: Socket NÃO está na sala ${roomId} - será tratado pelo OnlineGame`);
+      }
+    }
+  }, [socket, roomId, playerName]);
 
   // 🔥 DETECTAR FOCO DA JANELA
   useEffect(() => {
-    const handleFocus = () => setIsFocused(true);
-    const handleBlur = () => setIsFocused(false);
+    const handleFocus = () => {
+      setIsFocused(true);
+      isFocusedRef.current = true;
+    };
+    const handleBlur = () => {
+      setIsFocused(false);
+      isFocusedRef.current = false;
+    };
 
     window.addEventListener("focus", handleFocus);
     window.addEventListener("blur", handleBlur);
@@ -64,76 +94,14 @@ export default function Chat({
     };
   }, []);
 
-  // 🔥 ATUALIZAR CONTAGEM DE NÃO LIDAS
+  // 🔥 ATUALIZAR REFS QUANDO ESTADOS MUDAM
   useEffect(() => {
-    if (onUnreadChange) {
-      onUnreadChange(unreadCount);
-    }
-  }, [unreadCount, onUnreadChange]);
+    isMinimizedRef.current = isMinimized;
+  }, [isMinimized]);
 
-  // 🔥 RECEBER MENSAGENS
   useEffect(() => {
-    if (!socket) return;
-
-    const handleChatMessage = (data) => {
-      const isOwnMessage = data.player === playerName;
-      
-      setMessages((prev) => {
-        const newMessages = [...prev, data];
-        if (newMessages.length > 100) {
-          return newMessages.slice(-100);
-        }
-        return newMessages;
-      });
-
-      if (!isOwnMessage) {
-        if (notificationSound) {
-          try {
-            soundManager.playSound("deal", { volume: 0.15 });
-          } catch (e) {}
-        }
-
-        if (onNewMessage) {
-          onNewMessage({
-            from: data.player,
-            message: data.message,
-            timestamp: data.timestamp,
-          });
-        }
-
-        if (isMinimized || !isFocused) {
-          setUnreadCount((prev) => {
-            const newCount = prev + 1;
-            if (newCount > 0) {
-              document.title = `💬 (${newCount}) Poker by BruCe`;
-            }
-            return newCount;
-          });
-
-          if (unreadTimeoutRef.current) {
-            clearTimeout(unreadTimeoutRef.current);
-          }
-
-          unreadTimeoutRef.current = setTimeout(() => {
-            setUnreadCount(0);
-            document.title = "Poker by BruCe";
-          }, 30000);
-        }
-      }
-
-      // 🔥 ROLAR PARA O FINAL SEMPRE QUE RECEBE MENSAGEM
-      setTimeout(() => scrollChatToBottom(), 100);
-    };
-
-    socket.on("chat-message", handleChatMessage);
-
-    return () => {
-      socket.off("chat-message", handleChatMessage);
-      if (unreadTimeoutRef.current) {
-        clearTimeout(unreadTimeoutRef.current);
-      }
-    };
-  }, [socket, playerName, isMinimized, isFocused, notificationSound, onNewMessage]);
+    isFocusedRef.current = isFocused;
+  }, [isFocused]);
 
   // 🔥 SCROLL PARA O FINAL (FORÇADO)
   const scrollChatToBottom = useCallback((force = false) => {
@@ -165,42 +133,111 @@ export default function Chat({
     }
   }, []);
 
+  // 🔥 ATUALIZAR CONTAGEM DE NÃO LIDAS
+  useEffect(() => {
+    if (onUnreadChange) {
+      onUnreadChange(unreadCount);
+    }
+  }, [unreadCount, onUnreadChange]);
+
+  // 🔥 RECEBER MENSAGENS
+  useEffect(() => {
+    if (!socket) {
+      console.log("⚠️ Chat: Socket não disponível");
+      return;
+    }
+
+    const handleChatMessage = (data) => {
+      console.log("📡 Chat: Mensagem recebida:", data);
+      const isOwnMessage = data.player === playerName;
+      
+      setMessages((prev) => {
+        const newMessages = [...prev, data];
+        if (newMessages.length > 100) {
+          return newMessages.slice(-100);
+        }
+        return newMessages;
+      });
+
+      if (!isOwnMessage) {
+        if (notificationSound) {
+          try {
+            soundManager.playSound("deal", { volume: 0.15 });
+          } catch (e) {}
+        }
+
+        if (onNewMessage) {
+          onNewMessage({
+            from: data.player,
+            message: data.message,
+            timestamp: data.timestamp,
+          });
+        }
+
+        const shouldCountUnread = isMinimizedRef.current || !isFocusedRef.current;
+        
+        if (shouldCountUnread) {
+          setUnreadCount((prev) => {
+            const newCount = prev + 1;
+            if (newCount > 0) {
+              document.title = `💬 (${newCount}) Poker by BruCe`;
+            }
+            return newCount;
+          });
+
+          if (unreadTimeoutRef.current) {
+            clearTimeout(unreadTimeoutRef.current);
+          }
+
+          unreadTimeoutRef.current = setTimeout(() => {
+            setUnreadCount(0);
+            document.title = "Poker by BruCe";
+          }, 30000);
+        }
+      }
+
+      // 🔥 ROLAR PARA O FINAL SEMPRE QUE RECEBE MENSAGEM
+      scrollChatToBottom(true);
+    };
+
+    socket.on("chat-message", handleChatMessage);
+    console.log("✅ Chat: Listener chat-message registrado");
+
+    return () => {
+      socket.off("chat-message", handleChatMessage);
+      console.log("🔌 Chat: Listener chat-message removido");
+      if (unreadTimeoutRef.current) {
+        clearTimeout(unreadTimeoutRef.current);
+      }
+    };
+  }, [socket, playerName, notificationSound, onNewMessage, scrollChatToBottom]);
+
   // 🔥 ENVIAR MENSAGEM
   const sendMessage = useCallback((e) => {
     e.preventDefault();
-    if (!inputMessage.trim() || !socket) return;
-
     const message = inputMessage.trim();
+    if (!message || !socket) {
+      console.log("⚠️ Chat: Não é possível enviar - socket:", !!socket, "message:", message);
+      return;
+    }
+
     setInputMessage("");
 
+    console.log("📤 Chat: Enviando mensagem para sala", roomId, ":", message);
     socket.emit("send-chat-message", {
       roomId: roomId,
       message: message,
     });
 
-    const localMessage = {
-      player: playerName,
-      message: message,
-      timestamp: Date.now(),
-      isSystem: false,
-      isOwn: true,
-    };
-
-    setMessages((prev) => {
-      const newMessages = [...prev, localMessage];
-      if (newMessages.length > 100) {
-        return newMessages.slice(-100);
-      }
-      return newMessages;
-    });
-
+    // 🔥 NÃO ADICIONAR LOCALMENTE - O SERVIDOR ENVIA PARA TODOS
+    // Isso evita duplicação de mensagens
+    
     setShowEmojis(false);
-    setTimeout(() => scrollChatToBottom(true), 50);
     
     if (inputRef.current) {
       inputRef.current.focus();
     }
-  }, [inputMessage, socket, roomId, playerName, scrollChatToBottom]);
+  }, [inputMessage, socket, roomId]);
 
   // 🔥 INSERIR EMOJI
   const insertEmoji = useCallback((emoji) => {

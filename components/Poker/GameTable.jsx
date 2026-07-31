@@ -29,6 +29,7 @@ const GameTable = memo(function GameTable({
   const memoizedCommunityCards = useMemo(() => communityCards, [communityCards]);
   const memoizedPlayerCards = useMemo(() => playerCards, [playerCards]);
   const memoizedCpuCards = useMemo(() => cpuCards, [cpuCards]);
+  
   const [potAnimationKey, setPotAnimationKey] = useState(0);
   const [showPotEffect, setShowPotEffect] = useState(false);
   const chipKeyCounter = useRef(0);
@@ -47,26 +48,26 @@ const GameTable = memo(function GameTable({
   const tableGlowVariants = useMemo(
     () => ({
       idle: {
-        boxShadow: "0 0 40px rgba(0,200,0,0.08)",
+        boxShadow: "0 0 50px rgba(0,200,0,0.1)",
       },
       active: {
-        boxShadow: "0 0 60px rgba(0,200,0,0.2)",
+        boxShadow: "0 0 70px rgba(0,200,0,0.25)",
       },
       showdown: {
         boxShadow: [
-          "0 0 40px rgba(255,215,0,0.1)",
-          "0 0 80px rgba(255,215,0,0.3)",
-          "0 0 40px rgba(255,215,0,0.1)",
+          "0 0 50px rgba(255,215,0,0.15)",
+          "0 0 100px rgba(255,215,0,0.4)",
+          "0 0 50px rgba(255,215,0,0.15)",
         ],
-        transition: { duration: 1.5, repeat: Infinity },
+        transition: { duration: 2, repeat: Infinity },
       },
       allin: {
         boxShadow: [
-          "0 0 40px rgba(255,0,0,0.1)",
-          "0 0 80px rgba(255,0,0,0.3)",
-          "0 0 40px rgba(255,0,0,0.1)",
+          "0 0 50px rgba(255,0,0,0.15)",
+          "0 0 100px rgba(255,0,0,0.4)",
+          "0 0 50px rgba(255,0,0,0.15)",
         ],
-        transition: { duration: 0.8, repeat: Infinity },
+        transition: { duration: 1, repeat: Infinity },
       },
     }),
     [],
@@ -113,7 +114,7 @@ const GameTable = memo(function GameTable({
       );
     }
     return chips;
-  }, [pot]);
+  }, [pot, chipKeyCounter.current]);
 
   const shouldRenderChips = pot > 0 && pot < 5000;
 

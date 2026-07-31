@@ -850,7 +850,7 @@ export default function PokerGame() {
 
   // ====================== DO SHOWDOWN ======================
   async function doShowdown(g, user) {
-    if (!g.handActive || g.showdownStarted || isProcessingAction.current) {
+    if (!g?.handActive || g?.showdownStarted || isProcessingAction.current) {
       return g;
     }
 
@@ -865,8 +865,8 @@ export default function PokerGame() {
       stage: "showdown",
     };
 
-    const pScore = getHandRank(state.playerCards, state.community);
-    const cScore = getHandRank(state.cpuCards, state.community);
+    const pScore = getHandRank(state?.playerCards, state?.community);
+    const cScore = getHandRank(state?.cpuCards, state?.community);
     const pName = getHandName(pScore);
     const cName = getHandName(cScore);
 
@@ -911,9 +911,19 @@ export default function PokerGame() {
           const handId = `${currentUser || "player"}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
           if (comparison === 0) {
-            const split = Math.floor(finalState.pot / 2);
-            const remainder = finalState.pot - split * 2;
-
+            // 🔥 EMPATE: Cada jogador recebe de volta suas apostas + metade do pote total
+            const playerBet = state.playerBet || 0;
+            const cpuBet = state.cpuBet || 0;
+            const totalPot = finalState.pot;
+            
+            // 🔥 Cada jogador recebe de volta suas apostas
+            finalState.playerMoney += playerBet;
+            finalState.cpuMoney += cpuBet;
+            
+            // 🔥 Dividir o pote restante igualmente
+            const split = Math.floor(totalPot / 2);
+            const remainder = totalPot - split * 2;
+            
             finalState.playerMoney += split + remainder;
             finalState.cpuMoney += split;
 
@@ -1766,7 +1776,52 @@ function resetSession() {
 
   const currentMoney = game.playerMoney || currentChips || 0;
 
-  // 🔥 SEMPRE PERGUNTAR SE QUER RECARREGAR
+  // 🔥 NO MODO MULTIPLAYER, NÃO PERGUNTAR - SÓ DAS 1000 FICHAS DE CORTESIA
+  if (isMultiplayer && multiplayerModeActive) {
+    isAllInRef.current = false;
+    hasLostAllRef.current = false;
+
+    try {
+      const baseUrl = window.location.origin;
+      fetch(`${baseUrl}/api/save-game-state`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: currentUser,
+          gameState: null,
+        }),
+      }).catch(() => {});
+    } catch (e) {}
+
+    const money = 1000;
+    const playerName =
+      multiplayerPlayers[currentPlayerIndex]?.name || "Jogador";
+
+    const message = `🔄 ${playerName} recebeu 1000 fichas de cortesia! (${currentMoney} → 1000)`;
+
+    showNotification(message, false);
+    setTimeout(() => saveChips(currentUser, money, true), 100);
+
+    updateMultiplayerChips(currentPlayerIndex, money);
+
+    setGame((prev) => ({
+      ...prev,
+      playerMoney: money,
+      cpuMoney: 1000,
+      gameOver: false,
+      handActive: false,
+      showdownStarted: false,
+      winnerMsg: "",
+      cpuThought: "",
+      playerHandName: "",
+      cpuHandName: "🔒 ???",
+    }));
+
+    setWaitingForNewHand(true);
+    return;
+  }
+
+  // 🔥 NO MODO CPU, PERGUNTAR SE QUER RECARREGAR
   if (!window.confirm(
     `💰 Você tem ${currentMoney} fichas.\n\nDeseja receber 1000 fichas de cortesia para continuar jogando?\n\n(Suas fichas atuais serão perdidas)`
   )) {
@@ -1789,19 +1844,12 @@ function resetSession() {
   } catch (e) {}
 
   const money = 1000;
-  const playerName =
-    isMultiplayer && multiplayerModeActive
-      ? multiplayerPlayers[currentPlayerIndex]?.name || "Jogador"
-      : currentUser || "Jogador";
+  const playerName = currentUser || "Jogador";
 
   const message = `🔄 ${playerName} recebeu 1000 fichas de cortesia! (${currentMoney} → 1000)`;
 
   showNotification(message, false);
   setTimeout(() => saveChips(currentUser, money, true), 100);
-
-  if (isMultiplayer && multiplayerModeActive) {
-    updateMultiplayerChips(currentPlayerIndex, money);
-  }
 
   setGame((prev) => ({
     ...prev,
@@ -1833,7 +1881,7 @@ function resetSession() {
       // fichas nunca são um "reset" para 1000. Os demais assentos (convidados
       // sem conta, jogando no mesmo dispositivo) usam o valor configurado.
       const ownerChips =
-        currentChips ?? session?.user?.chips ?? game.playerMoney ?? 0;
+        currentChips ?? session?.user?.chips ?? game?.playerMoney ?? 0;
 
       const playersWithChips = config.players.map((p, idx) => ({
         ...p,
@@ -1855,7 +1903,7 @@ function resetSession() {
         startNewHand(currentUser, firstPlayer.chips);
       }, 100);
     },
-    [currentUser, currentChips, session, game.playerMoney],
+    [currentUser, currentChips, session, game?.playerMoney],
   );
 
   // ====================== SAIR DO MULTIPLAYER (2 JOGADORES) ======================
@@ -2025,17 +2073,17 @@ function resetSession() {
 
   // ====================== SUGESTÃO DO JOGADOR ======================
   function getPlayerSuggestion(g) {
-    if (!g || !g.playerCards || !g.playerCards.length) return "";
+    if (!g || !g?.playerCards || !g?.playerCards?.length) return "";
 
-    if (g.stage === "preflop") {
-      const isPair = g.playerCards[0].rank === g.playerCards[1].rank;
-      const high = Math.max(g.playerCards[0].rank, g.playerCards[1].rank);
+    if (g?.stage === "preflop") {
+      const isPair = g?.playerCards[0]?.rank === g?.playerCards[1]?.rank;
+      const high = Math.max(g?.playerCards[0]?.rank, g?.playerCards[1]?.rank);
       if (isPair) return "🎯 Par - Considere aumentar";
       if (high >= 12) return "📈 Cartas altas - CALL seguro";
       return "⚠️ Mão fraca - Cuidado";
     }
-    if (g.community && g.community.length >= 3) {
-      const score = getHandRank(g.playerCards, g.community);
+    if (g?.community && g?.community?.length >= 3) {
+      const score = getHandRank(g?.playerCards, g?.community);
       return `📊 ${getHandName(score)}`;
     }
     return "";
@@ -2082,42 +2130,42 @@ function resetSession() {
   }, []);
 
   // ====================== RENDER ======================
-  const g = game;
+  const g = game || INITIAL_GAME;
   const suggestion = getPlayerSuggestion(g);
-  const showCpuCards = !g.handActive || g.stage === "showdown";
+  const showCpuCards = !g?.handActive || g?.stage === "showdown";
   
   // 🔥 BOTÕES DE AÇÃO SÓ FUNCIONAM SE O JOGO ESTIVER ATIVO
   const actionButtonsDisabled =
-  !g.handActive ||
-  !g.waitingPlayer ||
-  g.gameOver ||
-  g.stage === "showdown" ||
-  g.playerMoney <= 0 ||
-  g.playerAllin ||
+  !g?.handActive ||
+  !g?.waitingPlayer ||
+  g?.gameOver ||
+  g?.stage === "showdown" ||
+  g?.playerMoney <= 0 ||
+  g?.playerAllin ||
   isProcessingAction.current ||
   waitingForNewHand;
 
   // 🔥 CONSOLE.LOG PARA DEBUG
   console.log("🔍 [Page] RENDER - Estado do jogo:", {
-    handActive: g.handActive,
-    waitingPlayer: g.waitingPlayer,
-    gameOver: g.gameOver,
-    stage: g.stage,
-    playerMoney: g.playerMoney,
-    playerAllin: g.playerAllin,
+    handActive: g?.handActive,
+    waitingPlayer: g?.waitingPlayer,
+    gameOver: g?.gameOver,
+    stage: g?.stage,
+    playerMoney: g?.playerMoney,
+    playerAllin: g?.playerAllin,
     isProcessingAction: isProcessingAction.current,
     waitingForNewHand,
     actionButtonsDisabled,
-    toCall: g.currentBet - g.playerBet,
-    canRaise: !actionButtonsDisabled && !g.playerAllin && g.currentBet - g.playerBet + (50 + g.raiseCounter * 50) <= g.playerMoney,
+    toCall: (g?.currentBet || 0) - (g?.playerBet || 0),
+    canRaise: !actionButtonsDisabled && !g?.playerAllin && (g?.currentBet || 0) - (g?.playerBet || 0) + (50 + (g?.raiseCounter || 0) * 50) <= (g?.playerMoney || 0),
   });
 
-  const toCall = g.currentBet - g.playerBet;
-  const nextRaise = 50 + g.raiseCounter * 50;
+  const toCall = (g?.currentBet || 0) - (g?.playerBet || 0);
+  const nextRaise = 50 + (g?.raiseCounter || 0) * 50;
   const canRaise =
     !actionButtonsDisabled &&
-    !g.playerAllin &&
-    g.currentBet - g.playerBet + nextRaise <= g.playerMoney;
+    !g?.playerAllin &&
+    (g?.currentBet || 0) - (g?.playerBet || 0) + nextRaise <= (g?.playerMoney || 0);
   const stageNames = {
     preflop: "Pré-flop",
     flop: "Flop",
@@ -2341,15 +2389,17 @@ function resetSession() {
                 transition: "var(--transition-theme)",
               }}
             >
-              {[
-                ["💰", g.pot],
-                ["🎴", stageNames[g.stage] || g.stage],
-                ["👤", g.playerMoney],
-                ["🤖", g.cpuMoney],
-                ["📊", `Aposta: ${g.currentBet}`],
-                ["🚀", isTurbo ? "Turbo" : "Normal"],
-                ["👥", isMultiplayer && multiplayerModeActive ? "2P" : "1P"],
-              ].map(([icon, val], i) => (
+              {g && (
+                <>
+                {[
+                  ["💰", g?.pot || 0],
+                  ["🎴", stageNames[g?.stage] || g?.stage || "preflop"],
+                  ["👤", g?.playerMoney || 0],
+                  ["🤖", g?.cpuMoney || 0],
+                  ["📊", `Aposta: ${g?.currentBet || 0}`],
+                  ["🚀", isTurbo ? "Turbo" : "Normal"],
+                  ["👥", isMultiplayer && multiplayerModeActive ? "2P" : "1P"],
+                ].map(([icon, val], i) => (
                 <motion.div
                   key={`header-${i}-${icon}`}
                   style={{
@@ -2387,6 +2437,9 @@ function resetSession() {
                   {val}
                 </motion.div>
               ))}
+                </>
+              )}
+
             </div>
 
             {isMultiplayer &&
@@ -2431,29 +2484,31 @@ function resetSession() {
 
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
               <div style={{ flex: 3, minWidth: 280 }}>
-                <GameTable
-                  communityCards={g.community || []}
-                  playerCards={g.playerCards || []}
-                  cpuCards={g.cpuCards || []}
-                  playerHandName={g.playerHandName}
-                  cpuHandName={g.cpuHandName}
-                  cpuThought={g.cpuThought}
-                  stage={g.stage}
-                  pot={g.pot}
-                  currentBet={g.currentBet}
-                  playerBet={g.playerBet}
-                  cpuBet={g.cpuBet}
-                  isTurbo={isTurbo}
-                  showCpuCards={showCpuCards}
-                  isMultiplayer={isMultiplayer && multiplayerModeActive}
-                  multiplayerPlayers={multiplayerPlayers}
-                  currentPlayerIndex={currentPlayerIndex}
-                  onSwitchPlayer={handleSwitchPlayer}
-                  currentUser={currentUser}
-                />
+                {g && (
+                  <GameTable
+                    communityCards={g?.community || []}
+                    playerCards={g?.playerCards || []}
+                    cpuCards={g?.cpuCards || []}
+                    playerHandName={g?.playerHandName || ""}
+                    cpuHandName={g?.cpuHandName || ""}
+                    cpuThought={g?.cpuThought || ""}
+                    stage={g?.stage || "preflop"}
+                    pot={g?.pot || 0}
+                    currentBet={g?.currentBet || 0}
+                    playerBet={g?.playerBet || 0}
+                    cpuBet={g?.cpuBet || 0}
+                    isTurbo={isTurbo}
+                    showCpuCards={showCpuCards}
+                    isMultiplayer={isMultiplayer && multiplayerModeActive}
+                    multiplayerPlayers={multiplayerPlayers}
+                    currentPlayerIndex={currentPlayerIndex}
+                    onSwitchPlayer={handleSwitchPlayer}
+                    currentUser={currentUser}
+                  />
+                )}
 
                 {/* 🔥 ACTION BUTTONS - COM CONSOLE.LOG */}
-                {console.log("🔍 [Page] Renderizando ActionButtons com:", {
+                {g && console.log("🔍 [Page] Renderizando ActionButtons com:", {
                   disabled: actionButtonsDisabled,
                   canRaise,
                   toCall,
@@ -2464,33 +2519,36 @@ function resetSession() {
                   hasOnAllIn: !!playerAllIn,
                   hasOnReset: !!resetSession,
                   hasOnNewHand: !!startNewHand,
-                  playerMoney: g.playerMoney,
+                  playerMoney: g?.playerMoney || 0,
                   isWaitingForNewHand: waitingForNewHand,
                 })}
 
-                <ActionButtons
-                  disabled={actionButtonsDisabled}
-                  canRaise={canRaise}
-                  toCall={toCall}
-                  nextRaise={nextRaise}
-                  onFold={playerFold}
-                  onCall={playerCall}
-                  onRaise={playerRaise}
-                  onAllIn={playerAllIn}
-                  onReset={resetSession}
-                  onNewHand={() => {
-                    console.log("🔍 [Page] onNewHand chamado! Iniciando nova mão...");
-                    startNewHand(currentUser, undefined);
-                  }}
-                  playerMoney={g.playerMoney}
-                  isWaitingForNewHand={waitingForNewHand}
-                  cpuAction={null}
-                />
+                {g && (
+                  <ActionButtons
+                    disabled={actionButtonsDisabled}
+                    canRaise={canRaise}
+                    toCall={toCall}
+                    nextRaise={nextRaise}
+                    onFold={playerFold}
+                    onCall={playerCall}
+                    onRaise={playerRaise}
+                    onAllIn={playerAllIn}
+                    onReset={resetSession}
+                    onNewHand={() => {
+                      console.log("🔍 [Page] onNewHand chamado! Iniciando nova mão...");
+                      startNewHand(currentUser, undefined);
+                    }}
+                    playerMoney={g?.playerMoney || 0}
+                    isWaitingForNewHand={waitingForNewHand}
+                    cpuAction={null}
+                  />
+                )}
 
-                {g.winnerMsg && (
+                {g?.winnerMsg && (
                   <motion.div
+                    className="winner-message"
                     style={{
-                      background: "#000000bb",
+                      background: "rgba(0,0,0,0.7)",
                       backdropFilter: "blur(12px)",
                       borderRadius: 40,
                       padding: "6px 15px",
@@ -2499,12 +2557,14 @@ function resetSession() {
                       fontSize: "0.85rem",
                       color: "#ffd966",
                       marginTop: 12,
+                      border: "1px solid rgba(255,215,0,0.3)",
+                      textShadow: "0 1px 2px rgba(0,0,0,0.3)",
                     }}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >
-                    {g.winnerMsg}
+                    {g?.winnerMsg}
                   </motion.div>
                 )}
                 <div
@@ -2530,32 +2590,38 @@ function resetSession() {
                   gap: 10,
                 }}
               >
-                <StatusPanel
-                  stage={g.stage}
-                  pot={g.pot}
-                  currentBet={g.currentBet}
-                  playerBet={g.playerBet}
-                  cpuBet={g.cpuBet}
-                  nextRaise={nextRaise}
-                  notification={notification}
-                  stageNames={stageNames}
-                  gameStatus={g.gameStatus}
-                  winnerMsg={g.winnerMsg}
-                  isTurbo={isTurbo}
-                />
+                {g && (
+                  <StatusPanel
+                    stage={g?.stage ?? "preflop"}
+                    pot={g?.pot ?? 0}
+                    currentBet={g?.currentBet ?? 0}
+                    playerBet={g?.playerBet ?? 0}
+                    cpuBet={g?.cpuBet ?? 0}
+                    nextRaise={nextRaise ?? 0}
+                    notification={notification ?? { msg: "", isError: false, visible: false }}
+                    stageNames={stageNames ?? {}}
+                    gameStatus={g?.gameStatus ?? ""}
+                    winnerMsg={g?.winnerMsg ?? ""}
+                    isTurbo={isTurbo ?? false}
+                  />
+                )}
 
-                <StatsPanel
-                  username={currentUser}
-                  onShowAchievements={() => setShowAchievementsModal(true)}
-                  isResultModalOpen={isResultModalOpen}
-                />
+                {g && (
+                  <StatsPanel
+                    username={currentUser}
+                    onShowAchievements={() => setShowAchievementsModal(true)}
+                    isResultModalOpen={isResultModalOpen}
+                  />
+                )}
 
-                <LevelDisplay
-                  username={currentUser}
-                  isResultModalOpen={isResultModalOpen}
-                  onShowAchievements={() => setShowAchievementsModal(true)}
-                  onShowFindings={() => setShowFindingsModal(true)}
-                />
+                {g && (
+                  <LevelDisplay
+                    username={currentUser}
+                    isResultModalOpen={isResultModalOpen}
+                    onShowAchievements={() => setShowAchievementsModal(true)}
+                    onShowFindings={() => setShowFindingsModal(true)}
+                  />
+                )}
 
                 <FriendsList
                   username={currentUser}

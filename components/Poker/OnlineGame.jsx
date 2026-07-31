@@ -139,6 +139,19 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
 
     console.log("🔄 OnlineGame montado, socket:", socket?.id);
     console.log(`📋 RoomId: ${roomId}, Player: ${playerName}`);
+    console.log(`📡 Socket rooms antes de join:`, socket.rooms ? Array.from(socket.rooms || []) : "N/A");
+    console.log(`📡 Socket type:`, typeof socket);
+    console.log(`📡 Socket has join:`, typeof socket?.join);
+    
+    // 🔥 NO CLIENTE, O JOIN É FEITO PELO SERVIDOR AO ENTRAR NA SALA
+    // Não usar socket.join() no cliente
+    console.log(`📡 Verificando se socket está na sala ${roomId}...`);
+    const inRoom = socket.rooms && socket.rooms.has(roomId);
+    console.log(`📡 Socket está na sala ${roomId}:`, inRoom);
+    
+    if (!inRoom) {
+      console.warn(`⚠️ Socket não está na sala ${roomId} - deve ter entrado pelo lobby`);
+    }
 
     socket.off("room-update");
     socket.off("game-started");
@@ -149,6 +162,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     socket.off("summary-closed");
     socket.off("summary-progress");
     socket.off("error");
+    socket.off("chat-message");
 
     const onRoomUpdate = (data) => {
       if (!isMounted.current) return;
@@ -293,6 +307,11 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       setTimeout(() => setGameError(""), 5000);
     };
 
+    // 🔥 LISTENER DE CHAT PARA DEBUG
+    const onChatMessage = (data) => {
+      console.log("📡 OnlineGame: Chat message recebido:", data);
+    };
+
     socket.on("room-update", onRoomUpdate);
     socket.on("game-started", onGameStarted);
     socket.on("game-update", onGameUpdate);
@@ -302,6 +321,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     socket.on("summary-progress", onSummaryProgress);
     socket.on("game-reset", onGameReset);
     socket.on("error", onError);
+    socket.on("chat-message", onChatMessage);
 
     socket.emit("list-rooms");
 
@@ -316,6 +336,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       socket.off("summary-progress", onSummaryProgress);
       socket.off("game-reset", onGameReset);
       socket.off("error", onError);
+      socket.off("chat-message", onChatMessage);
     };
   }, [socket, roomId, playerName, syncReadyState, checkAllReady, isStarting]);
 
@@ -375,7 +396,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
 
     socket.emit("player-ready", {
       roomId: roomId,
-      playerName: playerName,
     });
 
     const newReadyState = !isReady;

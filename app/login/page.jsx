@@ -1,7 +1,7 @@
 // app/login/page.jsx - COMPLETO COM TRATAMENTO DE ERROS AMIGÁVEL
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -13,6 +13,40 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [theme, setTheme] = useState("dark");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") || "dark";
+    setTheme(savedTheme);
+    document.documentElement.setAttribute("data-theme", savedTheme);
+  }, []);
+
+  // 🔥 INTERCEPTAR ERROS DE CONSOLE PARA NÃO APARECER NO CONSOLE
+  useEffect(() => {
+    const originalError = console.error;
+    console.error = (...args) => {
+      // 🔥 Filtrar erros de autenticação que são esperados
+      const message = args[0];
+      if (typeof message === "string" && 
+          (message.includes("401") || message.includes("Unauthorized") || 
+           message.includes("POST http://localhost:3000/api/auth"))) {
+        console.info("🔐 Autenticação tratada:", message);
+        return;
+      }
+      originalError.apply(console, args);
+    };
+
+    return () => {
+      console.error = originalError;
+    };
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "dark" ? "light" : "dark";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    document.documentElement.setAttribute("data-theme", newTheme);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -59,6 +93,29 @@ export default function LoginPage() {
           <div className="auth-icon">🃏</div>
           <h1 className="auth-title">Poker</h1>
           <p className="auth-subtitle">Faça login para continuar</p>
+          <motion.button
+            onClick={toggleTheme}
+            style={{
+              position: "absolute",
+              top: "15px",
+              right: "15px",
+              background: "var(--bg-button)",
+              border: "1px solid var(--border-light)",
+              borderRadius: "50%",
+              width: "40px",
+              height: "40px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              fontSize: "1.2rem",
+              transition: "all 0.2s ease",
+            }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </motion.button>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">

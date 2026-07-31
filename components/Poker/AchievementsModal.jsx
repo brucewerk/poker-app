@@ -1,220 +1,23 @@
-// components/Poker/AchievementsModal.jsx - CORRIGIDO (carregamento)
+// components/Poker/AchievementsModal.jsx - CORRIGIDO (sincronizado com backend)
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ACHIEVEMENTS } from "@/lib/achievements";
 
-// 🔥 CONQUISTAS (mantidas as 26 originais)
-const ACHIEVEMENTS = [
-  {
-    id: "first_win",
-    name: "Primeira Vitória",
-    description: "Ganhe sua primeira mão",
-    category: "Comum",
-    xpBonus: 10,
-    icon: "🎯",
-  },
-  {
-    id: "win_5",
-    name: "Cinco Seguidas!",
-    description: "Ganhe 5 mãos consecutivas",
-    category: "Comum",
-    xpBonus: 25,
-    icon: "🔥",
-  },
-  {
-    id: "win_10",
-    name: "Dez Seguidas!",
-    description: "Ganhe 10 mãos consecutivas",
-    category: "Comum",
-    xpBonus: 50,
-    icon: "⚡",
-  },
-  {
-    id: "flush",
-    name: "Flush!",
-    description: "Ganhe com um Flush",
-    category: "Comum",
-    xpBonus: 30,
-    icon: "♠️",
-  },
-  {
-    id: "full_house",
-    name: "Full House!",
-    description: "Ganhe com um Full House",
-    category: "Incomum",
-    xpBonus: 50,
-    icon: "🏠",
-  },
-  {
-    id: "four_of_kind",
-    name: "Quadra!",
-    description: "Ganhe com uma Quadra",
-    category: "Incomum",
-    xpBonus: 75,
-    icon: "4️⃣",
-  },
-  {
-    id: "straight_flush",
-    name: "Straight Flush!",
-    description: "Ganhe com um Straight Flush",
-    category: "Raro",
-    xpBonus: 100,
-    icon: "🌈",
-  },
-  {
-    id: "royal_flush",
-    name: "Royal Flush!",
-    description: "Ganhe com um Royal Flush - A MAIOR MÃO DO POKER!",
-    category: "Lendário",
-    xpBonus: 200,
-    icon: "👑",
-  },
-  {
-    id: "all_in_win",
-    name: "All-In Vitorioso!",
-    description: "Ganhe uma mão após ir All-In",
-    category: "Incomum",
-    xpBonus: 40,
-    icon: "⚔️",
-  },
-  {
-    id: "comeback",
-    name: "Virada!",
-    description: "Ganhe uma mão com menos de 20% de chance",
-    category: "Raro",
-    xpBonus: 60,
-    icon: "🔄",
-  },
-  {
-    id: "big_pot",
-    name: "Pote Gigante!",
-    description: "Ganhe um pote com mais de 500 fichas",
-    category: "Incomum",
-    xpBonus: 35,
-    icon: "💰",
-  },
-  {
-    id: "win_50",
-    name: "50 Vitórias!",
-    description: "Ganhe 50 mãos no total",
-    category: "Raro",
-    xpBonus: 80,
-    icon: "🏆",
-  },
-  {
-    id: "win_100",
-    name: "100 Vitórias!",
-    description: "Ganhe 100 mãos no total",
-    category: "Épico",
-    xpBonus: 120,
-    icon: "🌟",
-  },
-  {
-    id: "win_500",
-    name: "500 Vitórias!",
-    description: "Ganhe 500 mãos no total",
-    category: "Lendário",
-    xpBonus: 200,
-    icon: "💎",
-  },
-  {
-    id: "poker_god",
-    name: "Deus do Poker!",
-    description: "Ganhe 1000 mãos no total",
-    category: "Mítico",
-    xpBonus: 500,
-    icon: "⚡",
-  },
-  {
-    id: "flop_100",
-    name: "Flopmaníaco",
-    description: "Veja 100 flops",
-    category: "Comum",
-    xpBonus: 15,
-    icon: "🎴",
-  },
-  {
-    id: "turn_100",
-    name: "Turnista",
-    description: "Veja 100 turns",
-    category: "Comum",
-    xpBonus: 15,
-    icon: "🔄",
-  },
-  {
-    id: "river_100",
-    name: "Reveriano",
-    description: "Veja 100 rivers",
-    category: "Comum",
-    xpBonus: 15,
-    icon: "🌊",
-  },
-  {
-    id: "bluff_10",
-    name: "Bluffer",
-    description: "Dê 10 blefes bem-sucedidos",
-    category: "Raro",
-    xpBonus: 40,
-    icon: "🎭",
-  },
-  {
-    id: "all_in_10",
-    name: "All-In",
-    description: "Vá All-In 10 vezes",
-    category: "Incomum",
-    xpBonus: 25,
-    icon: "⚡",
-  },
-  {
-    id: "chips_1000",
-    name: "Milionário",
-    description: "Acumule 1000 fichas",
-    category: "Incomum",
-    xpBonus: 30,
-    icon: "💎",
-  },
-  {
-    id: "chips_10000",
-    name: "Magnata",
-    description: "Acumule 10000 fichas",
-    category: "Épico",
-    xpBonus: 100,
-    icon: "💰",
-  },
-  {
-    id: "chips_100000",
-    name: "Bilionário",
-    description: "Acumule 100000 fichas",
-    category: "Lendário",
-    xpBonus: 250,
-    icon: "💎",
-  },
-  {
-    id: "win_streak_5",
-    name: "Sequência de 5",
-    description: "Ganhe 5 mãos seguidas",
-    category: "Incomum",
-    xpBonus: 30,
-    icon: "🔥",
-  },
-  {
-    id: "win_streak_10",
-    name: "Sequência de 10",
-    description: "Ganhe 10 mãos seguidas",
-    category: "Raro",
-    xpBonus: 60,
-    icon: "⚡",
-  },
-  {
-    id: "win_streak_20",
-    name: "Sequência de 20",
-    description: "Ganhe 20 mãos seguidas",
-    category: "Épico",
-    xpBonus: 120,
-    icon: "🌟",
-  },
-];
+// 🔥 Converter ACHIEVEMENTS do backend para o formato do modal
+const ACHIEVEMENTS_LIST = Object.values(ACHIEVEMENTS).map((ach) => ({
+  id: ach.id,
+  name: ach.name,
+  description: ach.description,
+  category: ach.rarity === "comum" ? "Comum" : 
+           ach.rarity === "incomum" ? "Incomum" :
+           ach.rarity === "raro" ? "Raro" :
+           ach.rarity === "épico" ? "Épico" :
+           ach.rarity === "lendário" ? "Lendário" : "Mítico",
+  xpBonus: ach.xpBonus,
+  icon: ach.icon,
+}));
 
 const CATEGORY_COLORS = {
   Comum: "#8a8a8a",
@@ -290,13 +93,13 @@ export default function AchievementsModal({
 
   // 🔥 Categorias
   const categories = useMemo(() => {
-    const cats = ["Todos", ...new Set(ACHIEVEMENTS.map((a) => a.category))];
+    const cats = ["Todos", ...new Set(ACHIEVEMENTS_LIST.map((a) => a.category))];
     return cats;
   }, []);
 
   // 🔥 Conquistas filtradas
   const filteredAchievements = useMemo(() => {
-    let filtered = ACHIEVEMENTS;
+    let filtered = ACHIEVEMENTS_LIST;
 
     if (selectedCategory !== "Todos") {
       filtered = filtered.filter((a) => a.category === selectedCategory);
@@ -317,7 +120,10 @@ export default function AchievementsModal({
   // 🔥 Verificar se conquista está desbloqueada
   const isUnlocked = useCallback(
     (achievementId) => {
-      return userAchievements.some((a) => a.id === achievementId);
+      // 🔥 VERIFICAÇÃO ROBUSTA: Verifica tanto por ID quanto por compatibilidade
+      const idMatch = userAchievements.some((a) => a === achievementId || a.id === achievementId);
+      console.log(`🔍 [AchievementsModal] Verificando ${achievementId}: ${idMatch ? '✅ DESBLOQUEADA' : '❌ NÃO DESBLOQUEADA'}`, userAchievements);
+      return idMatch;
     },
     [userAchievements],
   );
@@ -333,9 +139,9 @@ export default function AchievementsModal({
   // 🔥 Contagem por categoria
   const getCategoryCount = useCallback((category) => {
     if (category === "Todos") {
-      return ACHIEVEMENTS.length;
+      return ACHIEVEMENTS_LIST.length;
     }
-    return ACHIEVEMENTS.filter((a) => a.category === category).length;
+    return ACHIEVEMENTS_LIST.filter((a) => a.category === category).length;
   }, []);
 
   // 🔥 Contagem desbloqueada por categoria
@@ -343,9 +149,11 @@ export default function AchievementsModal({
     (category) => {
       const achievements =
         category === "Todos"
-          ? ACHIEVEMENTS
-          : ACHIEVEMENTS.filter((a) => a.category === category);
-      return achievements.filter((a) => isUnlocked(a.id)).length;
+          ? ACHIEVEMENTS_LIST
+          : ACHIEVEMENTS_LIST.filter((a) => a.category === category);
+      // 🔥 Garantir que achievements seja sempre um array
+      const achievementsArray = Array.isArray(achievements) ? achievements : [];
+      return achievementsArray.filter((a) => isUnlocked(a.id)).length;
     },
     [isUnlocked],
   );
