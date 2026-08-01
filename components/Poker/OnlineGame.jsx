@@ -645,7 +645,9 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           </div>
         )}
 
+        {/* 🔥 CHAT NO LOBBY COM KEY */}
         <Chat
+          key={`chat-lobby-${roomId}-${socket?.id}`}
           socket={socket}
           roomId={roomId}
           playerName={playerName}
@@ -814,7 +816,9 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
           </div>
         )}
 
+      {/* 🔥 CHAT NO JOGO COM KEY */}
       <Chat
+        key={`chat-game-${roomId}-${socket?.id}`}
         socket={socket}
         roomId={roomId}
         playerName={playerName}

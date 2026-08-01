@@ -1,4 +1,4 @@
-// components/Poker/OnlineLobby.jsx - COMPLETO CORRIGIDO (FILTRA SALAS DE CONVITE)
+// components/Poker/OnlineLobby.jsx - COMPLETO CORRIGIDO (FILTRA SALAS DE CONVITE E NORMALIZA ROOMID)
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -77,7 +77,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
           const validRooms = roomList.filter((room) => {
             const hasValidId = room.roomId && room.roomId.length > 0;
             const hasPlayers = room.players && room.players.length > 0;
-            const isNotInviteRoom = !room.roomId?.startsWith("ROOM_INVITE_");
+            const isNotInviteRoom = !room.roomId?.toUpperCase().startsWith("ROOM_INVITE_");
             const hasAvailableSlot = room.hasAvailableSlot !== false;
             
             return hasValidId && hasPlayers && isNotInviteRoom && hasAvailableSlot;
@@ -93,11 +93,13 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       }
     };
 
+    // 🔥 CORREÇÃO: NORMALIZAR ROOMID PARA MAIÚSCULAS
     const onRoomCreated = (data) => {
       console.log("✅ Sala criada:", data);
       setCreating(false);
-      setCurrentRoomId(data.roomId);
-      setSuccess(`✅ Sala ${data.roomId} criada com sucesso!`);
+      const roomId = data.roomId.toUpperCase(); // <-- NORMALIZAR
+      setCurrentRoomId(roomId);
+      setSuccess(`✅ Sala ${roomId} criada com sucesso!`);
 
       fetchRooms();
       setTimeout(() => fetchRooms(), 500);
@@ -105,9 +107,9 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
 
       setTimeout(() => {
         if (onJoinGame && isMounted.current) {
-          console.log(`📤 Entrando na sala criada: ${data.roomId}`);
+          console.log(`📤 Entrando na sala criada: ${roomId}`);
           onJoinGame({
-            roomId: data.roomId,
+            roomId: roomId, // <-- USAR ID NORMALIZADO
             playerName: currentUser,
             socket: socketClient.socket,
             isInviteCreator: true,
@@ -139,7 +141,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         setSuccess(`✅ Convite aceito! Entrando na sala...`);
         const inviteData = pendingInvite;
         if (inviteData && onJoinGame) {
-          const roomId = inviteData.roomId || `room_${inviteData.inviteId}`;
+          const roomId = (inviteData.roomId || `room_${inviteData.inviteId}`).toUpperCase(); // <-- NORMALIZAR
           socketClient.emit("join-room", {
             roomId: roomId,
             playerName: currentUser,
@@ -163,7 +165,6 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         setError(`❌ ${data}`);
       } else {
         console.warn("Erro do servidor sem mensagem detalhada:", data);
-        // Não mostrar erro genérico se não houver mensagem específica
       }
       if (data && (data.message || typeof data === 'string')) {
         setTimeout(() => setError(""), 5000);
@@ -350,6 +351,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
     [currentUser, onJoinGame, rooms],
   );
 
+  // 🔥 CORREÇÃO: NORMALIZAR ROOMID EM handleAcceptInvite
   const handleAcceptInvite = useCallback(
     (inviteData) => {
       if (!socketClient.isConnected()) {
@@ -357,7 +359,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         return;
       }
       console.log("✅ Aceitando convite:", inviteData);
-      const roomId = inviteData.roomId || `room_${inviteData.inviteId}`;
+      const roomId = (inviteData.roomId || `room_${inviteData.inviteId}`).toUpperCase(); // <-- NORMALIZAR
       setCurrentRoomId(roomId);
       socketClient.emit("join-room", {
         roomId: roomId,

@@ -30,12 +30,12 @@ const EMOJIS = [
   { emoji: "👑", label: "Coroa" },
 ];
 
-export default function Chat({ 
-  socket, 
-  roomId, 
+export default function Chat({
+  socket,
+  roomId,
   playerName,
   onNewMessage,
-  onUnreadChange
+  onUnreadChange,
 }) {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -60,16 +60,17 @@ export default function Chat({
     if (socket) {
       console.log(`📡 Chat: Socket ID: ${socket.id}`);
       console.log(`📡 Chat: Socket type:`, typeof socket);
-      console.log(`📡 Chat: Socket rooms:`, socket.rooms ? Array.from(socket.rooms || []) : "N/A");
-      
-      // 🔥 VERIFICAR SE ESTÁ NA SALA CORRETA
-      const inRoom = socket.rooms && socket.rooms.has(roomId);
-      console.log(`📡 Chat: Socket está na sala ${roomId}:`, inRoom);
-      
-      if (!inRoom) {
-        console.warn(`⚠️ Chat: Socket NÃO está na sala ${roomId}`);
-        console.warn(`⚠️ Chat: O chat pode não funcionar. Verifique se o socket entrou na sala corretamente.`);
-      }
+      console.log(
+        `📡 Chat: Socket rooms:`,
+        socket.rooms ? Array.from(socket.rooms || []) : "N/A",
+      );
+
+      // 🔥 COMENTADO: Verificação de sala no cliente não é confiável
+      // const inRoom = socket.rooms && socket.rooms.has(roomId);
+      // console.log(`📡 Chat: Socket está na sala ${roomId}:`, inRoom);
+      // if (!inRoom) {
+      //   console.warn(`⚠️ Chat: Socket NÃO está na sala ${roomId}`);
+      // }
     }
   }, [socket, roomId, playerName]);
 
@@ -107,7 +108,7 @@ export default function Chat({
     if (force) {
       hasScrolledRef.current = true;
     }
-    
+
     // 🔥 TENTAR VÁRIAS FORMAS DE ROLAR
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({
@@ -118,7 +119,9 @@ export default function Chat({
     }
 
     if (chatContainerRef.current) {
-      const container = chatContainerRef.current.querySelector('.chat-messages-scroll');
+      const container = chatContainerRef.current.querySelector(
+        ".chat-messages-scroll",
+      );
       if (container) {
         container.scrollTop = container.scrollHeight;
         return;
@@ -149,7 +152,7 @@ export default function Chat({
     const handleChatMessage = (data) => {
       console.log("📡 Chat: Mensagem recebida:", data);
       const isOwnMessage = data.player === playerName;
-      
+
       setMessages((prev) => {
         const newMessages = [...prev, data];
         if (newMessages.length > 100) {
@@ -173,8 +176,9 @@ export default function Chat({
           });
         }
 
-        const shouldCountUnread = isMinimizedRef.current || !isFocusedRef.current;
-        
+        const shouldCountUnread =
+          isMinimizedRef.current || !isFocusedRef.current;
+
         if (shouldCountUnread) {
           setUnreadCount((prev) => {
             const newCount = prev + 1;
@@ -212,31 +216,39 @@ export default function Chat({
   }, [socket, playerName, notificationSound, onNewMessage, scrollChatToBottom]);
 
   // 🔥 ENVIAR MENSAGEM
-  const sendMessage = useCallback((e) => {
-    e.preventDefault();
-    const message = inputMessage.trim();
-    if (!message || !socket) {
-      console.log("⚠️ Chat: Não é possível enviar - socket:", !!socket, "message:", message);
-      return;
-    }
+  const sendMessage = useCallback(
+    (e) => {
+      e.preventDefault();
+      const message = inputMessage.trim();
+      if (!message || !socket) {
+        console.log(
+          "⚠️ Chat: Não é possível enviar - socket:",
+          !!socket,
+          "message:",
+          message,
+        );
+        return;
+      }
 
-    setInputMessage("");
+      setInputMessage("");
 
-    console.log("📤 Chat: Enviando mensagem para sala", roomId, ":", message);
-    socket.emit("send-chat-message", {
-      roomId: roomId,
-      message: message,
-    });
+      console.log("📤 Chat: Enviando mensagem para sala", roomId, ":", message);
+      socket.emit("send-chat-message", {
+        roomId: roomId,
+        message: message,
+      });
 
-    // 🔥 NÃO ADICIONAR LOCALMENTE - O SERVIDOR ENVIA PARA TODOS
-    // Isso evita duplicação de mensagens
-    
-    setShowEmojis(false);
-    
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [inputMessage, socket, roomId]);
+      // 🔥 NÃO ADICIONAR LOCALMENTE - O SERVIDOR ENVIA PARA TODOS
+      // Isso evita duplicação de mensagens
+
+      setShowEmojis(false);
+
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    },
+    [inputMessage, socket, roomId],
+  );
 
   // 🔥 INSERIR EMOJI
   const insertEmoji = useCallback((emoji) => {
@@ -251,7 +263,7 @@ export default function Chat({
   const toggleMinimize = useCallback(() => {
     const newMinimized = !isMinimized;
     setIsMinimized(newMinimized);
-    
+
     // 🔥 SE ESTIVER MAXIMIZANDO, ROLAR PARA O FINAL
     if (newMinimized === false) {
       setUnreadCount(0);
@@ -405,7 +417,9 @@ export default function Chat({
             style={{
               background: "none",
               border: "none",
-              color: notificationSound ? "var(--text-primary)" : "var(--text-muted)",
+              color: notificationSound
+                ? "var(--text-primary)"
+                : "var(--text-muted)",
               cursor: "pointer",
               fontSize: "0.8rem",
               padding: "2px 6px",
@@ -471,7 +485,7 @@ export default function Chat({
         {messages.map((msg, index) => {
           const isOwn = msg.player === playerName || msg.isOwn === true;
           const isSystem = msg.isSystem === true;
-          
+
           return (
             <motion.div
               key={`msg_${index}_${msg.timestamp}`}
