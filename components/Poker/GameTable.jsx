@@ -136,51 +136,67 @@ const GameTable = memo(function GameTable({
       initial="idle"
     >
       <div className="game-table-felt" style={tableFeltStyle()}>
-        {/* Área do dealer com Turbo integrado ao lado direito */}
-        <div className="game-table-dealer" style={dealerAreaStyle()}>
-          <motion.span
-            className="game-table-dealer-text"
-            animate={{
-              opacity: [0.7, 0.9, 0.7],
-              scale: [1, 1.05, 1],
-            }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            🎯 DEALER
-          </motion.span>
-          {isTurbo && (
-            <motion.span
-              style={{
-                marginLeft: "12px",
-                padding: "2px 12px",
-                borderRadius: "12px",
-                background: "rgba(255, 152, 0, 0.2)",
-                border: "1px solid rgba(255, 152, 0, 0.3)",
-                color: "#ff9800",
-                fontSize: "0.55rem",
-                fontWeight: "700",
-                letterSpacing: "0.5px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-              animate={{
-                scale: [1, 1.08, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{ duration: 1.2, repeat: Infinity }}
-            >
-              🚀 TURBO
-            </motion.span>
-          )}
-        </div>
-
         {/* Cartas da CPU */}
         <div
           className="game-table-player-area game-table-player-area-cpu"
-          style={cpuAreaStyle()}
+          style={{
+            ...cpuAreaStyle(),
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+          }}
         >
-          <div className="game-table-player-label">
+          {/* Área do dealer com Turbo integrado */}
+          <div className="game-table-dealer" style={{
+            ...dealerAreaStyle(),
+            position: "relative",
+            top: "auto",
+            left: "auto",
+            transform: "none",
+            padding: "3px 10px",
+            fontSize: "0.7rem",
+            alignSelf: "flex-start",
+          }}>
+            <motion.span
+              className="game-table-dealer-text"
+              animate={{
+                opacity: [0.7, 0.9, 0.7],
+                scale: [1, 1.05, 1],
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+              style={{ fontSize: "0.7rem" }}
+            >
+              🎯 DEALER
+            </motion.span>
+            {isTurbo && (
+              <motion.span
+                style={{
+                  marginLeft: "8px",
+                  padding: "3px 10px",
+                  borderRadius: "8px",
+                  background: "rgba(34, 197, 94, 0.3)",
+                  border: "1px solid rgba(34, 197, 94, 0.5)",
+                  color: "#22c55e",
+                  fontSize: "0.7rem",
+                  fontWeight: "700",
+                  letterSpacing: "0.5px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "3px",
+                }}
+                animate={{
+                  scale: [1, 1.08, 1],
+                  opacity: [0.8, 1, 0.8],
+                }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+              >
+                🚀 TURBO
+              </motion.span>
+            )}
+          </div>
+
+          {/* CPU e suas fichas */}
+          <div className="game-table-player-label" style={{ fontSize: "0.75rem" }}>
             <span className="game-table-player-label-text">🤖 CPU</span>
             <motion.span
               className="game-table-chips-label"
@@ -188,11 +204,14 @@ const GameTable = memo(function GameTable({
               initial={{ scale: 1 }}
               animate={{ scale: cpuBet > 0 ? [1, 1.2, 1] : 1 }}
               transition={{ duration: 0.3 }}
+              style={{ fontSize: "0.7rem" }}
             >
               💰 {cpuBet}
             </motion.span>
           </div>
-          <div className="game-table-cards-row">
+
+          {/* Cartas da CPU */}
+          <div className="game-table-cards-row" style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
             {cpuCards && cpuCards.length > 0 ? (
               cpuCards.map((card, i) => (
                 <Card
@@ -208,24 +227,29 @@ const GameTable = memo(function GameTable({
               <span className="game-table-empty-cards-text">🔒 ???</span>
             )}
           </div>
-          {cpuHandName && (
-            <motion.div
-              className="game-table-hand-badge game-table-hand-badge-cpu"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              {cpuHandName}
-            </motion.div>
-          )}
+
+          {/* Pensamentos da CPU */}
           {cpuThought && (
             <motion.div
               className="game-table-cpu-thought"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
+              style={{ fontSize: "0.65rem" }}
             >
-              <span className="game-table-thought-icon">💭</span> {cpuThought}
+              <span className="game-table-thought-icon">�</span> {cpuThought}
+            </motion.div>
+          )}
+
+          {cpuHandName && (
+            <motion.div
+              className="game-table-hand-badge game-table-hand-badge-cpu"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 300 }}
+              style={{ fontSize: "0.65rem", padding: "2px 6px" }}
+            >
+              {cpuHandName}
             </motion.div>
           )}
         </div>
@@ -286,8 +310,15 @@ const GameTable = memo(function GameTable({
                   ))}
           </div>
 
-          {/* Área do pote */}
-          <div className="game-table-pot-area">
+          {/* Área do pote e apostas em linha única */}
+          <div className="game-table-info-row" style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "8px",
+            marginTop: "6px",
+            flexWrap: "wrap",
+          }}>
             <motion.div
               key={`pot-${potAnimationKey}`}
               className="game-table-pot"
@@ -301,7 +332,12 @@ const GameTable = memo(function GameTable({
                 stiffness: 300,
                 duration: 0.4,
               }}
-              style={potDisplayStyle()}
+              style={{
+                ...potDisplayStyle(),
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
             >
               <motion.span
                 className="game-table-pot-text"
@@ -309,23 +345,28 @@ const GameTable = memo(function GameTable({
                   scale: showPotEffect ? [1, 1.15, 1] : 1,
                 }}
                 transition={{ duration: 0.5 }}
+                style={{ fontSize: "0.85rem" }}
               >
                 💰 Pote: ${pot}
               </motion.span>
-              {shouldRenderChips && (
-                <div className="game-table-chip-container">{renderChips}</div>
-              )}
             </motion.div>
-          </div>
 
-          {/* Apostas atuais */}
-          <div className="game-table-bets-display">
+            {shouldRenderChips && (
+              <div className="game-table-chip-container" style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                marginLeft: "4px",
+              }}>{renderChips}</div>
+            )}
+
             <motion.span
               className="game-table-bet game-table-bet-player"
               key={`player-bet-${playerBet}`}
               initial={{ scale: 1 }}
               animate={{ scale: playerBet > 0 ? [1, 1.1, 1] : 1 }}
               transition={{ duration: 0.3 }}
+              style={{ fontSize: "0.8rem" }}
             >
               👤 ${playerBet}
             </motion.span>
@@ -335,11 +376,12 @@ const GameTable = memo(function GameTable({
               initial={{ scale: 1 }}
               animate={{ scale: cpuBet > 0 ? [1, 1.1, 1] : 1 }}
               transition={{ duration: 0.3 }}
+              style={{ fontSize: "0.8rem" }}
             >
               🤖 ${cpuBet}
             </motion.span>
             {currentBet > 0 && (
-              <span className="game-table-current-bet">
+              <span className="game-table-current-bet" style={{ fontSize: "0.8rem" }}>
                 📊 Aposta: ${currentBet}
               </span>
             )}
@@ -428,9 +470,9 @@ const GameTable = memo(function GameTable({
 function tableContainerStyle() {
   return {
     width: "100%",
-    maxWidth: 1000,
+    maxWidth: 900,
     margin: "0 auto",
-    padding: "10px",
+    padding: "2px",
     borderRadius: 60,
     background: "var(--bg-table)",
     boxShadow: "var(--table-shadow)",
@@ -442,9 +484,9 @@ function tableFeltStyle() {
   return {
     background: "var(--bg-felt)",
     borderRadius: 50,
-    padding: "30px 20px",
+    padding: "16px 14px",
     position: "relative",
-    minHeight: 500,
+    minHeight: 340,
     border: "3px solid var(--border-felt)",
     boxShadow: "inset 0 0 60px var(--shadow-felt)",
     transition: "var(--transition-theme)",
@@ -454,11 +496,11 @@ function tableFeltStyle() {
 function dealerAreaStyle() {
   return {
     position: "absolute",
-    top: 10,
+    top: 4,
     left: "50%",
     transform: "translateX(-50%)",
     background: "var(--bg-element)",
-    padding: "6px 24px",
+    padding: "3px 12px",
     borderRadius: 24,
     border: "1px solid var(--border-element)",
     backdropFilter: "blur(8px)",
@@ -466,7 +508,7 @@ function dealerAreaStyle() {
     transition: "var(--transition-theme)",
     display: "flex",
     alignItems: "center",
-    gap: "6px",
+    gap: "3px",
     zIndex: 100,
   };
 }
@@ -474,8 +516,8 @@ function dealerAreaStyle() {
 function cpuAreaStyle() {
   return {
     textAlign: "center",
-    marginBottom: "20px",
-    padding: "10px",
+    marginBottom: "8px",
+    padding: "6px",
     background: "var(--bg-status-item)",
     borderRadius: 20,
     border: "1px solid var(--border-element)",
@@ -487,8 +529,8 @@ function cpuAreaStyle() {
 function playerAreaStyle() {
   return {
     textAlign: "center",
-    marginTop: "20px",
-    padding: "10px",
+    marginTop: "8px",
+    padding: "6px",
     background: "var(--bg-status-item)",
     borderRadius: 20,
     border: "1px solid var(--border-element)",
@@ -500,10 +542,10 @@ function playerAreaStyle() {
 function communityAreaStyle() {
   return {
     textAlign: "center",
-    padding: "15px",
+    padding: "4px",
     background: "rgba(0, 0, 0, 0.10)",
     borderRadius: 25,
-    margin: "10px 0",
+    margin: "3px 0",
     border: "1px solid var(--border-gold)",
     position: "relative",
     transition: "var(--transition-theme)",
@@ -525,10 +567,10 @@ function emptyCardSlotStyle() {
 function potDisplayStyle() {
   return {
     color: "var(--text-white)",
-    fontSize: "1rem",
+    fontSize: "0.8rem",
     fontWeight: "bold",
     background: "var(--bg-pot)",
-    padding: "8px 20px",
+    padding: "4px 10px",
     borderRadius: 20,
     display: "inline-block",
     position: "relative",

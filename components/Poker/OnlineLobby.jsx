@@ -295,6 +295,15 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         roomId: normalizedRoomId,
         playerName: currentUser,
       });
+      
+      // 🔥 APÓS ENTRAR, EMITIR EVENTO PARA VERIFICAR CHAT
+      setTimeout(() => {
+        console.log(`📡 Verificando socket no OnlineLobby após entrar na sala`);
+        if (socketClient.socket) {
+          console.log(`📡 Socket rooms:`, Array.from(socketClient.socket.rooms || []));
+          console.log(`📡 Socket está na sala ${normalizedRoomId}:`, socketClient.socket.rooms?.has(normalizedRoomId));
+        }
+      }, 500);
 
       if (joinTimeoutRef.current) {
         clearTimeout(joinTimeoutRef.current);

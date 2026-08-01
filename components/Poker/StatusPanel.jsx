@@ -1,9 +1,9 @@
-// components/Poker/StatusPanel.jsx
+// components/Poker/StatusPanel.jsx - CORRIGIDO PARA REALTIME
 "use client";
 
-import { motion, AnimatePresence, memo } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
-const StatusPanel = memo(function StatusPanel(props) {
+export default function StatusPanel(props) {
   const {
     stage = "preflop",
     pot = 0,
@@ -17,6 +17,10 @@ const StatusPanel = memo(function StatusPanel(props) {
     winnerMsg = "",
     isTurbo = false,
   } = props || {};
+  
+  // 🔥 FORÇAR RE-RENDER COM KEY
+  const updateKey = `${stage}-${pot}-${currentBet}-${playerBet}-${cpuBet}-${isTurbo}`;
+  
   const statusItems = [
     {
       id: "stage",
@@ -35,13 +39,14 @@ const StatusPanel = memo(function StatusPanel(props) {
 
   return (
     <motion.div
+      key={updateKey}
       className="status-panel"
       style={{
         background: "var(--bg-panel)",
         backdropFilter: "blur(4px)",
         borderRadius: 20,
-        padding: 15,
-        marginTop: 10,
+        padding: 6,
+        marginTop: 4,
         color: "var(--text-primary)",
         border: "1px solid var(--border-gold)",
         transition: "var(--transition-theme)",
@@ -273,6 +278,4 @@ const StatusPanel = memo(function StatusPanel(props) {
       </AnimatePresence>
     </motion.div>
   );
-});
-
-export default StatusPanel;
+}

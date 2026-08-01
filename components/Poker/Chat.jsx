@@ -60,22 +60,15 @@ export default function Chat({
     if (socket) {
       console.log(`📡 Chat: Socket ID: ${socket.id}`);
       console.log(`📡 Chat: Socket type:`, typeof socket);
-      console.log(`📡 Chat: Socket has join:`, typeof socket.join);
       console.log(`📡 Chat: Socket rooms:`, socket.rooms ? Array.from(socket.rooms || []) : "N/A");
       
       // 🔥 VERIFICAR SE ESTÁ NA SALA CORRETA
       const inRoom = socket.rooms && socket.rooms.has(roomId);
       console.log(`📡 Chat: Socket está na sala ${roomId}:`, inRoom);
       
-      // 🔥 SE NÃO ESTIVER NA SALA, TENTAR ENTRAR VIA CLIENT-SIDE
-      if (!inRoom && typeof socket.join === 'function') {
-        console.warn(`⚠️ Chat: Socket NÃO está na sala ${roomId}, tentando entrar via client-side...`);
-        socket.join(roomId);
-        setTimeout(() => {
-          console.log(`📡 Chat: Socket rooms após join:`, socket.rooms ? Array.from(socket.rooms || []) : "N/A");
-        }, 100);
-      } else if (!inRoom) {
-        console.warn(`⚠️ Chat: Socket NÃO está na sala ${roomId} e não tem método join`);
+      if (!inRoom) {
+        console.warn(`⚠️ Chat: Socket NÃO está na sala ${roomId}`);
+        console.warn(`⚠️ Chat: O chat pode não funcionar. Verifique se o socket entrou na sala corretamente.`);
       }
     }
   }, [socket, roomId, playerName]);

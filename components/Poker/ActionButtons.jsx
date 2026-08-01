@@ -89,13 +89,13 @@ export default function ActionButtons({
           className="action-btn-reset"
           style={{
             width: "100%",
-            marginBottom: "10px",
-            padding: "14px 8px",
-            background: "radial-gradient(#f7d97c, #d6a12e)",
+            marginBottom: "8px",
+            padding: "10px 8px",
+            background: "radial-gradient(#fbbf24, #d97706)",
             border: "none",
             borderRadius: "12px",
             fontWeight: "700",
-            fontSize: "0.9rem",
+            fontSize: "0.95rem",
             color: "#2e241f",
             boxShadow: "0 4px 0 #7a4c1a",
             cursor: "pointer",
@@ -104,56 +104,57 @@ export default function ActionButtons({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "10px",
+            gap: "6px",
             transition: "all 0.2s ease",
           }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <span style={{ fontSize: "1.2rem" }}>🔄</span>
+          <span style={{ fontSize: "1rem" }}>🔄</span>
           RENOVAR FICHAS (1000)
         </motion.button>
       )}
 
-      {/* 🔥 BOTÃO NOVA MÃO - SÓ APARECE COM FICHAS */}
-      {showNewHand && (
-        <button
-          onClick={() => {
-            console.log(`🔍 [ActionButtons] Clique NOVA MÃO - playerMoney: ${playerMoney}`);
-            handleAction("new-hand", onNewHand);
-          }}
-          className="action-btn-reset"
-          style={{
-            width: "100%",
-            marginBottom: "10px",
-            padding: "14px 8px",
-            background: "radial-gradient(#f7d97c, #d6a12e)",
-            border: "none",
-            borderRadius: "12px",
-            fontWeight: "700",
-            fontSize: "0.9rem",
-            color: "#2e241f",
-            boxShadow: "0 4px 0 #7a4c1a",
-            cursor: "pointer",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "10px",
-            transition: "all 0.2s ease",
-          }}
-        >
-          <span style={{ fontSize: "1.2rem" }}>🃏</span>
-          NOVA MÃO
-          <span style={{ fontSize: "0.6rem", opacity: 0.7, color: "#2e241f" }}>
-            ({playerMoney} fichas)
-          </span>
-        </button>
-      )}
-
       {/* 🔥 BOTÕES DE AÇÃO - BLOQUEADOS SE disabled OU SEM FICHAS */}
-      <div className="action-buttons-grid">
+      <div className="action-buttons-grid" style={{
+        display: "grid",
+        gridTemplateColumns: showNewHand ? "auto 1fr 1fr 1fr 1fr" : "repeat(4, 1fr)",
+        gap: "3px",
+      }}>
+        {/* Botão NOVA MÃO antes do FOLD */}
+        {showNewHand && (
+          <button
+            onClick={() => {
+              console.log(`🔍 [ActionButtons] Clique NOVA MÃO - playerMoney: ${playerMoney}`);
+              handleAction("new-hand", onNewHand);
+            }}
+            className="action-btn-reset"
+            style={{
+              minHeight: "28px",
+              padding: "3px 6px",
+              background: "radial-gradient(#fbbf24, #d97706)",
+              border: "none",
+              borderRadius: "10px",
+              fontWeight: "700",
+              fontSize: "0.8rem",
+              color: "#2e241f",
+              boxShadow: "0 3px 0 #7a4c1a",
+              cursor: "pointer",
+              textTransform: "uppercase",
+              letterSpacing: "0.3px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "2px",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <span style={{ fontSize: "0.85rem" }}>🃏</span>
+            NOVA MÃO
+          </button>
+        )}
+
+        {/* Botão FOLD */}
         <button
           onClick={() => {
             console.log("🔍 [ActionButtons] Clique FOLD");
@@ -161,6 +162,11 @@ export default function ActionButtons({
           }}
           disabled={disabled || playerMoney <= 0 || isWaitingForNewHand}
           className="action-btn action-btn-fold"
+          style={{
+            minHeight: "28px",
+            fontSize: "0.8rem",
+            padding: "3px 6px",
+          }}
         >
           <span className="action-btn-icon">🏳️</span>
           DESISTIR
@@ -173,6 +179,11 @@ export default function ActionButtons({
           }}
           disabled={disabled || playerMoney <= 0 || isWaitingForNewHand}
           className={`action-btn ${toCall <= 0 ? "action-btn-check" : "action-btn-call"}`}
+          style={{
+            minHeight: "28px",
+            fontSize: "0.8rem",
+            padding: "3px 6px",
+          }}
         >
           <span className="action-btn-icon">{toCall <= 0 ? "✅" : "💰"}</span>
           {toCall <= 0 ? "CHECK" : `PAGAR ${toCall}`}
@@ -185,6 +196,11 @@ export default function ActionButtons({
           }}
           disabled={!canRaise || disabled || playerMoney <= 0 || isWaitingForNewHand}
           className="action-btn action-btn-raise"
+          style={{
+            minHeight: "28px",
+            fontSize: "0.8rem",
+            padding: "3px 6px",
+          }}
         >
           <span className="action-btn-icon">📈</span>
           AUMENTAR {nextRaise}
@@ -197,6 +213,11 @@ export default function ActionButtons({
           }}
           disabled={disabled || playerMoney <= 0 || isWaitingForNewHand}
           className="action-btn action-btn-allin"
+          style={{
+            minHeight: "28px",
+            fontSize: "0.8rem",
+            padding: "3px 6px",
+          }}
         >
           <span className="action-btn-icon">⚡</span>
           ALL-IN
