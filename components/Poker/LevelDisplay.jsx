@@ -423,8 +423,8 @@ function cardStyle() {
     background: "var(--bg-panel)",
     backdropFilter: "blur(4px)",
     borderRadius: 20,
-    padding: 6,
-    marginTop: 4,
+    padding: 15,
+    marginTop: 10,
     color: "var(--text-primary)",
     border: "1px solid var(--border-gold)",
     transition: "var(--transition-theme)",
@@ -455,9 +455,9 @@ function headerStyle() {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "6px",
+    marginBottom: "10px",
     flexWrap: "wrap",
-    gap: "4px",
+    gap: "6px",
   };
 }
 

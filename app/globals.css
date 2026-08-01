@@ -17,56 +17,36 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ====================== SUPORTE PARA VIEWPORT ZOOM ====================== */
-/* Garantir que elementos escalados mantenham proporções */
-.game-table-container,
-.game-table,
-.poker-card,
-.action-btn,
-.status-panel,
-.toolbar-buttons-container,
-.chat-container {
-  max-width: 100% !important;
-  max-height: 100% !important;
-  overflow: visible !important;
-}
-
-/* Evitar que elementos fiquem muito pequenos com o zoom */
-* {
-  min-width: auto !important;
-  min-height: auto !important;
-}
-
-/* ====================== TAMANHOS BASE - FONTES LEGÍVEIS ====================== */
+/* ====================== TAMANHOS BASE REDUZIDOS (AGRESSIVO) ====================== */
 .game-table {
-  max-height: 35vh !important;
-  padding: 3px !important;
+  max-height: 50vh !important;
+  padding: 8px !important;
 }
 
 .poker-card {
-  width: 42px !important;
-  height: 59px !important;
-  font-size: 0.85rem !important;
+  width: 45px !important;
+  height: 63px !important;
+  font-size: 0.75rem !important;
 }
 
 .action-btn {
-  min-height: 36px !important;
-  min-width: 36px !important;
-  font-size: 0.9rem !important;
-  padding: 6px 10px !important;
+  min-height: 40px !important;
+  min-width: 40px !important;
+  font-size: 0.8rem !important;
+  padding: 8px 12px !important;
 }
 
 .status-panel {
-  font-size: 0.8rem !important;
-  padding: 6px 10px !important;
+  font-size: 0.65rem !important;
+  padding: 6px 8px !important;
   margin-top: 5px !important;
 }
 
 .toolbar-buttons-container button {
   min-width: 32px !important;
   min-height: 32px !important;
-  font-size: 0.85rem !important;
-  padding: 5px 8px !important;
+  font-size: 0.7rem !important;
+  padding: 4px 6px !important;
 }
 
 /* 🔥 HEADER RESPONSIVO */
@@ -74,13 +54,12 @@ header, .header-container {
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
-  flex-shrink: 0 !important;
 }
 
 @media (max-width: 480px) {
   header, .header-container {
-    padding: 5px 8px !important;
-    font-size: 0.8rem !important;
+    padding: 6px 10px !important;
+    font-size: 0.75rem !important;
   }
 }
 
@@ -94,7 +73,7 @@ body {
 /* 🔥 GARANTIR QUE O TOPO SEJA VISÍVEL */
 main {
   padding-top: 0;
-  padding-bottom: 5px;
+  padding-bottom: 10px;
   min-height: 100vh;
   margin: 0;
   width: 100%;
@@ -218,22 +197,22 @@ main {
   
   .game-table {
     width: 100vw !important;
-    max-height: 35vh !important;
-    padding: 4px !important;
+    max-height: 40vh !important;
+    padding: 5px !important;
     border-radius: 0 !important;
   }
   
   .poker-card {
-    width: 35px !important;
-    height: 49px !important;
-    font-size: 0.8rem !important;
+    width: 32px !important;
+    height: 45px !important;
+    font-size: 0.5rem !important;
   }
   
   .action-btn {
     min-height: 32px !important;
     min-width: 32px !important;
-    font-size: 0.85rem !important;
-    padding: 6px 10px !important;
+    font-size: 0.55rem !important;
+    padding: 4px 6px !important;
   }
   
   .action-buttons-grid {
@@ -242,8 +221,8 @@ main {
   }
   
   .status-panel {
-    font-size: 0.45rem !important;
-    padding: 2px 4px !important;
+    font-size: 0.5rem !important;
+    padding: 3px 5px !important;
   }
   
   .toolbar-buttons-container button {
@@ -273,22 +252,22 @@ main {
   
   .game-table {
     width: 100vw !important;
-    max-height: 38vh !important;
-    padding: 5px !important;
+    max-height: 45vh !important;
+    padding: 6px !important;
     border-radius: 0 !important;
   }
   
   .poker-card {
     width: 38px !important;
     height: 53px !important;
-    font-size: 0.85rem !important;
+    font-size: 0.65rem !important;
   }
   
   .action-btn {
-    min-height: 34px !important;
-    min-width: 34px !important;
-    font-size: 0.9rem !important;
-    padding: 7px 10px !important;
+    min-height: 36px !important;
+    min-width: 36px !important;
+    font-size: 0.65rem !important;
+    padding: 5px 7px !important;
   }
   
   .action-buttons-grid {
@@ -297,8 +276,8 @@ main {
   }
   
   .status-panel {
-    font-size: 0.5rem !important;
-    padding: 3px 4px !important;
+    font-size: 0.6rem !important;
+    padding: 4px 6px !important;
   }
   
   .toolbar-buttons-container button {
@@ -328,21 +307,21 @@ main {
   
   .game-table {
     width: 100vw !important;
-    max-height: 38vh !important;
-    padding: 6px !important;
+    max-height: 42vh !important;
+    padding: 7px !important;
   }
   
   .poker-card {
-    width: 42px !important;
-    height: 59px !important;
-    font-size: 0.9rem !important;
+    width: 40px !important;
+    height: 56px !important;
+    font-size: 0.7rem !important;
   }
   
   .action-btn {
-    min-height: 36px !important;
-    min-width: 36px !important;
-    font-size: 0.95rem !important;
-    padding: 8px 12px !important;
+    min-height: 38px !important;
+    min-width: 38px !important;
+    font-size: 0.7rem !important;
+    padding: 6px 8px !important;
   }
   
   .action-buttons-grid {
@@ -364,27 +343,27 @@ main {
   }
   
   .game-table {
-    max-height: 40vh !important;
+    max-height: 48vh !important;
     padding: 8px !important;
   }
   
   .poker-card {
     width: 45px !important;
     height: 63px !important;
-    font-size: 0.95rem !important;
+    font-size: 0.75rem !important;
   }
   
   .action-btn {
     min-height: 38px !important;
     min-width: 38px !important;
-    font-size: 0.95rem !important;
-    padding: 8px 12px !important;
+    font-size: 0.75rem !important;
+    padding: 6px 9px !important;
   }
   
   header, .header-container {
-    padding: 6px 14px !important;
-    font-size: 0.9rem !important;
-    gap: 8px !important;
+    padding: 7px 14px !important;
+    font-size: 0.85rem !important;
+    gap: 10px !important;
   }
 }
 
@@ -395,26 +374,26 @@ main {
   }
   
   .game-table {
-    max-height: 42vh !important;
+    max-height: 50vh !important;
     padding: 10px !important;
   }
   
   .poker-card {
     width: 50px !important;
     height: 70px !important;
-    font-size: 1rem !important;
+    font-size: 0.8rem !important;
   }
   
   .action-btn {
-    min-height: 42px !important;
-    min-width: 42px !important;
-    font-size: 1rem !important;
-    padding: 10px 14px !important;
+    min-height: 40px !important;
+    min-width: 40px !important;
+    font-size: 0.8rem !important;
+    padding: 7px 11px !important;
   }
   
   header, .header-container {
-    padding: 8px 16px !important;
-    font-size: 0.95rem !important;
+    padding: 8px 15px !important;
+    font-size: 0.9rem !important;
     gap: 10px !important;
   }
 }
@@ -513,33 +492,33 @@ main {
 
 /* ====================== VARIÁVEIS DE TEMA ====================== */
 :root {
-  /* 🔥 TEMA ESCURO PROFISSIONAL - BASEADO EM DESIGN MODERNO */
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-card: rgba(30, 41, 59, 0.95);
-  --bg-table: #1e293b;
-  --bg-felt: #0f766e;
-  --bg-modal: #1e293b;
-  --bg-header: rgba(30, 41, 59, 0.95);
-  --bg-input: rgba(15, 23, 42, 0.5);
-  --bg-button: rgba(51, 65, 85, 0.9);
-  --bg-panel: rgba(30, 41, 59, 0.95);
-  --bg-status-item: rgba(255, 255, 255, 0.08);
-  --bg-pot: rgba(15, 23, 42, 0.6);
-  --bg-element: rgba(255, 255, 255, 0.1);
+  /* 🔥 TEMA ESCURO (PADRÃO) */
+  --bg-primary: #0a2f1f;
+  --bg-secondary: #1a3a2a;
+  --bg-card: rgba(26, 42, 30, 0.85);
+  --bg-table: #1a3a1a;
+  --bg-felt: #1a6a3a;
+  --bg-modal: #1a3a2a;
+  --bg-header: rgba(44, 46, 43, 0.87);
+  --bg-input: rgba(0,0,0,0.3);
+  --bg-button: rgba(30, 27, 20, 0.8);
+  --bg-panel: rgba(26, 42, 30, 0.85);
+  --bg-status-item: rgba(255, 255, 255, 0.05);
+  --bg-pot: rgba(0, 0, 0, 0.25);
+  --bg-element: rgba(255, 255, 255, 0.08);
   
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --text-dark: #0f172a;
-  --text-white: #f1f5f9;
-  --text-black: #0f172a;
+  --text-primary: #ffffff;
+  --text-secondary: #ffefb9;
+  --text-muted: #aaaaaa;
+  --text-dark: #1a2a1f;
+  --text-white: #ffffff;
+  --text-black: #0d1f15;
   
-  --border-gold: rgba(251, 191, 36, 0.3);
-  --border-light: rgba(255,255,255,0.1);
-  --border-input: rgba(251, 191, 36, 0.4);
-  --border-felt: #0d9488;
-  --border-element: rgba(255,255,255,0.15);
+  --border-gold: rgba(255,215,0,0.2);
+  --border-light: rgba(255,255,255,0.05);
+  --border-input: rgba(255,215,0,0.3);
+  --border-felt: #2a2a1a;
+  --border-element: rgba(255,255,255,0.08);
   
   --shadow-dark: rgba(0,0,0,0.5);
   --shadow-light: rgba(0,0,0,0.3);
@@ -547,51 +526,51 @@ main {
   --shadow-chip: rgba(0,0,0,0.3);
   --shadow-element: rgba(0,0,0,0.2);
   
-  --gold: #fbbf24;
-  --gold-dim: rgba(251, 191, 36, 0.15);
-  --green: #22c55e;
-  --red: #ef4444;
-  --orange: #f97316;
-  --blue: #3b82f6;
+  --gold: #ffd700;
+  --gold-dim: rgba(255,215,0,0.15);
+  --green: #4caf50;
+  --red: #f44336;
+  --orange: #ff9800;
+  --blue: #2196f3;
   
-  --card-shadow: 0 4px 12px rgba(0,0,0,0.4);
-  --modal-shadow: 0 25px 50px rgba(0,0,0,0.7);
-  --table-shadow: 0 25px 50px rgba(0,0,0,0.5);
+  --card-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --modal-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  --table-shadow: 0 30px 40px rgba(0,0,0,0.5);
   
-  --bg-empty-card: rgba(255,255,255,0.05);
-  --border-empty-card: rgba(255,255,255,0.1);
+  --bg-empty-card: rgba(255,255,255,0.02);
+  --border-empty-card: rgba(255,255,255,0.05);
   
   --transition-theme: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* 🔥 TEMA CLARO PROFISSIONAL - DESIGN LIMPO E MODERNO */
+/* 🔥 TEMA CLARO - FUNDO BRANCO PURO COM MELHOR CONTRASTE */
 [data-theme="light"] {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
+  --bg-primary: #f8faf9;
+  --bg-secondary: #f0f4f2;
   --bg-card: rgba(255, 255, 255, 0.98);
-  --bg-table: #e2e8f0;
-  --bg-felt: #0d9488;
-  --bg-modal: #f8fafc;
+  --bg-table: #e5efe9;
+  --bg-felt: #1e8a5a;
+  --bg-modal: #f8faf9;
   --bg-header: rgba(255, 255, 255, 0.98);
   --bg-input: rgba(255, 255, 255, 0.95);
   --bg-button: rgba(255, 255, 255, 0.95);
   --bg-panel: rgba(255, 255, 255, 0.98);
-  --bg-status-item: rgba(255, 255, 255, 0.9);
-  --bg-pot: rgba(255, 255, 255, 0.95);
-  --bg-element: rgba(255, 255, 255, 0.9);
+  --bg-status-item: rgba(255, 255, 255, 0.95);
+  --bg-pot: rgba(255, 255, 255, 0.98);
+  --bg-element: rgba(255, 255, 255, 0.95);
   
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #64748b;
-  --text-dark: #0f172a;
-  --text-white: #0f172a;
-  --text-black: #0f172a;
+  --text-primary: #0a2f1f;
+  --text-secondary: #1a4a3a;
+  --text-muted: #4a6a5a;
+  --text-dark: #0a2f1f;
+  --text-white: #0a2f1f;
+  --text-black: #0a2f1f;
   
-  --border-gold: rgba(251, 191, 36, 0.4);
-  --border-light: rgba(15, 23, 42, 0.1);
-  --border-input: rgba(251, 191, 36, 0.4);
-  --border-felt: #0f766e;
-  --border-element: rgba(15, 23, 42, 0.15);
+  --border-gold: rgba(26, 74, 58, 0.3);
+  --border-light: rgba(26, 74, 58, 0.15);
+  --border-input: rgba(26, 74, 58, 0.3);
+  --border-felt: #0f5a3a;
+  --border-element: rgba(26, 74, 58, 0.2);
   
   --shadow-dark: rgba(0, 0, 0, 0.18);
   --shadow-light: rgba(0, 0, 0, 0.12);
@@ -599,15 +578,15 @@ main {
   --shadow-chip: rgba(0, 0, 0, 0.2);
   --shadow-element: rgba(0, 0, 0, 0.15);
   
-  --gold: #d97706;
-  --gold-dim: rgba(217, 119, 6, 0.15);
+  --gold: #1a4a3a;
+  --gold-dim: rgba(26, 74, 58, 0.15);
   
-  --card-shadow: 0 8px 24px rgba(0,0,0,0.15);
-  --modal-shadow: 0 35px 90px rgba(0,0,0,0.3);
-  --table-shadow: 0 30px 60px rgba(0,0,0,0.2);
+  --card-shadow: 0 6px 16px rgba(0,0,0,0.15);
+  --modal-shadow: 0 30px 80px rgba(0,0,0,0.3);
+  --table-shadow: 0 40px 60px rgba(0,0,0,0.2);
   
   --bg-empty-card: rgba(255, 255, 255, 0.95);
-  --border-empty-card: rgba(15, 23, 42, 0.2);
+  --border-empty-card: rgba(26, 74, 58, 0.3);
 }
 
 /* ====================== APLICAÇÃO DAS VARIÁVEIS ====================== */
@@ -1040,8 +1019,8 @@ body {
 /* 🔥 Container da Toolbar */
 .toolbar-buttons-container {
   position: fixed;
-  top: 85px;
-  right: 15px;
+  top: 70px;
+  right: 10px;
   z-index: 100;
   display: flex;
   flex-direction: column;

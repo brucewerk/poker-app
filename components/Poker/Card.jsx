@@ -48,9 +48,9 @@ const Card = memo(function Card({
 
   // 🔥 CORRIGIDO: Garantir que todos os tamanhos tenham valores definidos
   const sizeMap = {
-    small: { width: 40, height: 56, fontSize: "0.95rem", suitSize: "1.1rem" },
-    normal: { width: 48, height: 67, fontSize: "1rem", suitSize: "1.2rem" },
-    large: { width: 55, height: 77, fontSize: "1.1rem", suitSize: "1.3rem" },
+    small: { width: 50, height: 70, fontSize: "0.8rem", suitSize: "0.9rem" },
+    normal: { width: 60, height: 84, fontSize: "0.9rem", suitSize: "1rem" },
+    large: { width: 70, height: 98, fontSize: "1rem", suitSize: "1.2rem" },
   };
 
   // 🔥 CORRIGIDO: Fallback para "normal" se o size não existir

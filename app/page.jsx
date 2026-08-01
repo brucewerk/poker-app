@@ -2241,7 +2241,7 @@ function resetSession() {
           display: "flex",
           justifyContent: "center",
           fontFamily: "'Segoe UI','Poppins',system-ui,sans-serif",
-          padding: "8px 12px",
+          padding: "8px 15px",
           userSelect: "none",
           position: "relative",
           transition: "var(--transition-theme)",
@@ -2253,12 +2253,12 @@ function resetSession() {
           <div
             style={{
               position: "fixed",
-              top: 4,
-              right: 4,
+              top: 8,
+              right: 8,
               zIndex: 100,
               display: "flex",
               alignItems: "center",
-              gap: "6px",
+              gap: "8px",
             }}
           >
             <motion.button
@@ -2267,12 +2267,12 @@ function resetSession() {
                 background: "rgba(200,50,50,0.8)",
                 color: "white",
                 border: "none",
-                padding: "4px 8px",
+                padding: "6px 12px",
                 borderRadius: 20,
                 cursor: "pointer",
                 fontWeight: "bold",
                 backdropFilter: "blur(4px)",
-                fontSize: "0.7rem",
+                fontSize: "0.8rem",
               }}
               whileHover={{ scale: 1.05, background: "rgba(200,50,50,0.95)" }}
               whileTap={{ scale: 0.95 }}
@@ -2368,10 +2368,10 @@ function resetSession() {
             borderRadius: 50,
             boxShadow:
               "var(--table-shadow), inset 0 2px 5px rgba(255,255,255,0.2)",
-            padding: "10px 14px",
+            padding: "15px 20px",
             maxWidth: 1600,
             width: "100%",
-            marginTop: "3px",
+            marginTop: "5px",
             transition: "var(--transition-theme)",
           }}
           initial={{ opacity: 0, scale: 0.97 }}
@@ -2382,7 +2382,7 @@ function resetSession() {
             style={{
               background: "rgba(0,20,0,0.3)",
               borderRadius: 40,
-              padding: "3px 5px",
+              padding: "12px 15px",
             }}
           >
             <div
@@ -2393,10 +2393,10 @@ function resetSession() {
                 background: "var(--bg-header)",
                 backdropFilter: "blur(8px)",
                 borderRadius: 50,
-                padding: "6px 12px",
-                marginBottom: 10,
+                padding: "8px 15px",
+                marginBottom: 15,
                 flexWrap: "wrap",
-                gap: 6,
+                gap: 8,
                 transition: "var(--transition-theme)",
               }}
             >
@@ -2415,7 +2415,7 @@ function resetSession() {
                   key={`header-${i}-${icon}`}
                   style={{
                     background: "var(--bg-button)",
-                    padding: "6px 12px",
+                    padding: "4px 12px",
                     borderRadius: 40,
                     color: "var(--text-primary)",
                     fontWeight: "bold",
@@ -2493,8 +2493,8 @@ function resetSession() {
                 </>
               )}
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ flex: 3, minWidth: 300 }}>
+            <div style={{ display: "flex", gap: 15, flexWrap: "wrap" }}>
+              <div style={{ flex: 3, minWidth: 280 }}>
                 {g && (
                   <GameTable
                     communityCards={g?.community || []}
@@ -2562,12 +2562,12 @@ function resetSession() {
                       background: "rgba(0,0,0,0.7)",
                       backdropFilter: "blur(12px)",
                       borderRadius: 40,
-                      padding: "3px 8px",
+                      padding: "6px 15px",
                       textAlign: "center",
                       fontWeight: "bold",
-                      fontSize: "0.6rem",
+                      fontSize: "0.85rem",
                       color: "#ffd966",
-                      marginTop: 5,
+                      marginTop: 12,
                       border: "1px solid rgba(255,215,0,0.3)",
                       textShadow: "0 1px 2px rgba(0,0,0,0.3)",
                     }}
@@ -2582,43 +2582,23 @@ function resetSession() {
                   style={{
                     textAlign: "center",
                     marginTop: 12,
-                    fontSize: "0.85rem",
-                    color: "var(--text-primary)",
-                    fontWeight: "600",
+                    fontSize: "0.7rem",
+                    color: "var(--text-muted)",
+                    textShadow: "1px 1px 0 #2a1f0e",
                     transition: "var(--transition-theme)",
-                    padding: "6px 12px",
-                    background: "rgba(0,0,0,0.2)",
-                    borderRadius: "14px",
-                    backdropFilter: "blur(4px)",
                   }}
                 >
-                  Desenvolvido por{" "}
-                  <a
-                    href="https://klingklang.free.nf"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      color: "#fbbf24",
-                      textDecoration: "none",
-                      fontWeight: "700",
-                      borderBottom: "1px dotted #fbbf24",
-                      padding: "0 3px",
-                    }}
-                  >
-                    BruCe
-                  </a>{" "}
-                  - 2026
+                  Desenvolvido por BruCe - 2026
                 </div>
               </div>
 
               <div
                 style={{
                   flex: 1,
-                  minWidth: 160,
-                  maxWidth: 220,
+                  minWidth: 220,
                   display: "flex",
                   flexDirection: "column",
-                  gap: 4,
+                  gap: 8,
                 }}
               >
                 {g && (

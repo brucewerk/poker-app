@@ -459,8 +459,8 @@ function panelStyle() {
     background: "var(--bg-panel)",
     backdropFilter: "blur(4px)",
     borderRadius: 20,
-    padding: 6,
-    marginTop: 4,
+    padding: 15,
+    marginTop: 10,
     color: "var(--text-primary)",
     border: "1px solid var(--border-gold)",
     transition: "var(--transition-theme)",
@@ -473,7 +473,7 @@ function headerStyle() {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "4px",
+    marginBottom: "10px",
   };
 }
 
@@ -510,7 +510,7 @@ function statsGridStyle() {
 function statItemStyle() {
   return {
     background: "var(--bg-status-item, rgba(255,255,255,0.05))",
-    padding: "4px",
+    padding: "8px",
     borderRadius: 10,
     textAlign: "center",
     border: "1px solid var(--border-light)",
@@ -541,8 +541,8 @@ function statValueStyle(color = "gold") {
 
 function detailsStyle() {
   return {
-    marginTop: "6px",
-    padding: "6px",
+    marginTop: "10px",
+    padding: "10px",
     background: "rgba(0,0,0,0.3)",
     borderRadius: 10,
     transition: "var(--transition-theme)",
@@ -570,7 +570,7 @@ function detailValueStyle() {
 
 function advancedToggleStyle() {
   return {
-    marginTop: "6px",
+    marginTop: "8px",
     textAlign: "center",
   };
 }
@@ -590,8 +590,8 @@ function advancedButtonStyle() {
 
 function advancedStatsStyle() {
   return {
-    marginTop: "6px",
-    padding: "6px",
+    marginTop: "8px",
+    padding: "8px",
     background: "rgba(0,0,0,0.2)",
     borderRadius: 10,
     transition: "var(--transition-theme)",
@@ -652,8 +652,8 @@ function advancedDescStyle() {
 
 function chartSectionStyle() {
   return {
-    marginTop: "6px",
-    padding: "6px",
+    marginTop: "8px",
+    padding: "8px",
     background: "rgba(255,255,255,0.03)",
     borderRadius: 8,
   };
@@ -778,8 +778,8 @@ function monthlyLabelStyle() {
 
 function achievementsStyle() {
   return {
-    marginTop: "6px",
-    paddingTop: "6px",
+    marginTop: "10px",
+    paddingTop: "10px",
     borderTop: "1px solid rgba(255,215,0,0.2)",
   };
 }
