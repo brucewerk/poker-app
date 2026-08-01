@@ -136,7 +136,7 @@ const GameTable = memo(function GameTable({
       initial="idle"
     >
       <div className="game-table-felt" style={tableFeltStyle()}>
-        {/* Área do dealer com Turbo integrado ao lado direito */}
+        {/* Área do dealer centralizada, com Turbo flutuando ao lado direito */}
         <div className="game-table-dealer" style={dealerAreaStyle()}>
           <motion.span
             className="game-table-dealer-text"
@@ -150,20 +150,7 @@ const GameTable = memo(function GameTable({
           </motion.span>
           {isTurbo && (
             <motion.span
-              style={{
-                marginLeft: "12px",
-                padding: "2px 12px",
-                borderRadius: "12px",
-                background: "rgba(255, 152, 0, 0.2)",
-                border: "1px solid rgba(255, 152, 0, 0.3)",
-                color: "#ff9800",
-                fontSize: "0.55rem",
-                fontWeight: "700",
-                letterSpacing: "0.5px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
+              style={turboBadgeStyle()}
               animate={{
                 scale: [1, 1.08, 1],
                 opacity: [0.7, 1, 0.7],
@@ -466,8 +453,33 @@ function dealerAreaStyle() {
     transition: "var(--transition-theme)",
     display: "flex",
     alignItems: "center",
-    gap: "6px",
+    justifyContent: "center",
+    textAlign: "center",
+    whiteSpace: "nowrap",
     zIndex: 100,
+  };
+}
+
+function turboBadgeStyle() {
+  return {
+    position: "absolute",
+    left: "100%",
+    top: "50%",
+    transform: "translateY(-50%)",
+    marginLeft: "10px",
+    padding: "2px 12px",
+    borderRadius: "12px",
+    background: "rgba(255, 215, 0, 0.15)",
+    border: "1px solid rgba(255, 215, 0, 0.35)",
+    color: "#ffd700",
+    fontSize: "0.55rem",
+    fontWeight: "700",
+    letterSpacing: "0.5px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    whiteSpace: "nowrap",
+    textShadow: "0 1px 3px rgba(0,0,0,0.35)",
   };
 }
 

@@ -264,6 +264,11 @@ body {
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
   background: var(--bg-element);
   padding: 6px 24px;
   border-radius: 24px;
@@ -635,13 +640,13 @@ body {
   top: 50%;
   right: 20px;
   transform: translateY(-50%);
-  color: var(--text-white);
+  color: #ffd700;
   font-size: 0.7rem;
   font-weight: 600;
-  background: var(--bg-element);
+  background: rgba(255, 215, 0, 0.15);
   padding: 4px 14px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 152, 0, 0.2);
+  border: 1px solid rgba(255, 215, 0, 0.35);
   backdrop-filter: blur(4px);
   box-shadow: 0 2px 6px var(--shadow-element);
   transition: var(--transition-theme);
