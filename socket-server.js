@@ -1,17 +1,11 @@
-// socket-server.js - COMPLETO CORRIGIDO (SALVAMENTO DE FICHAS NO MULTIPLAYER)
+// socket-server.js
 const { Server } = require("socket.io");
 
 // ====================== ESTADO ======================
 const rooms = new Map();
-const onlineUsers = new Map();
 
 function generateRoomId() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let result = "";
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
 function createDeck() {
@@ -169,51 +163,6 @@ async function saveChipsToDatabase(playerName, chips) {
   }
 }
 
-// 🔥 ESTATÍSTICAS E HISTÓRICO GLOBAIS — para que o multiplayer online
-// alimente os MESMOS dados do modo CPU (fichas, estatísticas e histórico
-// são únicos por conta, independente do modo de jogo).
-async function updateStatsInDatabase(playerName, result, chips, handName, wasAllIn) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/public/update-stats`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: playerName,
-        result,
-        chips,
-        handName,
-        wasAllIn: !!wasAllIn,
-      }),
-    });
-    const data = await response.json();
-    if (!data.success) {
-      console.log(`⚠️ Falha ao atualizar estatísticas de ${playerName}: ${data.error}`);
-    }
-    return data.success === true;
-  } catch (error) {
-    console.error(`❌ Erro ao atualizar estatísticas de ${playerName}:`, error.message);
-    return false;
-  }
-}
-
-async function saveHandHistoryToDatabase(playerName, handData) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/public/save-hand-history`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: playerName, handData }),
-    });
-    const data = await response.json();
-    if (!data.success) {
-      console.log(`⚠️ Falha ao salvar histórico de ${playerName}: ${data.error}`);
-    }
-    return data.success === true;
-  } catch (error) {
-    console.error(`❌ Erro ao salvar histórico de ${playerName}:`, error.message);
-    return false;
-  }
-}
-
 // ====================== FUNÇÃO PARA CLONAR GAMESTATE ======================
 function sanitizeGameState(gameState) {
   if (!gameState) return null;
@@ -234,7 +183,6 @@ function sanitizeGameState(gameState) {
           isActive: p.isActive,
           hasActed: p.hasActed,
           hasClosedSummary: p.hasClosedSummary || false,
-          position: p.position || 0,
         }))
       : [],
     pot: gameState.pot,
@@ -245,151 +193,32 @@ function sanitizeGameState(gameState) {
     lastRaiser: gameState.lastRaiser,
     roundStartIndex: gameState.roundStartIndex,
     bettingRoundComplete: gameState.bettingRoundComplete,
-    smallBlind: gameState.smallBlind || 25,
-    bigBlind: gameState.bigBlind || 50,
-    chatMessages: gameState.chatMessages || [],
   };
 }
-
-// ====================== LIMPEZA DE SALAS DE CONVITE ======================
-function cleanupInviteRooms() {
-  let removed = 0;
-  const now = Date.now();
-  
-  for (const [roomId, room] of rooms) {
-    if (roomId.startsWith("ROOM_INVITE_")) {
-      const isEmpty = !room.players || room.players.length === 0;
-      const isInactive = room.lastActivity && (now - room.lastActivity > 60000);
-      const hasNoGame = !room.gameState;
-      
-      if (isEmpty || (isInactive && hasNoGame)) {
-        const reason = isEmpty ? 'vazia' : 'inativa';
-        const message = reason === 'vazia' 
-          ? `🏠 Sala ${roomId} foi fechada (sem jogadores)`
-          : `⏰ Sala ${roomId} foi fechada por inatividade`;
-          
-        const creator = room.createdBy || (room.players && room.players.length > 0 ? room.players[0]?.name : null);
-        if (creator) {
-          for (const [id, user] of onlineUsers) {
-            if (user.username === creator) {
-              user.socket.emit("chat-message", {
-                player: "Sistema",
-                message: message,
-                timestamp: Date.now(),
-                isSystem: true,
-              });
-              break;
-            }
-          }
-        }
-        
-        if (room.players && room.players.length > 0) {
-          room.players.forEach((player) => {
-            if (player && player.name && player.name !== creator) {
-              for (const [id, user] of onlineUsers) {
-                if (user.username === player.name) {
-                  user.socket.emit("chat-message", {
-                    player: "Sistema",
-                    message: `🏠 A sala ${roomId} foi fechada${reason === 'vazia' ? ' (sem jogadores)' : ' (inatividade)'}`,
-                    timestamp: Date.now(),
-                    isSystem: true,
-                  });
-                  break;
-                }
-              }
-            }
-          });
-        }
-        
-        rooms.delete(roomId);
-        removed++;
-        console.log(`🗑️ Sala de convite ${roomId} removida (${reason}) - Notificações enviadas`);
-      }
-    }
-  }
-  
-  if (removed > 0) {
-    broadcastRoomList();
-  }
-}
-
-setInterval(cleanupInviteRooms, 15000);
 
 // ====================== BROADCAST LISTA DE SALAS ======================
 async function broadcastRoomList() {
   const roomList = [];
 
-  console.log(`📡 Broadcast room-list: ${rooms.size} salas no total`);
-
   for (const [roomId, room] of rooms) {
-    if (!room || !room.players || room.players.length === 0) {
-      if (room && room.players && room.players.length === 0) {
-        rooms.delete(roomId);
-        console.log(`🗑️ Sala ${roomId} removida (vazia)`);
-      }
-      continue;
-    }
-
-    const isInviteRoom = roomId.startsWith("ROOM_INVITE_");
-    const hasGameState = !!room.gameState;
-    const allPlayersLeft = room.players.length === 0;
-
-    if (isInviteRoom && (allPlayersLeft || !hasGameState)) {
-      const activePlayers = room.players.filter((p) => p.id && p.name);
-      if (activePlayers.length === 0) {
-        rooms.delete(roomId);
-        console.log(`🗑️ Sala de convite ${roomId} removida (inativa)`);
-        continue;
-      }
-    }
-
-    if (room.lastActivity) {
-      const inactiveTime = Date.now() - room.lastActivity;
-      // 🔥 Aumentar timeout para 2 horas para não fechar salas ativas
-      if (inactiveTime > 2 * 60 * 60 * 1000) {
-        rooms.delete(roomId);
-        console.log(`🗑️ Sala ${roomId} removida (inativa por 2h+)`);
-        continue;
-      }
-    }
-
     const updatedPlayers = [];
     for (const player of room.players) {
-      if (!player || !player.name) continue;
-      try {
-        const currentChips = await getChipsFromDatabase(player.name);
-        player.chips = currentChips;
-        updatedPlayers.push({
-          name: player.name,
-          chips: currentChips,
-          isReady: player.isReady || false,
-        });
-      } catch (error) {
-        updatedPlayers.push({
-          name: player.name,
-          chips: player.chips || 1000,
-          isReady: player.isReady || false,
-        });
-      }
+      const currentChips = await getChipsFromDatabase(player.name);
+      updatedPlayers.push({
+        name: player.name,
+        chips: currentChips,
+      });
+      player.chips = currentChips;
     }
 
     roomList.push({
       roomId: roomId,
       players: updatedPlayers,
-      playerCount: updatedPlayers.length,
-      maxPlayers: room.maxPlayers || 6,
+      playerCount: room.players.length,
+      maxPlayers: 4,
       isGameActive: !!room.gameState,
-      hasAvailableSlot: updatedPlayers.length < (room.maxPlayers || 6),
-      isInviteRoom: isInviteRoom,
     });
   }
-
-  console.log(`📡 Enviando ${roomList.length} salas para todos os clientes`);
-  roomList.forEach((room) => {
-    console.log(
-      `  🏠 ${room.roomId} - ${room.playerCount}/${room.maxPlayers} jogadores${room.isInviteRoom ? ' [CONVITE]' : ''}`,
-    );
-  });
 
   io.emit("room-list", roomList);
 }
@@ -398,183 +227,15 @@ async function broadcastRoomList() {
 io.on("connection", (socket) => {
   console.log(`🟢 Conectado: ${socket.id}`);
 
-  // ====================== AMIGO ONLINE ======================
-  socket.on("friend-online", (data) => {
-    const { username } = data;
-    if (!username) return;
-
-    console.log(`🟢 ${username} está online (socket: ${socket.id})`);
-
-    let oldId = null;
-    for (const [id, user] of onlineUsers) {
-      if (user.username === username) {
-        oldId = id;
-        break;
-      }
-    }
-    if (oldId) {
-      onlineUsers.delete(oldId);
-    }
-
-    onlineUsers.set(socket.id, { username, socket });
-
-    const onlineList = Array.from(onlineUsers.values()).map((u) => u.username);
-    console.log(
-      `📡 Broadcast friends-online: ${onlineList.length} usuários online`,
-    );
-    io.emit("friends-online", { online: onlineList });
-  });
-
-  // ====================== CONVITE EM GRUPO ======================
-  socket.on("group-invite", (data) => {
-    const { inviteId, from, players, message, roomId } = data;
-    console.log(`📤 ${from} convidou ${players.length} amigos:`, players);
-
-    const finalRoomId = roomId || `ROOM_INVITE_${inviteId}`;
-
-    let sentCount = 0;
-    for (const [id, user] of onlineUsers) {
-      if (players.includes(user.username)) {
-        user.socket.emit("group-invite", {
-          inviteId,
-          from,
-          players,
-          message,
-          roomId: finalRoomId,
-          timestamp: Date.now(),
-        });
-        sentCount++;
-      }
-    }
-
-    socket.emit("invite-sent", {
-      success: true,
-      players: players,
-      sentCount: sentCount,
-      roomId: finalRoomId,
-    });
-
-    console.log(`✅ ${sentCount} convites enviados para a sala ${finalRoomId}`);
-  });
-
-  // ====================== ACEITAR CONVITE ======================
-  socket.on("accept-invite", (data) => {
-    const { inviteId, from } = data;
-    console.log(`✅ ${from} aceitou o convite ${inviteId}`);
-
-    const roomId = `ROOM_INVITE_${inviteId}`;
-    const room = rooms.get(roomId);
-    if (room) {
-      const creator = room.createdBy || (room.players && room.players.length > 0 ? room.players[0]?.name : null);
-      if (creator && creator !== from) {
-        for (const [id, user] of onlineUsers) {
-          if (user.username === creator) {
-            user.socket.emit("chat-message", {
-              player: "Sistema",
-              message: `✅ ${from} aceitou o convite! Entrando na sala...`,
-              timestamp: Date.now(),
-              isSystem: true,
-            });
-            break;
-          }
-        }
-      }
-    }
-
-    io.emit("invite-accepted", {
-      inviteId,
-      from,
-      timestamp: Date.now(),
-    });
-  });
-
-  // ====================== RECUSAR CONVITE ======================
-  socket.on("decline-invite", (data) => {
-    const { inviteId, from } = data;
-    console.log(`❌ ${from} recusou o convite ${inviteId}`);
-
-    const roomId = `ROOM_INVITE_${inviteId}`;
-    const room = rooms.get(roomId);
-    
-    if (room) {
-      const creator = room.createdBy || (room.players && room.players.length > 0 ? room.players[0]?.name : null);
-      if (creator && creator !== from) {
-        for (const [id, user] of onlineUsers) {
-          if (user.username === creator) {
-            user.socket.emit("chat-message", {
-              player: "Sistema",
-              message: `❌ ${from} recusou o convite - Sala ${roomId} removida`,
-              timestamp: Date.now(),
-              isSystem: true,
-            });
-            break;
-          }
-        }
-      }
-      
-      rooms.delete(roomId);
-      console.log(`🗑️ Sala de convite ${roomId} removida (recusada)`);
-      
-      broadcastRoomList();
-    }
-
-    io.emit("invite-declined", {
-      inviteId,
-      from,
-      timestamp: Date.now(),
-    });
-  });
-
-  // ====================== MENSAGEM PRIVADA ======================
-  socket.on("private-message", (data) => {
-    const { to, from, message } = data;
-    console.log(`💬 ${from} -> ${to}: ${message}`);
-
-    for (const [id, user] of onlineUsers) {
-      if (user.username === to) {
-        user.socket.emit("private-message", {
-          from,
-          message,
-          timestamp: Date.now(),
-        });
-        break;
-      }
-    }
-  });
-
-  // ====================== LISTAR SALAS ======================
   socket.on("list-rooms", async () => {
-    console.log(`📡 Cliente ${socket.id} solicitou lista de salas`);
     await broadcastRoomList();
   });
 
-  // ====================== CRIAR SALA ======================
   socket.on("create-room", async (data) => {
-    const {
-      playerName,
-      maxPlayers = 6,
-      invitedPlayers = [],
-      roomId: customRoomId,
-    } = data;
-
-    console.log(`📤 create-room recebido de ${socket.id}:`, { playerName, maxPlayers, customRoomId });
-
-    let roomId = customRoomId;
-    if (!roomId) {
-      roomId = generateRoomId();
-    }
-
-    roomId = roomId.toUpperCase();
-    console.log(`📋 RoomId normalizado: ${roomId}`);
-
-    if (rooms.has(roomId)) {
-      console.log(`❌ Sala ${roomId} já existe!`);
-      socket.emit("error", { message: `Sala ${roomId} já existe!` });
-      return;
-    }
+    const { playerName } = data;
+    const roomId = generateRoomId();
 
     const userChips = await getChipsFromDatabase(playerName);
-    console.log(`💰 Fichas do usuário ${playerName}: ${userChips}`);
 
     rooms.set(roomId, {
       players: [
@@ -584,60 +245,34 @@ io.on("connection", (socket) => {
           chips: userChips,
           isReady: false,
           hasClosedSummary: false,
-          position: 0,
         },
       ],
       gameState: null,
       isSummaryVisible: false,
       summaryTimer: null,
-      maxPlayers: Math.min(Math.max(maxPlayers, 2), 6),
-      chatMessages: [],
-      invitedPlayers: invitedPlayers || [],
-      createdAt: Date.now(),
-      lastActivity: Date.now(),
-      isInviteRoom: roomId.startsWith("ROOM_INVITE_"),
-      createdBy: playerName,
+      messages: [], // 🔥 NOVO: histórico de chat da sala
     });
 
-    console.log(`📡 Socket ${socket.id} entrando na sala ${roomId} (criador)`);
     socket.join(roomId);
-    console.log(`📡 Socket ${socket.id} rooms após join:`, Array.from(socket.rooms));
-    
-    // 🔥 VERIFICAR SE O SOCKET ESTÁ NA SALA
-    const socketInRoom = socket.rooms.has(roomId);
-    console.log(`📡 Socket ${socket.id} está na sala ${roomId}:`, socketInRoom);
-    
-    if (!socketInRoom) {
-      console.error(`❌ ERRO CRÍTICO: Socket ${socket.id} NÃO está na sala ${roomId} após join!`);
-    }
-
     socket.emit("room-created", { roomId });
-    console.log(`📤 room-created emitido para ${socket.id}`);
+    socket.emit("room-update", rooms.get(roomId));
 
-    io.to(roomId).emit("room-update", rooms.get(roomId));
-    console.log(`📡 room-update emitido para sala ${roomId}`);
+    // 🔥 NOVO: enviar histórico de chat vazio ao criador
+    socket.emit("chat-history", { roomId, messages: [] });
 
-    setTimeout(async () => {
-      await broadcastRoomList();
-    }, 100);
+    await broadcastRoomList();
 
     console.log(
-      `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas) | Máx: ${maxPlayers} jogadores | Convidados: ${invitedPlayers.join(", ")}`,
+      `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas)`,
     );
   });
 
-  // ====================== ENTRAR NA SALA ======================
   socket.on("join-room", async (data) => {
     const { roomId, playerName } = data;
     const normalizedRoomId = roomId.toUpperCase();
 
-    console.log(
-      `📤 join-room recebido de ${socket.id}:`, { roomId: normalizedRoomId, playerName },
-    );
-
     const room = rooms.get(normalizedRoomId);
     if (!room) {
-      console.log(`❌ Sala não encontrada: ${normalizedRoomId}`);
       socket.emit("error", {
         message: `Sala não encontrada: ${normalizedRoomId}`,
       });
@@ -645,20 +280,21 @@ io.on("connection", (socket) => {
     }
 
     if (room.players.find((p) => p.id === socket.id)) {
-      console.log(`⚠️ ${playerName} já está na sala ${normalizedRoomId}`);
-      socket.emit("room-update", room);
+      socket.emit("error", { message: "Você já está nesta sala!" });
       return;
     }
 
-    if (room.players.length >= (room.maxPlayers || 6)) {
-      socket.emit("error", {
-        message: `Sala lotada (máx ${room.maxPlayers})!`,
-      });
+    if (room.players.length >= 4) {
+      socket.emit("error", { message: "Sala lotada!" });
       return;
     }
 
     const userChips = await getChipsFromDatabase(playerName);
-    console.log(`💰 Fichas do usuário ${playerName}: ${userChips}`);
+
+    // 🔥 NOVO: garantir que a sala tem array de mensagens (salas antigas em memória)
+    if (!room.messages) {
+      room.messages = [];
+    }
 
     room.players.push({
       id: socket.id,
@@ -666,101 +302,103 @@ io.on("connection", (socket) => {
       chips: userChips,
       isReady: false,
       hasClosedSummary: false,
-      position: room.players.length,
     });
-    
-    console.log(`📡 Socket ${socket.id} entrando na sala ${normalizedRoomId}`);
     socket.join(normalizedRoomId);
-    console.log(`📡 Socket ${socket.id} rooms após join:`, Array.from(socket.rooms));
-    
-    // 🔥 VERIFICAR SE O SOCKET ESTÁ NA SALA
-    const socketInRoom = socket.rooms.has(normalizedRoomId);
-    console.log(`📡 Socket ${socket.id} está na sala ${normalizedRoomId}:`, socketInRoom);
-    
-    if (!socketInRoom) {
-      console.error(`❌ ERRO CRÍTICO: Socket ${socket.id} NÃO está na sala ${normalizedRoomId} após join!`);
+
+    io.to(normalizedRoomId).emit("room-update", room);
+
+    // 🔥 NOVO: enviar histórico de chat existente para quem entrou
+    socket.emit("chat-history", {
+      roomId: normalizedRoomId,
+      messages: room.messages,
+    });
+
+    // 🔥 NOVO: avisar a sala que alguém entrou (mensagem de sistema)
+    const systemMessage = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      playerId: "system",
+      playerName: "Sistema",
+      message: `${playerName} entrou na sala.`,
+      timestamp: new Date().toISOString(),
+      isSystem: true,
+    };
+    room.messages.push(systemMessage);
+    if (room.messages.length > 100) {
+      room.messages = room.messages.slice(-100);
     }
+    io.to(normalizedRoomId).emit("chat-message", systemMessage);
+
+    await broadcastRoomList();
 
     console.log(
       `✅ ${playerName} entrou na sala ${normalizedRoomId} (${userChips} fichas)`,
     );
-
-    // 🔥 EMITIR CHAT-MESSAGE DE TESTE PARA VERIFICAR QUEM RECEBE
-    io.to(normalizedRoomId).emit("chat-message", {
-      player: "Sistema",
-      message: `🎉 ${playerName} entrou na sala!`,
-      timestamp: Date.now(),
-      isSystem: true,
-    });
-    console.log(`📡 Chat de entrada emitido para sala ${normalizedRoomId}`);
-
-    io.to(normalizedRoomId).emit("room-update", room);
-    console.log(`📡 room-update emitido para sala ${normalizedRoomId}`);
-
-    setTimeout(async () => {
-      await broadcastRoomList();
-    }, 100);
   });
 
-  // ====================== PRONTO PARA JOGAR ======================
-  socket.on("player-ready", (data) => {
-    const { roomId } = data;
+  // ====================== 🔥 NOVO: CHAT DA SALA ======================
+  socket.on("send-chat-message", (data) => {
+    const { roomId, message } = data || {};
+    if (!roomId) return;
+
     const normalizedRoomId = roomId.toUpperCase();
-    console.log(`🔄 player-ready recebido de ${socket.id} para sala ${normalizedRoomId}`);
-    
     const room = rooms.get(normalizedRoomId);
     if (!room) {
-      console.log(`❌ Sala não encontrada: ${normalizedRoomId}`);
-      socket.emit("error", {
-        message: `Sala não encontrada: ${normalizedRoomId}`,
-      });
+      socket.emit("error", { message: "Sala não encontrada para o chat." });
       return;
     }
 
     const player = room.players.find((p) => p.id === socket.id);
     if (!player) {
-      console.log(`❌ Jogador ${socket.id} não encontrado na sala ${normalizedRoomId}`);
-      console.log(`📋 Jogadores na sala:`, room.players.map(p => ({ id: p.id, name: p.name })));
+      socket.emit("error", { message: "Você não está nesta sala." });
       return;
     }
 
-    player.isReady = !player.isReady;
-    console.log(
-      `🔄 ${player.name} ${player.isReady ? "✅ pronto" : "⏸️ não pronto"} na sala ${normalizedRoomId}`,
-    );
-    console.log(`📋 Room gameState:`, !!room.gameState);
-    console.log(`📋 Room isSummaryVisible:`, room.isSummaryVisible);
+    const trimmed = (message || "").toString().trim();
+    if (!trimmed) return;
 
-    io.to(normalizedRoomId).emit("room-update", room);
+    // 🔥 Limite de tamanho para evitar abuso
+    const safeMessage = trimmed.slice(0, 300);
 
-    io.to(normalizedRoomId).emit("chat-message", {
-      player: "Sistema",
-      message: `${player.name} ${player.isReady ? "✅ está pronto!" : "⏸️ não está mais pronto"}`,
-      timestamp: Date.now(),
-      isSystem: true,
-    });
+    const chatMessage = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      playerId: socket.id,
+      playerName: player.name,
+      message: safeMessage,
+      timestamp: new Date().toISOString(),
+      isSystem: false,
+    };
 
-    const allReady = room.players.every((p) => p.isReady);
-    console.log(`🔍 Verificando se todos estão prontos: ${allReady} (${room.players.length} jogadores)`);
-    console.log(`📋 Status dos jogadores:`, room.players.map(p => ({ name: p.name, isReady: p.isReady })));
-    
-    if (allReady && room.players.length >= 2 && !room.gameState) {
-      console.log(
-        `🚀 Todos prontos na sala ${normalizedRoomId}! Iniciando...`,
-      );
-      io.to(normalizedRoomId).emit("chat-message", {
-        player: "Sistema",
-        message: "🚀 Todos prontos! Iniciando partida...",
-        timestamp: Date.now(),
-        isSystem: true,
-      });
-      startGame(normalizedRoomId);
-    } else if (room.gameState) {
-      console.log(`⚠️ Já existe um gameState ativo na sala ${normalizedRoomId}`);
+    if (!room.messages) room.messages = [];
+    room.messages.push(chatMessage);
+
+    // 🔥 Manter só as últimas 100 mensagens em memória
+    if (room.messages.length > 100) {
+      room.messages = room.messages.slice(-100);
+    }
+
+    io.to(normalizedRoomId).emit("chat-message", chatMessage);
+
+    console.log(`💬 [${normalizedRoomId}] ${player.name}: ${safeMessage}`);
+  });
+
+  socket.on("player-ready", (data) => {
+    const { roomId } = data;
+    const normalizedRoomId = roomId.toUpperCase();
+    const room = rooms.get(normalizedRoomId);
+    if (!room) return;
+
+    const player = room.players.find((p) => p.id === socket.id);
+    if (player) {
+      player.isReady = !player.isReady;
+      io.to(normalizedRoomId).emit("room-update", room);
+
+      const allReady = room.players.every((p) => p.isReady);
+      if (allReady && room.players.length >= 2) {
+        startGame(normalizedRoomId);
+      }
     }
   });
 
-  // ====================== INICIAR JOGO ======================
   function startGame(roomId) {
     const room = rooms.get(roomId);
     if (!room) return;
@@ -768,26 +406,21 @@ io.on("connection", (socket) => {
     const deck = createDeck();
     const numPlayers = room.players.length;
 
-    const smallBlind = 25;
-    const bigBlind = 50;
-
     const gameState = {
       phase: "preflop",
       deck: deck,
       communityCards: [],
-      players: room.players.map((p, index) => ({
+      players: room.players.map((p) => ({
         id: p.id,
         name: p.name,
         cards: [],
         chips: p.chips,
-        handStartChips: p.chips,
         bet: 0,
         isFolded: false,
         isAllIn: false,
         isActive: true,
         hasActed: false,
         hasClosedSummary: false,
-        position: index,
       })),
       pot: 0,
       currentBet: 0,
@@ -797,24 +430,23 @@ io.on("connection", (socket) => {
       lastRaiser: -1,
       roundStartIndex: 0,
       bettingRoundComplete: false,
-      smallBlind: smallBlind,
-      bigBlind: bigBlind,
-      chatMessages: room.chatMessages || [],
     };
 
     gameState.players.forEach((p) => {
       p.cards = [deck.pop(), deck.pop()];
     });
 
+    const sb = 25;
+    const bb = 50;
     const sbIdx = 1 % numPlayers;
     const bbIdx = 2 % numPlayers;
 
     gameState.dealerIndex = 0;
 
     const sbPlayer = gameState.players[sbIdx];
-    if (sbPlayer.chips >= smallBlind) {
-      sbPlayer.chips -= smallBlind;
-      sbPlayer.bet = smallBlind;
+    if (sbPlayer.chips >= sb) {
+      sbPlayer.chips -= sb;
+      sbPlayer.bet = sb;
     } else {
       sbPlayer.bet = sbPlayer.chips;
       sbPlayer.chips = 0;
@@ -823,9 +455,9 @@ io.on("connection", (socket) => {
     gameState.pot += sbPlayer.bet;
 
     const bbPlayer = gameState.players[bbIdx];
-    if (bbPlayer.chips >= bigBlind) {
-      bbPlayer.chips -= bigBlind;
-      bbPlayer.bet = bigBlind;
+    if (bbPlayer.chips >= bb) {
+      bbPlayer.chips -= bb;
+      bbPlayer.bet = bb;
     } else {
       bbPlayer.bet = bbPlayer.chips;
       bbPlayer.chips = 0;
@@ -833,26 +465,18 @@ io.on("connection", (socket) => {
     }
     gameState.pot += bbPlayer.bet;
 
-    gameState.currentBet = bigBlind;
+    gameState.currentBet = bb;
     gameState.lastRaiser = bbIdx;
     gameState.currentPlayerIndex = (bbIdx + 1) % numPlayers;
     gameState.roundStartIndex = gameState.currentPlayerIndex;
 
     room.gameState = gameState;
 
-    io.to(roomId).emit("chat-message", {
-      player: "Sistema",
-      message: `🃏 Partida iniciada! Small Blind: ${smallBlind}, Big Blind: ${bigBlind}`,
-      timestamp: Date.now(),
-      isSystem: true,
-    });
-
     const safeGameState = sanitizeGameState(gameState);
     io.to(roomId).emit("game-started", safeGameState);
     console.log(`🎮 Jogo iniciado na sala ${roomId}`);
   }
 
-  // ====================== AÇÕES DO JOGADOR ======================
   socket.on("player-action", (data) => {
     const { roomId, action, amount } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -878,13 +502,10 @@ io.on("connection", (socket) => {
     player.hasActed = true;
     gameState.actionCount++;
 
-    let actionMessage = "";
-
     switch (action) {
       case "fold":
         player.isFolded = true;
         player.isActive = false;
-        actionMessage = `🙅 ${player.name} desistiu`;
         console.log(`👤 ${player.name} FOLD`);
         break;
 
@@ -897,7 +518,6 @@ io.on("connection", (socket) => {
           gameState.actionCount--;
           return;
         }
-        actionMessage = `✅ ${player.name} deu CHECK`;
         console.log(`👤 ${player.name} CHECK`);
         break;
 
@@ -909,13 +529,11 @@ io.on("connection", (socket) => {
           player.chips = 0;
           gameState.pot += allInCall;
           player.isAllIn = true;
-          actionMessage = `💰 ${player.name} pagou ALL-IN ${allInCall}`;
           console.log(`👤 ${player.name} ALL-IN CALL ${allInCall}`);
         } else {
           player.chips -= callAmount;
           player.bet += callAmount;
           gameState.pot += callAmount;
-          actionMessage = `💰 ${player.name} pagou ${callAmount}`;
           console.log(`👤 ${player.name} CALL ${callAmount}`);
         }
         break;
@@ -945,7 +563,6 @@ io.on("connection", (socket) => {
             p.hasActed = false;
           }
         });
-        actionMessage = `📈 ${player.name} aumentou para ${amount}`;
         console.log(`👤 ${player.name} RAISE para ${amount}`);
         break;
 
@@ -970,79 +587,13 @@ io.on("connection", (socket) => {
             }
           });
         }
-        actionMessage = `⚡ ${player.name} ALL-IN ${allInAmount}`;
         console.log(`👤 ${player.name} ALL-IN ${allInAmount}`);
         break;
-    }
-
-    if (actionMessage) {
-      io.to(normalizedRoomId).emit("chat-message", {
-        player: "Ação",
-        message: actionMessage,
-        timestamp: Date.now(),
-        isSystem: true,
-      });
     }
 
     advanceGame(normalizedRoomId);
   });
 
-  // ====================== CHAT EM TEMPO REAL ======================
-  socket.on("send-chat-message", (data) => {
-    const { roomId, message } = data;
-    const normalizedRoomId = roomId.toUpperCase();
-    console.log(`📤 Chat: Mensagem recebida de ${socket.id} para sala ${normalizedRoomId}:`, message);
-    console.log(`📡 Socket ${socket.id} rooms:`, Array.from(socket.rooms));
-    
-    const room = rooms.get(normalizedRoomId);
-    if (!room) {
-      console.log(`❌ Sala não encontrada: ${normalizedRoomId}`);
-      console.log(`📋 Salas disponíveis:`, Array.from(rooms.keys()));
-      socket.emit("error", {
-        message: `Sala não encontrada: ${normalizedRoomId}`,
-      });
-      return;
-    }
-
-    const player = room.players.find((p) => p.id === socket.id);
-    if (!player) {
-      console.log(`❌ Jogador ${socket.id} não encontrado na sala ${normalizedRoomId}`);
-      console.log(`📋 Jogadores na sala:`, room.players.map(p => ({ id: p.id, name: p.name })));
-      return;
-    }
-
-    if (message.length > 500) {
-      socket.emit("error", { message: "Mensagem muito longa!" });
-      return;
-    }
-
-    const chatMessage = {
-      player: player.name,
-      message: message.trim(),
-      timestamp: Date.now(),
-      isSystem: false,
-    };
-
-    if (!room.chatMessages) room.chatMessages = [];
-    room.chatMessages.push(chatMessage);
-    if (room.chatMessages.length > 100) {
-      room.chatMessages = room.chatMessages.slice(-100);
-    }
-
-    console.log(`📡 Chat: Enviando mensagem para sala ${normalizedRoomId}`);
-    console.log(`📋 Jogadores na sala:`, room.players.map(p => ({ id: p.id, name: p.name })));
-    
-    // 🔥 VERIFICAR QUEM ESTÁ NA SALA
-    const roomSockets = io.sockets.adapter.rooms.get(normalizedRoomId);
-    console.log(`📡 Sockets na sala ${normalizedRoomId}:`, roomSockets ? Array.from(roomSockets) : "Nenhum");
-    
-    // 🔥 ENVIAR PARA TODOS NA SALA
-    const result = io.to(normalizedRoomId).emit("chat-message", chatMessage);
-    console.log(`✅ Chat: Mensagem enviada. Resultado:`, result);
-    console.log(`📡 io.to(${normalizedRoomId}) enviou para ${result} sockets`);
-  });
-
-  // ====================== AVANÇAR JOGO ======================
   function advanceGame(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -1120,7 +671,6 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("player-turn", { playerId: players[nextIndex].id });
   }
 
-  // ====================== AVANÇAR FASE ======================
   function advancePhase(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -1139,42 +689,28 @@ io.on("connection", (socket) => {
     gameState.actionCount = 0;
     gameState.bettingRoundComplete = false;
 
-    let phaseMessage = "";
-
     switch (gameState.phase) {
       case "preflop":
         gameState.phase = "flop";
         for (let i = 0; i < 3 && gameState.deck.length > 0; i++) {
           gameState.communityCards.push(gameState.deck.pop());
         }
-        phaseMessage = "🎴 FLOP - Três cartas comunitárias!";
         break;
       case "flop":
         gameState.phase = "turn";
         if (gameState.deck.length > 0) {
           gameState.communityCards.push(gameState.deck.pop());
         }
-        phaseMessage = "🔄 TURN - Quarta carta!";
         break;
       case "turn":
         gameState.phase = "river";
         if (gameState.deck.length > 0) {
           gameState.communityCards.push(gameState.deck.pop());
         }
-        phaseMessage = "🌊 RIVER - Última carta!";
         break;
       case "river":
         endRound(roomId);
         return;
-    }
-
-    if (phaseMessage) {
-      io.to(roomId).emit("chat-message", {
-        player: "Sistema",
-        message: phaseMessage,
-        timestamp: Date.now(),
-        isSystem: true,
-      });
     }
 
     const startIndex = (gameState.dealerIndex + 1) % players.length;
@@ -1204,7 +740,7 @@ io.on("connection", (socket) => {
     );
   }
 
-  // ====================== FECHAR RESUMO ======================
+  // ====================== FECHAR RESUMO (APENAS PARA QUEM CLICOU) ======================
   socket.on("close-summary", async (data) => {
     const { roomId } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -1221,8 +757,10 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // 🔥 Marcar que este jogador já fechou
     player.hasClosedSummary = true;
 
+    // Atualizar no gameState também
     if (room.gameState) {
       const gamePlayer = room.gameState.players.find((p) => p.id === socket.id);
       if (gamePlayer) {
@@ -1237,21 +775,13 @@ io.on("connection", (socket) => {
       `📊 ${player.name} fechou o resumo (${closedCount}/${totalPlayers})`,
     );
 
+    // 🔥 EMITIR APENAS PARA QUEM CLICOU
     socket.emit("summary-closed", {
       roomId: normalizedRoomId,
       playerId: socket.id,
     });
 
-    io.to(normalizedRoomId).emit("summary-progress", {
-      roomId: normalizedRoomId,
-      closedCount: closedCount,
-      totalPlayers: totalPlayers,
-      players: room.players.map((p) => ({
-        name: p.name,
-        hasClosed: p.hasClosedSummary,
-      })),
-    });
-
+    // 🔥 Verificar se TODOS os jogadores já fecharam
     const allClosed = room.players.every((p) => p.hasClosedSummary === true);
 
     if (allClosed) {
@@ -1259,11 +789,13 @@ io.on("connection", (socket) => {
         `✅ Todos os jogadores fecharam! Resetando sala ${normalizedRoomId}`,
       );
 
+      // Limpar timer se existir
       if (room.summaryTimer) {
         clearTimeout(room.summaryTimer);
         room.summaryTimer = null;
       }
 
+      // Resetar o jogo para todos
       if (room.gameState) {
         for (const p of room.gameState.players) {
           await saveChipsToDatabase(p.name, p.chips);
@@ -1285,25 +817,6 @@ io.on("connection", (socket) => {
 
         io.to(normalizedRoomId).emit("room-update", room);
         io.to(normalizedRoomId).emit("game-reset");
-        io.to(normalizedRoomId).emit("chat-message", {
-          player: "Sistema",
-          message: "🔄 Jogo resetado! Preparem-se para a próxima rodada!",
-          timestamp: Date.now(),
-          isSystem: true,
-        });
-
-        if (room.isInviteRoom) {
-          setTimeout(() => {
-            if (rooms.has(normalizedRoomId)) {
-              const currentRoom = rooms.get(normalizedRoomId);
-              if (currentRoom && currentRoom.players.length === 0) {
-                rooms.delete(normalizedRoomId);
-                console.log(`🗑️ Sala de convite ${normalizedRoomId} removida (jogo finalizado)`);
-                broadcastRoomList();
-              }
-            }
-          }, 5000);
-        }
 
         await broadcastRoomList();
 
@@ -1311,200 +824,153 @@ io.on("connection", (socket) => {
           `🔄 Jogo resetado na sala ${normalizedRoomId} (todos fecharam)`,
         );
       }
+    } else {
+      // 🔥 Notificar todos sobre o progresso (quem já fechou)
+      io.to(normalizedRoomId).emit("summary-progress", {
+        roomId: normalizedRoomId,
+        closedCount: closedCount,
+        totalPlayers: totalPlayers,
+        players: room.players.map((p) => ({
+          name: p.name,
+          hasClosed: p.hasClosedSummary,
+        })),
+      });
     }
   });
 
-  // ====================== ENCERRAR RODADA ======================
-async function endRound(roomId) {
-  const room = rooms.get(roomId);
-  if (!room || !room.gameState) return;
+  // ====================== ENCERRAR RODADA (COM TIMER DE 25s) ======================
+  async function endRound(roomId) {
+    const room = rooms.get(roomId);
+    if (!room || !room.gameState) return;
 
-  const gameState = room.gameState;
-  const playersInHand = gameState.players.filter((p) => !p.isFolded);
+    const gameState = room.gameState;
+    const playersInHand = gameState.players.filter((p) => !p.isFolded);
 
-  let winner = null;
-  let bestScore = -1;
-  let results = [];
+    let winner = null;
+    let bestScore = -1;
+    let results = [];
 
-  if (playersInHand.length === 1) {
-    winner = playersInHand[0];
-    results.push({
-      name: winner.name,
-      hand: "Fold dos outros",
-      score: 0,
-      isWinner: true,
-    });
-  } else {
-    for (const player of playersInHand) {
-      const score = evaluateBestHand(player.cards, gameState.communityCards);
-      const handName = getHandName(score);
+    if (playersInHand.length === 1) {
+      winner = playersInHand[0];
       results.push({
-        name: player.name,
-        hand: handName,
-        score: score,
-        isWinner: false,
-      });
-      if (score > bestScore) {
-        bestScore = score;
-        winner = player;
-      }
-    }
-    results = results.map((r) => ({
-      ...r,
-      isWinner: r.name === winner.name,
-    }));
-  }
-
-  if (winner) {
-    winner.chips += gameState.pot;
-
-    console.log(
-      `💾 Salvando fichas de ${gameState.players.length} jogadores...`,
-    );
-
-    // 🔥 SALVAR FICHAS DE TODOS OS JOGADORES IMEDIATAMENTE
-    for (const p of gameState.players) {
-      await saveChipsToDatabase(p.name, p.chips);
-      console.log(`💰 ${p.name}: ${p.chips} fichas salvas (endRound)`);
-    }
-
-    // 🔥 SALVAR ESTATÍSTICAS E HISTÓRICO GLOBAIS (mesmo destino do modo CPU)
-    const handId = `${roomId}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    const winnerResult = results.find((r) => r.isWinner);
-    const winnerHandName = winnerResult?.hand || "Fold dos outros";
-
-    for (const p of gameState.players) {
-      const isWinner = p.name === winner.name;
-      const playerResult = results.find((r) => r.name === p.name);
-      const startChips = typeof p.handStartChips === "number" ? p.handStartChips : p.chips;
-
-      if (isWinner) {
-        const chipsWon = Math.max(0, p.chips - startChips);
-        await updateStatsInDatabase(p.name, "win", chipsWon, winnerHandName, !!p.isAllIn);
-        await saveHandHistoryToDatabase(p.name, {
-          id: `${handId}_${p.name}`,
-          result: "win",
-          playerHand: winnerHandName,
-          pot: gameState.pot,
-          chipsWon,
-          playerCards: p.cards,
-          communityCards: gameState.communityCards,
-          wasAllIn: !!p.isAllIn,
-          timestamp: new Date().toISOString(),
-        });
-      } else {
-        const chipsLost = Math.max(0, startChips - p.chips);
-        await updateStatsInDatabase(p.name, "loss", chipsLost, winnerHandName, !!p.isAllIn);
-        await saveHandHistoryToDatabase(p.name, {
-          id: `${handId}_${p.name}`,
-          result: "loss",
-          playerHand: playerResult?.hand || (p.isFolded ? "Fold" : "?"),
-          cpuHand: winnerHandName,
-          pot: gameState.pot,
-          chipsLost,
-          playerCards: p.cards,
-          communityCards: gameState.communityCards,
-          wasAllIn: !!p.isAllIn,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    }
-
-    room.isSummaryVisible = true;
-
-    room.players.forEach((p) => {
-      p.hasClosedSummary = false;
-    });
-    gameState.players.forEach((p) => {
-      p.hasClosedSummary = false;
-    });
-
-    io.to(roomId).emit("chat-message", {
-      player: "Sistema",
-      message: `🏆 ${winner.name} venceu ${gameState.pot} fichas com ${results.find((r) => r.isWinner)?.hand || "boa mão"}!`,
-      timestamp: Date.now(),
-      isSystem: true,
-    });
-
-    const roundEndData = {
-      winner: {
         name: winner.name,
-        chips: winner.chips,
-      },
-      pot: gameState.pot,
-      results: results,
-      communityCards: gameState.communityCards,
-      players: gameState.players.map((p) => ({
-        name: p.name,
-        chips: p.chips,
-        hasClosedSummary: p.hasClosedSummary || false,
-      })),
-    };
-
-    io.to(roomId).emit("round-ended", roundEndData);
-
-    console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
-
-    if (room.summaryTimer) {
-      clearTimeout(room.summaryTimer);
-    }
-
-    room.summaryTimer = setTimeout(async () => {
-      if (room.isSummaryVisible) {
-        console.log(
-          `⏰ Timer de 25s - Fechando resumo da sala ${roomId} (fallback)`,
-        );
-
-        io.to(roomId).emit("summary-closed", {
-          roomId: roomId,
-          forced: true,
+        hand: "Fold dos outros",
+        score: 0,
+        isWinner: true,
+      });
+    } else {
+      for (const player of playersInHand) {
+        const score = evaluateBestHand(player.cards, gameState.communityCards);
+        const handName = getHandName(score);
+        results.push({
+          name: player.name,
+          hand: handName,
+          score: score,
+          isWinner: false,
         });
-
-        if (room.gameState) {
-          // 🔥 SALVAR FICHAS NO TIMEOUT TAMBÉM
-          for (const p of room.gameState.players) {
-            await saveChipsToDatabase(p.name, p.chips);
-          }
-
-          room.gameState = null;
-          room.isSummaryVisible = false;
-
-          room.players.forEach((p) => {
-            p.isReady = false;
-            p.cards = [];
-            p.bet = 0;
-            p.isFolded = false;
-            p.isAllIn = false;
-            p.isActive = true;
-            p.hasActed = false;
-            p.hasClosedSummary = false;
-          });
-
-          io.to(roomId).emit("room-update", room);
-          io.to(roomId).emit("game-reset");
-
-          if (room.isInviteRoom) {
-            setTimeout(() => {
-              if (rooms.has(roomId)) {
-                const currentRoom = rooms.get(roomId);
-                if (currentRoom && currentRoom.players.length === 0) {
-                  rooms.delete(roomId);
-                  console.log(`🗑️ Sala de convite ${roomId} removida (timeout)`);
-                  broadcastRoomList();
-                }
-              }
-            }, 3000);
-          }
-
-          await broadcastRoomList();
-
-          console.log(`🔄 Jogo resetado na sala ${roomId} (timer fallback)`);
+        if (score > bestScore) {
+          bestScore = score;
+          winner = player;
         }
       }
-      room.summaryTimer = null;
-    }, 25000);
+      results = results.map((r) => ({
+        ...r,
+        isWinner: r.name === winner.name,
+      }));
+    }
+
+    if (winner) {
+      winner.chips += gameState.pot;
+
+      console.log(
+        `💾 Salvando fichas de ${gameState.players.length} jogadores...`,
+      );
+
+      for (const p of gameState.players) {
+        await saveChipsToDatabase(p.name, p.chips);
+      }
+
+      room.isSummaryVisible = true;
+
+      // 🔥 Resetar estado de fechamento dos jogadores
+      room.players.forEach((p) => {
+        p.hasClosedSummary = false;
+      });
+      gameState.players.forEach((p) => {
+        p.hasClosedSummary = false;
+      });
+
+      // 🔥 Emitir resultado
+      const roundEndData = {
+        winner: {
+          name: winner.name,
+          chips: winner.chips,
+        },
+        pot: gameState.pot,
+        results: results,
+        communityCards: gameState.communityCards,
+        players: gameState.players.map((p) => ({
+          name: p.name,
+          chips: p.chips,
+          hasClosedSummary: p.hasClosedSummary || false,
+        })),
+      };
+
+      io.to(roomId).emit("round-ended", roundEndData);
+
+      console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
+      console.log(`📊 Resumo enviado. Aguardando cliques individuais...`);
+
+      // 🔥 TIMER DE 25 SEGUNDOS (FALLBACK)
+      if (room.summaryTimer) {
+        clearTimeout(room.summaryTimer);
+      }
+
+      room.summaryTimer = setTimeout(async () => {
+        // Verificar se o resumo ainda está visível
+        if (room.isSummaryVisible) {
+          console.log(
+            `⏰ Timer de 25s - Fechando resumo da sala ${roomId} (fallback)`,
+          );
+
+          // Forçar fechamento para todos
+          io.to(roomId).emit("summary-closed", {
+            roomId: roomId,
+            forced: true,
+          });
+
+          // Resetar o jogo
+          if (room.gameState) {
+            for (const p of room.gameState.players) {
+              await saveChipsToDatabase(p.name, p.chips);
+            }
+
+            room.gameState = null;
+            room.isSummaryVisible = false;
+
+            room.players.forEach((p) => {
+              p.isReady = false;
+              p.cards = [];
+              p.bet = 0;
+              p.isFolded = false;
+              p.isAllIn = false;
+              p.isActive = true;
+              p.hasActed = false;
+              p.hasClosedSummary = false;
+            });
+
+            io.to(roomId).emit("room-update", room);
+            io.to(roomId).emit("game-reset");
+
+            await broadcastRoomList();
+
+            console.log(`🔄 Jogo resetado na sala ${roomId} (timer fallback)`);
+          }
+        }
+        room.summaryTimer = null;
+      }, 25000); // 🔥 25 SEGUNDOS
+    }
   }
-}
 
   // ====================== SAIR ======================
   socket.on("leave-room", async (data) => {
@@ -1513,36 +979,16 @@ async function endRound(roomId) {
     const room = rooms.get(normalizedRoomId);
     if (!room) return;
 
-    const player = room.players.find((p) => p.id === socket.id);
-    const playerName = player?.name || 'Jogador';
-    
-    if (player) {
-      // 🔥 CORREÇÃO: Se houver gameState, usar as fichas do gameState
-      let chipsToSave = player.chips;
-      
-      if (room.gameState) {
-        const gamePlayer = room.gameState.players.find((p) => p.id === socket.id);
-        if (gamePlayer) {
-          chipsToSave = gamePlayer.chips;
-          // 🔥 Atualizar o player da sala com as fichas do gameState
-          player.chips = gamePlayer.chips;
-          console.log(`🔄 ${player.name}: sincronizando fichas do gameState: ${chipsToSave}`);
-        }
+    for (const player of room.players) {
+      if (player.id === socket.id) {
+        await saveChipsToDatabase(player.name, player.chips);
+        console.log(
+          `💾 Fichas de ${player.name} salvas ao sair: ${player.chips}`,
+        );
       }
-      
-      // 🔥 SALVAR AS FICHAS CORRETAS NO BANCO
-      await saveChipsToDatabase(player.name, chipsToSave);
-      console.log(
-        `💾 Fichas de ${player.name} salvas ao sair: ${chipsToSave}`,
-      );
-
-      io.to(normalizedRoomId).emit("chat-message", {
-        player: "Sistema",
-        message: `👋 ${player.name} saiu da sala`,
-        timestamp: Date.now(),
-        isSystem: true,
-      });
     }
+
+    const leavingPlayer = room.players.find((p) => p.id === socket.id);
 
     room.players = room.players.filter((p) => p.id !== socket.id);
     socket.leave(normalizedRoomId);
@@ -1552,105 +998,40 @@ async function endRound(roomId) {
         clearTimeout(room.summaryTimer);
         room.summaryTimer = null;
       }
-      
-      if (normalizedRoomId.startsWith("ROOM_INVITE_")) {
-        const creator = room.createdBy || (room.players && room.players.length > 0 ? room.players[0]?.name : null);
-        if (creator && creator !== playerName) {
-          for (const [id, user] of onlineUsers) {
-            if (user.username === creator) {
-              user.socket.emit("chat-message", {
-                player: "Sistema",
-                message: `🏠 Sala ${normalizedRoomId} fechada (todos saíram)`,
-                timestamp: Date.now(),
-                isSystem: true,
-              });
-              break;
-            }
-          }
-        }
-      }
-      
       rooms.delete(normalizedRoomId);
       console.log(`🗑️ Sala ${normalizedRoomId} removida`);
     } else {
       io.to(normalizedRoomId).emit("room-update", room);
+
+      // 🔥 NOVO: avisar a sala que alguém saiu
+      if (leavingPlayer && room.messages) {
+        const systemMessage = {
+          id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+          playerId: "system",
+          playerName: "Sistema",
+          message: `${leavingPlayer.name} saiu da sala.`,
+          timestamp: new Date().toISOString(),
+          isSystem: true,
+        };
+        room.messages.push(systemMessage);
+        io.to(normalizedRoomId).emit("chat-message", systemMessage);
+      }
     }
 
     await broadcastRoomList();
   });
 
-  // ====================== JOGADOR SAIU DA SALA ======================
-  socket.on("player-left-room", (data) => {
-    const { roomId, playerName } = data;
-    console.log(`👤 ${playerName} confirmou saída da sala ${roomId}`);
-
-    socket.emit("leave-room-response", {
-      roomId: roomId,
-      playerName: playerName,
-      timestamp: Date.now(),
-    });
-  });
-
-  // ====================== DESCONEXÃO ======================
   socket.on("disconnect", () => {
     console.log(`🔴 Desconectado: ${socket.id}`);
-
-    const user = onlineUsers.get(socket.id);
-    if (user) {
-      console.log(`🔴 ${user.username} desconectou`);
-      onlineUsers.delete(socket.id);
-      const onlineList = Array.from(onlineUsers.values()).map((u) => u.username);
-      io.emit("friends-online", { online: onlineList });
-    }
-
     rooms.forEach((room, roomId) => {
       const idx = room.players.findIndex((p) => p.id === socket.id);
       if (idx !== -1) {
-        const player = room.players[idx];
-        const isInviteRoom = roomId.startsWith("ROOM_INVITE_");
-        
-        // 🔥 SALVAR FICHAS DO JOGADOR ANTES DE REMOVER
-        if (player && room.gameState) {
-          const gamePlayer = room.gameState.players.find((p) => p.id === socket.id);
-          if (gamePlayer) {
-            saveChipsToDatabase(player.name, gamePlayer.chips);
-            console.log(`💾 Fichas de ${player.name} salvas na desconexão: ${gamePlayer.chips}`);
-          } else {
-            saveChipsToDatabase(player.name, player.chips);
-          }
-        }
-        
-        io.to(roomId).emit("chat-message", {
-          player: "Sistema",
-          message: `👋 ${player.name} desconectou${isInviteRoom ? ' - Sala será fechada' : ''}`,
-          timestamp: Date.now(),
-          isSystem: true,
-        });
-
         room.players.splice(idx, 1);
         if (room.players.length === 0) {
           if (room.summaryTimer) {
             clearTimeout(room.summaryTimer);
             room.summaryTimer = null;
           }
-          
-          if (isInviteRoom) {
-            const creator = room.createdBy || player.name;
-            if (creator && creator !== player.name) {
-              for (const [id, user] of onlineUsers) {
-                if (user.username === creator) {
-                  user.socket.emit("chat-message", {
-                    player: "Sistema",
-                    message: `🏠 Sala ${roomId} fechada (desconexão de ${player.name})`,
-                    timestamp: Date.now(),
-                    isSystem: true,
-                  });
-                  break;
-                }
-              }
-            }
-          }
-          
           rooms.delete(roomId);
           console.log(`🗑️ Sala ${roomId} removida`);
         } else {
@@ -1669,33 +1050,11 @@ console.log(`📋 Texas Hold'em Online pronto!\n`);
 console.log(`💡 Fluxo correto:`);
 console.log(`  1. Preflop -> 2. Flop -> 3. Turn -> 4. River -> 5. Showdown\n`);
 console.log(`💡 Para testar:`);
-console.log(`  - Abra várias janelas para simular múltiplos jogadores`);
+console.log(`  - Abra duas janelas (Edge e Chrome)`);
 console.log(`  - Entre na mesma sala`);
-console.log(`  - Todos cliquem em "Pronto para jogar"\n`);
+console.log(`  - Ambos cliquem em "Pronto para jogar"\n`);
 console.log(`🆕 NOVIDADES:`);
-console.log(`   ✅ Suporte a 2-6 jogadores`);
-console.log(`   ✅ Sistema de blinds rotativo`);
-console.log(`   ✅ Chat em tempo real`);
 console.log(`   ✅ Cada jogador fecha o resumo individualmente`);
 console.log(`   ✅ Timer de 25 segundos como fallback`);
 console.log(`   ✅ Indicador de progresso (quem já fechou)`);
-console.log(`   ✅ Convites múltiplos para amigos`);
-console.log(`   ✅ Redirecionamento automático para o lobby ao aceitar convite`);
-console.log(`   ✅ Suporte a roomId customizado nos convites`);
-console.log(`   ✅ Criação de sala antes do envio de convites`);
-console.log(`   ✅ Logs detalhados para debug`);
-console.log(`   ✅ Broadcast de salas para todos os usuários`);
-console.log(`   ✅ Reset automático do estado do lobby ao sair`);
-console.log(`   ✅ LISTA DE SALAS ATUALIZADA EM TEMPO REAL`);
-console.log(`   ✅ SALAS DISPONÍVEIS NO LOBBY CORRETAMENTE`);
-console.log(`   ✅ FEEDBACK "SAIU DA SALA" FECHA SOZINHO`);
-console.log(`   ✅ SALAS DE CONVITE REMOVIDAS AUTOMATICAMENTE`);
-console.log(`   ✅ LIMPEZA DE SALAS INATIVAS (30min+)`);
-console.log(`   ✅ LIMPEZA DE SALAS DE CONVITE A CADA 15s`);
-console.log(`   ✅ REMOÇÃO IMEDIATA AO RECUSAR CONVITE`);
-console.log(`   ✅ FEEDBACKS VISUAIS: CONVITE RECUSADO/ACEITO/EXPIRADO`);
-console.log(`   ✅ NOTIFICAÇÕES DE SALAS FECHADAS`);
-console.log(`   ✅ SALAS DE CONVITE FILTRADAS NO LOBBY`);
-console.log(`   ✅ SALVAMENTO DE FICHAS CORRETO AO SAIR DA SALA`);
-console.log(`   ✅ SINCRONIZAÇÃO DE FICHAS DO GAMESTATE AO SAIR`);
-console.log(`   ✅ SALVAMENTO DE FICHAS NA DESCONEXÃO`);
+console.log(`   ✅ Chat em tempo real na sala de espera`);

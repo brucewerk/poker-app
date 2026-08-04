@@ -1,4 +1,4 @@
-// components/Poker/OnlineLobby.jsx - COMPLETO CORRIGIDO (FILTRA SALAS DE CONVITE E NORMALIZA ROOMID)
+// components/Poker/OnlineLobby.jsx - COMPLETO CORRIGIDO (CHAT FUNCIONANDO)
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -18,6 +18,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
   const [pendingInvite, setPendingInvite] = useState(null);
   const [currentRoomId, setCurrentRoomId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showChat, setShowChat] = useState(false);
   const roomListInterval = useRef(null);
   const isMounted = useRef(true);
   const fetchTimeoutRef = useRef(null);
@@ -69,20 +70,28 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
 
     // 🔥 CORREÇÃO: FILTRAR SALAS DE CONVITE
     const onRoomList = (roomList) => {
-      console.log("📡 Lista de salas recebida:", roomList?.length || 0, "salas");
-      
+      console.log(
+        "📡 Lista de salas recebida:",
+        roomList?.length || 0,
+        "salas",
+      );
+
       if (isMounted.current) {
         if (roomList && Array.isArray(roomList)) {
           // 🔥 FILTRAR SALAS DE CONVITE - NUNCA MOSTRAR NO LOBBY
           const validRooms = roomList.filter((room) => {
             const hasValidId = room.roomId && room.roomId.length > 0;
             const hasPlayers = room.players && room.players.length > 0;
-            const isNotInviteRoom = !room.roomId?.toUpperCase().startsWith("ROOM_INVITE_");
+            const isNotInviteRoom = !room.roomId
+              ?.toUpperCase()
+              .startsWith("ROOM_INVITE_");
             const hasAvailableSlot = room.hasAvailableSlot !== false;
-            
-            return hasValidId && hasPlayers && isNotInviteRoom && hasAvailableSlot;
+
+            return (
+              hasValidId && hasPlayers && isNotInviteRoom && hasAvailableSlot
+            );
           });
-          
+
           console.log("📡 Salas válidas (sem convites):", validRooms.length);
           setRooms(validRooms);
           setRefreshKey((prev) => prev + 1);
@@ -93,12 +102,13 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       }
     };
 
-    // 🔥 CORREÇÃO: NORMALIZAR ROOMID PARA MAIÚSCULAS
+    // 🔥 CORREÇÃO: NORMALIZAR ROOMID PARA MAIÚSCULAS E DEFINIR currentRoomId
     const onRoomCreated = (data) => {
       console.log("✅ Sala criada:", data);
       setCreating(false);
-      const roomId = data.roomId.toUpperCase(); // <-- NORMALIZAR
-      setCurrentRoomId(roomId);
+      const roomId = data.roomId.toUpperCase();
+      setCurrentRoomId(roomId); // <-- 🔥 CHAT ATIVADO AQUI
+      setShowChat(true);
       setSuccess(`✅ Sala ${roomId} criada com sucesso!`);
 
       fetchRooms();
@@ -109,7 +119,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         if (onJoinGame && isMounted.current) {
           console.log(`📤 Entrando na sala criada: ${roomId}`);
           onJoinGame({
-            roomId: roomId, // <-- USAR ID NORMALIZADO
+            roomId: roomId,
             playerName: currentUser,
             socket: socketClient.socket,
             isInviteCreator: true,
@@ -121,6 +131,11 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
 
     const onRoomUpdate = (data) => {
       console.log("📡 Atualização da sala recebida:", data);
+      // 🔥 SE O JOGADOR ESTIVER NA SALA, ATIVAR CHAT
+      if (data.players?.some((p) => p.name === currentUser) && data.roomId) {
+        setCurrentRoomId(data.roomId.toUpperCase());
+        setShowChat(true);
+      }
       setTimeout(() => fetchRooms(), 300);
     };
 
@@ -141,7 +156,11 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         setSuccess(`✅ Convite aceito! Entrando na sala...`);
         const inviteData = pendingInvite;
         if (inviteData && onJoinGame) {
-          const roomId = (inviteData.roomId || `room_${inviteData.inviteId}`).toUpperCase(); // <-- NORMALIZAR
+          const roomId = (
+            inviteData.roomId || `room_${inviteData.inviteId}`
+          ).toUpperCase();
+          setCurrentRoomId(roomId);
+          setShowChat(true);
           socketClient.emit("join-room", {
             roomId: roomId,
             playerName: currentUser,
@@ -161,12 +180,12 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
       console.error("❌ Erro do servidor:", data);
       if (data && data.message) {
         setError(`❌ ${data.message}`);
-      } else if (typeof data === 'string') {
+      } else if (typeof data === "string") {
         setError(`❌ ${data}`);
       } else {
         console.warn("Erro do servidor sem mensagem detalhada:", data);
       }
-      if (data && (data.message || typeof data === 'string')) {
+      if (data && (data.message || typeof data === "string")) {
         setTimeout(() => setError(""), 5000);
       }
     };
@@ -261,13 +280,17 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         return;
       }
       const normalizedRoomId = roomIdToJoin.toUpperCase();
-      
+
       // 🔥 VERIFICAR SE É SALA DE CONVITE (NUNCA DEVE APARECER NO LOBBY)
       if (normalizedRoomId.startsWith("ROOM_INVITE_")) {
         setError("❌ Esta sala é um convite e não está disponível no lobby.");
         return;
       }
-      
+
+      // 🔥 DEFINIR currentRoomId ANTES DE ENTRAR PARA ATIVAR CHAT
+      setCurrentRoomId(normalizedRoomId);
+      setShowChat(true);
+
       const room = rooms.find((r) => r.roomId === normalizedRoomId);
       if (room) {
         const playerInRoom = room.players?.some((p) => p.name === currentUser);
@@ -284,25 +307,32 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         }
         if (room.playerCount >= room.maxPlayers) {
           setError(`❌ Sala ${normalizedRoomId} está lotada!`);
+          setCurrentRoomId(null);
+          setShowChat(false);
           return;
         }
       }
       setJoining(true);
       setError("");
       setSuccess("");
-      setCurrentRoomId(normalizedRoomId);
       console.log(`📤 Entrando na sala ${normalizedRoomId}...`);
       socketClient.emit("join-room", {
         roomId: normalizedRoomId,
         playerName: currentUser,
       });
-      
+
       // 🔥 APÓS ENTRAR, EMITIR EVENTO PARA VERIFICAR CHAT
       setTimeout(() => {
         console.log(`📡 Verificando socket no OnlineLobby após entrar na sala`);
         if (socketClient.socket) {
-          console.log(`📡 Socket rooms:`, Array.from(socketClient.socket.rooms || []));
-          console.log(`📡 Socket está na sala ${normalizedRoomId}:`, socketClient.socket.rooms?.has(normalizedRoomId));
+          console.log(
+            `📡 Socket rooms:`,
+            Array.from(socketClient.socket.rooms || []),
+          );
+          console.log(
+            `📡 Socket está na sala ${normalizedRoomId}:`,
+            socketClient.socket.rooms?.has(normalizedRoomId),
+          );
         }
       }, 500);
 
@@ -343,7 +373,7 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         }
       };
       socketClient.on("room-update", handleRoomUpdate);
-      
+
       setTimeout(() => {
         socketClient.off("room-update", handleRoomUpdate);
       }, 5000);
@@ -351,7 +381,6 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
     [currentUser, onJoinGame, rooms],
   );
 
-  // 🔥 CORREÇÃO: NORMALIZAR ROOMID EM handleAcceptInvite
   const handleAcceptInvite = useCallback(
     (inviteData) => {
       if (!socketClient.isConnected()) {
@@ -359,8 +388,11 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
         return;
       }
       console.log("✅ Aceitando convite:", inviteData);
-      const roomId = (inviteData.roomId || `room_${inviteData.inviteId}`).toUpperCase(); // <-- NORMALIZAR
+      const roomId = (
+        inviteData.roomId || `room_${inviteData.inviteId}`
+      ).toUpperCase();
       setCurrentRoomId(roomId);
+      setShowChat(true);
       socketClient.emit("join-room", {
         roomId: roomId,
         playerName: currentUser,
@@ -598,13 +630,14 @@ export default function OnlineLobby({ onJoinGame, onCancel, currentUser }) {
           )}
         </div>
 
-        {currentRoomId && socketClient.socket && (
+        {/* 🔥 CHAT - AGORA FUNCIONA QUANDO currentRoomId ESTÁ DEFINIDO */}
+        {currentRoomId && socketClient.socket && isConnected && (
           <div style={chatWrapperStyle()}>
             <Chat
               socket={socketClient.socket}
               roomId={currentRoomId}
               playerName={currentUser}
-              key={`chat-${currentRoomId}-${socketClient.socket.id}`}
+              key={`chat-${currentRoomId}-${socketClient.socket.id || "default"}`}
             />
           </div>
         )}

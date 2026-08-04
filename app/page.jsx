@@ -1,4 +1,4 @@
-// app/page.jsx - VERSÃO COMPLETA COM CORREÇÕES
+// app/page.jsx - VERSÃO COMPLETA COM CORREÇÕES (CHAT + ZOOM DESKTOP)
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -38,6 +38,7 @@ import TournamentLobby from "@/components/Poker/TournamentLobby.jsx";
 import ResultModal from "@/components/Poker/ResultModal.jsx";
 import MobileMenu from "@/components/Poker/MobileMenu.jsx";
 import { useToast } from "@/components/Toast/ToastManager";
+import DesktopZoom from "@/components/Poker/DesktopZoom.jsx";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -137,32 +138,38 @@ export default function PokerGame() {
   // ============================================================
   // 🔥 FUNÇÃO PARA RECEBER NOVAS MENSAGENS DE CHAT GLOBAIS
   // ============================================================
-  const handleGlobalChatMessage = useCallback((data) => {
-    const { from, message } = data;
-    
-    toast.chat(`💬 ${from}: ${message.length > 30 ? message.substring(0, 30) + "..." : message}`);
-    
-    try {
-      soundManager.playSound("deal", { volume: 0.1 });
-    } catch (e) {}
-    
-    setGlobalChatUnread((prev) => prev + 1);
-    
-    setGlobalChatNotifications((prev) => [
-      ...prev,
-      {
-        id: Date.now() + Math.random(),
-        from,
-        message: message.length > 50 ? message.substring(0, 50) + "..." : message,
-        timestamp: Date.now(),
-      }
-    ]);
+  const handleGlobalChatMessage = useCallback(
+    (data) => {
+      const { from, message } = data;
 
-    const newCount = globalChatUnread + 1;
-    if (newCount > 0) {
-      document.title = `💬 (${newCount}) Poker by BruCe`;
-    }
-  }, [toast, globalChatUnread]);
+      toast.chat(
+        `💬 ${from}: ${message.length > 30 ? message.substring(0, 30) + "..." : message}`,
+      );
+
+      try {
+        soundManager.playSound("deal", { volume: 0.1 });
+      } catch (e) {}
+
+      setGlobalChatUnread((prev) => prev + 1);
+
+      setGlobalChatNotifications((prev) => [
+        ...prev,
+        {
+          id: Date.now() + Math.random(),
+          from,
+          message:
+            message.length > 50 ? message.substring(0, 50) + "..." : message,
+          timestamp: Date.now(),
+        },
+      ]);
+
+      const newCount = globalChatUnread + 1;
+      if (newCount > 0) {
+        document.title = `💬 (${newCount}) Poker by BruCe`;
+      }
+    },
+    [toast, globalChatUnread],
+  );
 
   const clearGlobalChatNotifications = useCallback(() => {
     setGlobalChatNotifications([]);
@@ -203,7 +210,6 @@ export default function PokerGame() {
   const fetchChipsFromDB = useCallback(async () => {
     if (!currentUser) return null;
     try {
-      // 🔥 MELHORIA: Reduzir timeout para 3 segundos e melhorar error handling
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
 
@@ -227,7 +233,7 @@ export default function PokerGame() {
       }
       return null;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (error.name === "AbortError") {
         console.log("⚠️ Timeout ao buscar fichas (3s)");
       } else {
         console.log("⚠️ Erro ao buscar fichas:", error.message);
@@ -256,14 +262,14 @@ export default function PokerGame() {
       if (chips !== null && chips !== currentChips) {
         console.log(`💰 Fichas atualizadas: ${chips}`);
         setCurrentChips(chips);
-        
+
         setGame((prev) => {
           if (!prev.handActive || prev.playerMoney !== chips) {
             return { ...prev, playerMoney: chips };
           }
           return prev;
         });
-        
+
         if (Math.abs(chips - (session?.user?.chips || 0)) > 10) {
           await update();
         }
@@ -271,7 +277,7 @@ export default function PokerGame() {
         window.dispatchEvent(
           new CustomEvent("chips-updated", {
             detail: { chips: chips },
-          })
+          }),
         );
       }
     } catch (error) {
@@ -300,10 +306,6 @@ export default function PokerGame() {
     async (user, chips, force = false) => {
       if (!user) return;
 
-      // 🔥 FICHAS GLOBAIS: no modo 2 Jogadores (local, mesmo dispositivo),
-      // só o assento do dono da conta (índice 0) pode gravar no saldo
-      // global — caso contrário, o saldo do convidado (Jogador 2)
-      // sobrescreveria a conta real do usuário logado.
       const isHotseatGuestTurn =
         isMultiplayer && multiplayerModeActive && currentPlayerIndex !== 0;
       if (isHotseatGuestTurn) {
@@ -428,9 +430,10 @@ export default function PokerGame() {
   // ====================== FORÇAR RESTAURAÇÃO DO JOGO CPU ======================
   const restoreCpuGame = useCallback(async () => {
     console.log("🔄 Restaurando jogo CPU...");
-    
+
     const chips = await fetchChipsFromDB();
-    const finalChips = chips !== null ? chips : currentChips || session?.user?.chips || 0;
+    const finalChips =
+      chips !== null ? chips : currentChips || session?.user?.chips || 0;
 
     console.log(`💰 Fichas restauradas: ${finalChips}`);
 
@@ -457,7 +460,7 @@ export default function PokerGame() {
     }
 
     await update();
-    
+
     console.log("✅ Jogo CPU restaurado com sucesso!");
   }, [fetchChipsFromDB, currentChips, session, currentUser, update]);
 
@@ -474,11 +477,11 @@ export default function PokerGame() {
     if (!onlineGame && !showOnline && currentUser && hasLeftOnlineRef.current) {
       console.log("🔄 Detectada saída do multiplayer, restaurando jogo CPU...");
       hasLeftOnlineRef.current = false;
-      
+
       const timer = setTimeout(() => {
         restoreCpuGame();
       }, 300);
-      
+
       return () => clearTimeout(timer);
     }
   }, [onlineGame, showOnline, currentUser, restoreCpuGame]);
@@ -683,16 +686,16 @@ export default function PokerGame() {
   // ====================== ATUALIZAR ESTATÍSTICAS ======================
   const updateStats = useCallback(
     async (result, chips, handName, wasAllIn = false) => {
-      // 🔥 No multiplayer, só atualiza estatísticas globais para o dono da conta (índice 0)
       if (isMultiplayer && multiplayerModeActive && currentPlayerIndex !== 0) {
-        console.log("🔍 [updateStats] Pulando atualização de estatísticas - não é dono da conta no multiplayer");
+        console.log(
+          "🔍 [updateStats] Pulando atualização de estatísticas - não é dono da conta no multiplayer",
+        );
         return;
       }
 
       if (!currentUser) return;
 
       try {
-        // 🔥 CORREÇÃO: Adicionar timeout e melhorar error handling
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
@@ -712,7 +715,11 @@ export default function PokerGame() {
         clearTimeout(timeoutId);
 
         if (!res.ok) {
-          console.error("❌ Erro na resposta da API update-stats:", res.status, res.statusText);
+          console.error(
+            "❌ Erro na resposta da API update-stats:",
+            res.status,
+            res.statusText,
+          );
           return null;
         }
 
@@ -761,9 +768,10 @@ export default function PokerGame() {
       const validResults = ["win", "loss", "tie"];
       if (!handData.result || !validResults.includes(handData.result)) return;
 
-      // 🔥 No multiplayer, só o dono da conta (índice 0) salva histórico globalmente
       if (isMultiplayer && multiplayerModeActive && currentPlayerIndex !== 0) {
-        console.log("🔍 [saveHandHistory] Pulando histórico - não é dono da conta no multiplayer");
+        console.log(
+          "🔍 [saveHandHistory] Pulando histórico - não é dono da conta no multiplayer",
+        );
         return;
       }
 
@@ -912,19 +920,16 @@ export default function PokerGame() {
           const handId = `${currentUser || "player"}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
           if (comparison === 0) {
-            // 🔥 EMPATE: Cada jogador recebe de volta suas apostas + metade do pote total
             const playerBet = state.playerBet || 0;
             const cpuBet = state.cpuBet || 0;
             const totalPot = finalState.pot;
-            
-            // 🔥 Cada jogador recebe de volta suas apostas
+
             finalState.playerMoney += playerBet;
             finalState.cpuMoney += cpuBet;
-            
-            // 🔥 Dividir o pote restante igualmente
+
             const split = Math.floor(totalPot / 2);
             const remainder = totalPot - split * 2;
-            
+
             finalState.playerMoney += split + remainder;
             finalState.cpuMoney += split;
 
@@ -948,11 +953,12 @@ export default function PokerGame() {
             });
 
             if (isMultiplayer && multiplayerModeActive) {
-              updateMultiplayerChips(currentPlayerIndex, finalState.playerMoney);
-              // 🔥 Salvar fichas globalmente também no multiplayer
+              updateMultiplayerChips(
+                currentPlayerIndex,
+                finalState.playerMoney,
+              );
               if (currentPlayerIndex === 0) {
                 await saveChips(u, finalState.playerMoney, false);
-                // 🔥 Atualizar estatísticas globalmente no multiplayer (empate)
                 await updateStats("tie", split, pName, state.playerAllin);
               }
             }
@@ -985,8 +991,10 @@ export default function PokerGame() {
             result = "win";
 
             if (isMultiplayer && multiplayerModeActive) {
-              updateMultiplayerChips(currentPlayerIndex, finalState.playerMoney);
-              // 🔥 Salvar fichas globalmente também no multiplayer
+              updateMultiplayerChips(
+                currentPlayerIndex,
+                finalState.playerMoney,
+              );
               if (currentPlayerIndex === 0) {
                 await saveChips(u, finalState.playerMoney, false);
               }
@@ -1051,11 +1059,12 @@ export default function PokerGame() {
             });
 
             if (isMultiplayer && multiplayerModeActive) {
-              updateMultiplayerChips(currentPlayerIndex, finalState.playerMoney);
-              // 🔥 Salvar fichas globalmente também no multiplayer
+              updateMultiplayerChips(
+                currentPlayerIndex,
+                finalState.playerMoney,
+              );
               if (currentPlayerIndex === 0) {
                 await saveChips(u, finalState.playerMoney, false);
-                // 🔥 Atualizar estatísticas globalmente no multiplayer (derrota)
                 await updateStats("loss", lost, cName);
               }
             }
@@ -1120,7 +1129,6 @@ export default function PokerGame() {
     });
   }
 
-  // ====================== FECHAR MODAL ======================
   // ====================== ALTERNAR JOGADOR ======================
   const switchToNextPlayer = useCallback(() => {
     if (
@@ -1132,10 +1140,10 @@ export default function PokerGame() {
       setCurrentPlayerIndex(nextIndex);
       const playerName = multiplayerPlayers[nextIndex]?.name || "Jogador";
       const playerChips = multiplayerPlayers[nextIndex]?.chips || 0;
-      showNotification(`🎯 Vez de ${playerName} (💰 ${playerChips} fichas)!`, false);
-      // 🔥 Retorna o índice diretamente: setCurrentPlayerIndex é assíncrono,
-      // então quem chama isso e em seguida usa `currentPlayerIndex` no mesmo
-      // tick ainda veria o valor antigo — usar o retorno evita essa corrida.
+      showNotification(
+        `🎯 Vez de ${playerName} (💰 ${playerChips} fichas)!`,
+        false,
+      );
       return nextIndex;
     }
     return false;
@@ -1177,10 +1185,6 @@ export default function PokerGame() {
       const refreshChipsAfterModal = async () => {
         const scheduleNextHand = (delay) => {
           startNewHandTimeoutRef.current = setTimeout(async () => {
-            // 🔥 Troca de jogador PRIMEIRO — usamos o índice retornado
-            // diretamente (não o state, que ainda não teria re-renderizado
-            // neste mesmo tick) para decidir de onde vêm as fichas da
-            // próxima mão.
             let nextIndex = currentPlayerIndex;
             if (isMultiplayer && multiplayerModeActive) {
               const switched = switchToNextPlayer();
@@ -1287,158 +1291,166 @@ export default function PokerGame() {
   }
 
   // ====================== INICIAR MÃO ======================
-  const startNewHand = useCallback(async (user, initialMoney, playerIndexOverride) => {
-    if (isProcessingAction.current) return;
+  const startNewHand = useCallback(
+    async (user, initialMoney, playerIndexOverride) => {
+      if (isProcessingAction.current) return;
 
-    console.log("🔍 [startNewHand] Iniciando nova mão!", { user, initialMoney });
-
-    // 🔥 ESCONDER BOTÃO NOVA MÃO
-    setWaitingForNewHand(false);
-
-    if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
-    if (startNewHandTimeoutRef.current) {
-      clearTimeout(startNewHandTimeoutRef.current);
-      startNewHandTimeoutRef.current = null;
-    }
-
-    // 🔥 BUSCAR FICHAS ATUALIZADAS DO BANCO ANTES DE INICIAR
-    const checkAndStart = async () => {
-      // 🔥 FICHAS GLOBAIS: só buscamos o saldo persistido (DB) quando é a vez
-      // do dono da conta. No modo 2 Jogadores, o convidado (assento != 0) usa
-      // sua própria pilha local (multiplayerPlayers) — do contrário ele
-      // herdaria (e sobrescreveria) o saldo global do dono da conta.
-      // Usamos `playerIndexOverride` quando disponível (ex.: logo após trocar
-      // de jogador) pois `currentPlayerIndex` do state ainda não teria sido
-      // atualizado nesse mesmo tick.
-      const effectiveIndex =
-        typeof playerIndexOverride === "number"
-          ? playerIndexOverride
-          : currentPlayerIndex;
-      const isHotseatGuestTurn =
-        isMultiplayer && multiplayerModeActive && effectiveIndex !== 0;
-
-      let playerMoney;
-      if (isHotseatGuestTurn) {
-        playerMoney =
-          typeof initialMoney === "number"
-            ? initialMoney
-            : (multiplayerPlayers[effectiveIndex]?.chips ?? 0);
-      } else {
-        const freshChips = await fetchChipsFromDB();
-        playerMoney = freshChips !== null ? freshChips : currentChips || session?.user?.chips || 0;
-      }
-
-      console.log(`🔍 [startNewHand] Fichas verificadas: ${playerMoney}`);
-
-      if (playerMoney <= 0) {
-        // 🔥 SEM FICHAS - MOSTRAR MENSAGEM E MANTER ESPERA
-        showNotification(
-          "❌ Você não tem fichas! Clique em RENOVAR FICHAS para recarregar.",
-          true,
-        );
-        setWaitingForNewHand(true);
-        setGame((prev) => ({ ...prev, handActive: false }));
-        return;
-      }
-
-      // 🔥 TEM FICHAS - INICIAR JOGO
-      setGame((prev) => {
-        let playerMoneyLocal = playerMoney;
-        // 🔥 CPU não recebe fichas automaticamente - precisa de reset manual
-        let cpuMoney = prev.cpuMoney;
-
-        const deck = createDeck();
-
-        try {
-          soundManager.playSound("shuffle");
-          setTimeout(() => {
-            try {
-              soundManager.playSound("deal");
-            } catch (e) {}
-          }, 200);
-        } catch (e) {}
-
-        const playerCards = [deck.pop(), deck.pop()];
-        const cpuCards = [deck.pop(), deck.pop()];
-
-        let pot = 0,
-          playerBet = 0,
-          cpuBet = 0,
-          currentBet = 0;
-        let playerAllin = false,
-          cpuAllin = false;
-
-        const sb = 25,
-          bb = 50;
-
-        if (playerMoneyLocal >= sb) {
-          playerMoneyLocal -= sb;
-          playerBet = sb;
-          pot += sb;
-        } else {
-          playerBet = playerMoneyLocal;
-          pot += playerMoneyLocal;
-          playerMoneyLocal = 0;
-          playerAllin = true;
-        }
-
-        if (cpuMoney >= bb) {
-          cpuMoney -= bb;
-          cpuBet = bb;
-          pot += bb;
-        } else {
-          cpuBet = cpuMoney;
-          pot += cpuMoney;
-          cpuMoney = 0;
-          cpuAllin = true;
-        }
-        currentBet = Math.max(playerBet, cpuBet);
-
-        const newG = {
-          deck,
-          community: [],
-          playerCards,
-          cpuCards,
-          pot,
-          playerMoney: playerMoneyLocal,
-          cpuMoney,
-          currentBet,
-          playerBet,
-          cpuBet,
-          stage: "preflop",
-          handActive: true,
-          waitingPlayer: true,
-          gameOver: false,
-          playerAllin,
-          cpuAllin,
-          raiseCounter: 0,
-          showdownStarted: false,
-          playerHandName: "",
-          cpuHandName: "🔒 ???",
-          winnerMsg: "",
-          cpuThought: "",
-          playerSuggestion: "",
-          gameStatus: "Pré-flop - Sua vez",
-        };
-
-        console.log("🔍 [startNewHand] Nova mão criada:", newG);
-
-        const u = user || currentUser;
-        setTimeout(() => saveChips(u, newG.playerMoney), 100);
-
-        if (
-          (playerAllin || cpuAllin) &&
-          playerBet === currentBet &&
-          cpuBet === currentBet
-        ) {
-          return fastForwardToShowdown(newG, u);
-        }
-        return newG;
+      console.log("🔍 [startNewHand] Iniciando nova mão!", {
+        user,
+        initialMoney,
       });
-    };
 
-    checkAndStart();
-  }, [currentUser, fetchChipsFromDB, currentChips, session, showNotification, currentPlayerIndex, isMultiplayer, multiplayerModeActive, multiplayerPlayers, saveChips]);
+      setWaitingForNewHand(false);
+
+      if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current);
+      if (startNewHandTimeoutRef.current) {
+        clearTimeout(startNewHandTimeoutRef.current);
+        startNewHandTimeoutRef.current = null;
+      }
+
+      const checkAndStart = async () => {
+        const effectiveIndex =
+          typeof playerIndexOverride === "number"
+            ? playerIndexOverride
+            : currentPlayerIndex;
+        const isHotseatGuestTurn =
+          isMultiplayer && multiplayerModeActive && effectiveIndex !== 0;
+
+        let playerMoney;
+        if (isHotseatGuestTurn) {
+          playerMoney =
+            typeof initialMoney === "number"
+              ? initialMoney
+              : (multiplayerPlayers[effectiveIndex]?.chips ?? 0);
+        } else {
+          const freshChips = await fetchChipsFromDB();
+          playerMoney =
+            freshChips !== null
+              ? freshChips
+              : currentChips || session?.user?.chips || 0;
+        }
+
+        console.log(`🔍 [startNewHand] Fichas verificadas: ${playerMoney}`);
+
+        if (playerMoney <= 0) {
+          showNotification(
+            "❌ Você não tem fichas! Clique em RENOVAR FICHAS para recarregar.",
+            true,
+          );
+          setWaitingForNewHand(true);
+          setGame((prev) => ({ ...prev, handActive: false }));
+          return;
+        }
+
+        setGame((prev) => {
+          let playerMoneyLocal = playerMoney;
+          let cpuMoney = prev.cpuMoney;
+
+          const deck = createDeck();
+
+          try {
+            soundManager.playSound("shuffle");
+            setTimeout(() => {
+              try {
+                soundManager.playSound("deal");
+              } catch (e) {}
+            }, 200);
+          } catch (e) {}
+
+          const playerCards = [deck.pop(), deck.pop()];
+          const cpuCards = [deck.pop(), deck.pop()];
+
+          let pot = 0,
+            playerBet = 0,
+            cpuBet = 0,
+            currentBet = 0;
+          let playerAllin = false,
+            cpuAllin = false;
+
+          const sb = 25,
+            bb = 50;
+
+          if (playerMoneyLocal >= sb) {
+            playerMoneyLocal -= sb;
+            playerBet = sb;
+            pot += sb;
+          } else {
+            playerBet = playerMoneyLocal;
+            pot += playerMoneyLocal;
+            playerMoneyLocal = 0;
+            playerAllin = true;
+          }
+
+          if (cpuMoney >= bb) {
+            cpuMoney -= bb;
+            cpuBet = bb;
+            pot += bb;
+          } else {
+            cpuBet = cpuMoney;
+            pot += cpuMoney;
+            cpuMoney = 0;
+            cpuAllin = true;
+          }
+          currentBet = Math.max(playerBet, cpuBet);
+
+          const newG = {
+            deck,
+            community: [],
+            playerCards,
+            cpuCards,
+            pot,
+            playerMoney: playerMoneyLocal,
+            cpuMoney,
+            currentBet,
+            playerBet,
+            cpuBet,
+            stage: "preflop",
+            handActive: true,
+            waitingPlayer: true,
+            gameOver: false,
+            playerAllin,
+            cpuAllin,
+            raiseCounter: 0,
+            showdownStarted: false,
+            playerHandName: "",
+            cpuHandName: "🔒 ???",
+            winnerMsg: "",
+            cpuThought: "",
+            playerSuggestion: "",
+            gameStatus: "Pré-flop - Sua vez",
+          };
+
+          console.log("🔍 [startNewHand] Nova mão criada:", newG);
+
+          const u = user || currentUser;
+          setTimeout(() => saveChips(u, newG.playerMoney), 100);
+
+          if (
+            (playerAllin || cpuAllin) &&
+            playerBet === currentBet &&
+            cpuBet === currentBet
+          ) {
+            return fastForwardToShowdown(newG, u);
+          }
+          return newG;
+        });
+      };
+
+      checkAndStart();
+    },
+    [
+      currentUser,
+      fetchChipsFromDB,
+      currentChips,
+      session,
+      showNotification,
+      currentPlayerIndex,
+      isMultiplayer,
+      multiplayerModeActive,
+      multiplayerPlayers,
+      saveChips,
+    ],
+  );
 
   // ====================== TRIGGER CPU ACTION ======================
   function triggerCpuAction(g, user) {
@@ -1585,7 +1597,7 @@ export default function PokerGame() {
         true,
       );
       saveChips(currentUser, state.playerMoney);
-      
+
       if (isMultiplayer && multiplayerModeActive) {
         updateMultiplayerChips(currentPlayerIndex, state.playerMoney);
       }
@@ -1772,7 +1784,6 @@ export default function PokerGame() {
 
     const currentMoney = game.playerMoney || currentChips || 0;
 
-    // 🔥 NO MODO MULTIPLAYER, NÃO PERGUNTAR - SÓ DAS 1000 FICHAS DE CORTESIA
     if (isMultiplayer && multiplayerModeActive) {
       isAllInRef.current = false;
       hasLostAllRef.current = false;
@@ -1817,10 +1828,11 @@ export default function PokerGame() {
       return;
     }
 
-    // 🔥 NO MODO CPU, PERGUNTAR SE QUER RECARREGAR
-    if (!window.confirm(
-      `💰 Você tem ${currentMoney} fichas.\n\nDeseja receber 1000 fichas de cortesia para continuar jogando?\n\n(Suas fichas atuais serão perdidas)`
-    )) {
+    if (
+      !window.confirm(
+        `💰 Você tem ${currentMoney} fichas.\n\nDeseja receber 1000 fichas de cortesia para continuar jogando?\n\n(Suas fichas atuais serão perdidas)`,
+      )
+    ) {
       return;
     }
 
@@ -1860,7 +1872,6 @@ export default function PokerGame() {
       cpuHandName: "🔒 ???",
     }));
 
-    // 🔥 APÓS RENOVAR, AGUARDAR "NOVA MÃO"
     setWaitingForNewHand(true);
   }
 
@@ -1872,10 +1883,6 @@ export default function PokerGame() {
   // ====================== MULTIPLAYER ======================
   const handleMultiplayerStart = useCallback(
     (config) => {
-      // 🔥 FICHAS GLOBAIS: o Jogador 1 (dono da conta logada) sempre entra
-      // no modo 2 Jogadores com o MESMO saldo que tinha no modo CPU — as
-      // fichas nunca são um "reset" para 1000. Os demais assentos (convidados
-      // sem conta, jogando no mesmo dispositivo) usam o valor configurado.
       const ownerChips =
         currentChips ?? session?.user?.chips ?? game?.playerMoney ?? 0;
 
@@ -1956,7 +1963,10 @@ export default function PokerGame() {
         setCurrentPlayerIndex(index);
         const playerName = multiplayerPlayers[index]?.name || "Jogador";
         const playerChips = multiplayerPlayers[index]?.chips || 0;
-        showNotification(`🎯 Vez de ${playerName} (💰 ${playerChips} fichas)!`, false);
+        showNotification(
+          `🎯 Vez de ${playerName} (💰 ${playerChips} fichas)!`,
+          false,
+        );
       }
     },
     [currentPlayerIndex, multiplayerPlayers],
@@ -1970,13 +1980,12 @@ export default function PokerGame() {
       if (data && data.roomId) {
         const isInviteAccepted = data.isInviteAccepted === true;
         const isInviteCreator = data.isInviteCreator === true;
-        
+
         if (isInviteCreator && !isInviteAccepted) {
           console.log("⏳ Aguardando aceitação do convite...");
           return;
         }
 
-        // 🔥 CORREÇÃO: GARANTIR QUE ROOMID ESTEJA EM MAIÚSCULAS
         const normalizedRoomId = data.roomId.toUpperCase();
 
         if (data.isInviteAccepted) {
@@ -2003,67 +2012,67 @@ export default function PokerGame() {
   );
 
   const handleLeaveOnlineGame = useCallback(
-  async (shouldReset = false) => {
-    console.log("👋 Saindo do jogo online...");
-    
-    // 🔥 LIMPAR ESTADO DO JOGO ONLINE
-    setOnlineGame(null);
-    showNotification("👋 Saiu do jogo online", false);
+    async (shouldReset = false) => {
+      console.log("👋 Saindo do jogo online...");
 
-    hasLeftOnlineRef.current = true;
+      setOnlineGame(null);
+      showNotification("👋 Saiu do jogo online", false);
 
-    if (handleJoinOnlineGame) {
-      handleJoinOnlineGame(null);
-    }
+      hasLeftOnlineRef.current = true;
 
-    // 🔥 FORÇAR ATUALIZAÇÃO DAS FICHAS
-    await refreshUserChips();
-    
-    // 🔥 FORÇAR ATUALIZAÇÃO DO ESTADO DO JOGO CONTRA CPU
-    const chips = await fetchChipsFromDB();
-    const finalChips = chips !== null ? chips : currentChips || session?.user?.chips || 0;
-    
-    console.log(`💰 Fichas após sair do multiplayer: ${finalChips}`);
-    
-    setCurrentChips(finalChips);
-    
-    // 🔥 RESETAR O JOGO COM AS FICHAS CORRETAS
-    setGame({
-      ...INITIAL_GAME,
-      playerMoney: finalChips,
-      cpuMoney: 1000,
-      handActive: false,
-      gameOver: false,
-    });
-    
-    // 🔥 IMPORTANTE: AGUARDAR CLIQUE EM "NOVA MÃO"
-    setWaitingForNewHand(true);
-    
-    // 🔥 LIMPAR TIMERS PENDENTES
-    if (cpuTimerRef.current) {
-      clearTimeout(cpuTimerRef.current);
-      cpuTimerRef.current = null;
-    }
-    if (startNewHandTimeoutRef.current) {
-      clearTimeout(startNewHandTimeoutRef.current);
-      startNewHandTimeoutRef.current = null;
-    }
-    
-    // 🔥 LIMPAR FLAG DE PROCESSAMENTO
-    isProcessingAction.current = false;
-    
-    // 🔥 FORÇAR ATUALIZAÇÃO DA SESSÃO
-    await update();
+      if (handleJoinOnlineGame) {
+        handleJoinOnlineGame(null);
+      }
 
-    // 🔥 FORÇAR ATUALIZAÇÃO DA INTERFACE
-    setTimeout(() => {
-      refreshUserChips();
-    }, 500);
+      await refreshUserChips();
 
-    console.log("✅ Jogo CPU restaurado após sair do multiplayer");
-  },
-  [showNotification, refreshUserChips, handleJoinOnlineGame, fetchChipsFromDB, currentChips, session, update],
-);
+      const chips = await fetchChipsFromDB();
+      const finalChips =
+        chips !== null ? chips : currentChips || session?.user?.chips || 0;
+
+      console.log(`💰 Fichas após sair do multiplayer: ${finalChips}`);
+
+      setCurrentChips(finalChips);
+
+      setGame({
+        ...INITIAL_GAME,
+        playerMoney: finalChips,
+        cpuMoney: 1000,
+        handActive: false,
+        gameOver: false,
+      });
+
+      setWaitingForNewHand(true);
+
+      if (cpuTimerRef.current) {
+        clearTimeout(cpuTimerRef.current);
+        cpuTimerRef.current = null;
+      }
+      if (startNewHandTimeoutRef.current) {
+        clearTimeout(startNewHandTimeoutRef.current);
+        startNewHandTimeoutRef.current = null;
+      }
+
+      isProcessingAction.current = false;
+
+      await update();
+
+      setTimeout(() => {
+        refreshUserChips();
+      }, 500);
+
+      console.log("✅ Jogo CPU restaurado após sair do multiplayer");
+    },
+    [
+      showNotification,
+      refreshUserChips,
+      handleJoinOnlineGame,
+      fetchChipsFromDB,
+      currentChips,
+      session,
+      update,
+    ],
+  );
 
   // ====================== SUGESTÃO DO JOGADOR ======================
   function getPlayerSuggestion(g) {
@@ -2127,39 +2136,24 @@ export default function PokerGame() {
   const g = game || INITIAL_GAME;
   const suggestion = getPlayerSuggestion(g);
   const showCpuCards = !g?.handActive || g?.stage === "showdown";
-  
-  // 🔥 BOTÕES DE AÇÃO SÓ FUNCIONAM SE O JOGO ESTIVER ATIVO
-  const actionButtonsDisabled =
-  !g?.handActive ||
-  !g?.waitingPlayer ||
-  g?.gameOver ||
-  g?.stage === "showdown" ||
-  g?.playerMoney <= 0 ||
-  g?.playerAllin ||
-  isProcessingAction.current ||
-  waitingForNewHand;
 
-  // 🔥 CONSOLE.LOG PARA DEBUG
-  console.log("🔍 [Page] RENDER - Estado do jogo:", {
-    handActive: g?.handActive,
-    waitingPlayer: g?.waitingPlayer,
-    gameOver: g?.gameOver,
-    stage: g?.stage,
-    playerMoney: g?.playerMoney,
-    playerAllin: g?.playerAllin,
-    isProcessingAction: isProcessingAction.current,
-    waitingForNewHand,
-    actionButtonsDisabled,
-    toCall: (g?.currentBet || 0) - (g?.playerBet || 0),
-    canRaise: !actionButtonsDisabled && !g?.playerAllin && (g?.currentBet || 0) - (g?.playerBet || 0) + (50 + (g?.raiseCounter || 0) * 50) <= (g?.playerMoney || 0),
-  });
+  const actionButtonsDisabled =
+    !g?.handActive ||
+    !g?.waitingPlayer ||
+    g?.gameOver ||
+    g?.stage === "showdown" ||
+    g?.playerMoney <= 0 ||
+    g?.playerAllin ||
+    isProcessingAction.current ||
+    waitingForNewHand;
 
   const toCall = (g?.currentBet || 0) - (g?.playerBet || 0);
   const nextRaise = 50 + (g?.raiseCounter || 0) * 50;
   const canRaise =
     !actionButtonsDisabled &&
     !g?.playerAllin &&
-    (g?.currentBet || 0) - (g?.playerBet || 0) + nextRaise <= (g?.playerMoney || 0);
+    (g?.currentBet || 0) - (g?.playerBet || 0) + nextRaise <=
+      (g?.playerMoney || 0);
   const stageNames = {
     preflop: "Pré-flop",
     flop: "Flop",
@@ -2226,6 +2220,7 @@ export default function PokerGame() {
 
   return (
     <>
+      <DesktopZoom />
       <div
         style={{
           margin: 0,
@@ -2278,9 +2273,15 @@ export default function PokerGame() {
         <MobileMenu
           onOpenAchievements={() => setShowAchievementsModal(true)}
           onOpenFindings={() => setShowFindingsModal(true)}
-          onOpenFriends={() => { /* Friends functionality */ }}
-          onOpenMissions={() => { /* Missions functionality */ }}
-          onOpenHistory={() => { /* History functionality */ }}
+          onOpenFriends={() => {
+            /* Friends functionality */
+          }}
+          onOpenMissions={() => {
+            /* Missions functionality */
+          }}
+          onOpenHistory={() => {
+            /* History functionality */
+          }}
         />
 
         <ToolbarButtons
@@ -2395,55 +2396,57 @@ export default function PokerGame() {
             >
               {g && (
                 <>
-                {[
-                  ["💰", g?.pot || 0],
-                  ["🎴", stageNames[g?.stage] || g?.stage || "preflop"],
-                  ["👤", g?.playerMoney || 0],
-                  ["🤖", g?.cpuMoney || 0],
-                  ["📊", `Aposta: ${g?.currentBet || 0}`],
-                  ["🚀", isTurbo ? "Turbo" : "Normal"],
-                  ["👥", isMultiplayer && multiplayerModeActive ? "2P" : "1P"],
-                ].map(([icon, val], i) => (
-                <motion.div
-                  key={`header-${i}-${icon}`}
-                  style={{
-                    background: "var(--bg-button)",
-                    padding: "4px 12px",
-                    borderRadius: 40,
-                    color: "var(--text-primary)",
-                    fontWeight: "bold",
-                    fontSize: "0.85rem",
-                    whiteSpace: "nowrap",
-                    transition: "var(--transition-theme)",
-                  }}
-                  whileHover={{ scale: 1.03 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  <span
-                    style={{
-                      color:
-                        icon === "🚀"
-                          ? isTurbo
-                            ? "#ff9800"
-                            : "#888"
-                          : icon === "👥"
-                            ? isMultiplayer && multiplayerModeActive
-                              ? "#4caf50"
-                              : "#888"
-                            : "gold",
-                      fontSize: "1.1rem",
-                      fontWeight: 800,
-                      marginRight: 5,
-                    }}
-                  >
-                    {icon}
-                  </span>
-                  {val}
-                </motion.div>
-              ))}
+                  {[
+                    ["💰", g?.pot || 0],
+                    ["🎴", stageNames[g?.stage] || g?.stage || "preflop"],
+                    ["👤", g?.playerMoney || 0],
+                    ["🤖", g?.cpuMoney || 0],
+                    ["📊", `Aposta: ${g?.currentBet || 0}`],
+                    ["🚀", isTurbo ? "Turbo" : "Normal"],
+                    [
+                      "👥",
+                      isMultiplayer && multiplayerModeActive ? "2P" : "1P",
+                    ],
+                  ].map(([icon, val], i) => (
+                    <motion.div
+                      key={`header-${i}-${icon}`}
+                      style={{
+                        background: "var(--bg-button)",
+                        padding: "4px 12px",
+                        borderRadius: 40,
+                        color: "var(--text-primary)",
+                        fontWeight: "bold",
+                        fontSize: "0.85rem",
+                        whiteSpace: "nowrap",
+                        transition: "var(--transition-theme)",
+                      }}
+                      whileHover={{ scale: 1.03 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      <span
+                        style={{
+                          color:
+                            icon === "🚀"
+                              ? isTurbo
+                                ? "#ff9800"
+                                : "#888"
+                              : icon === "👥"
+                                ? isMultiplayer && multiplayerModeActive
+                                  ? "#4caf50"
+                                  : "#888"
+                                : "gold",
+                          fontSize: "1.1rem",
+                          fontWeight: 800,
+                          marginRight: 5,
+                        }}
+                      >
+                        {icon}
+                      </span>
+                      {val}
+                    </motion.div>
+                  ))}
                 </>
               )}
-
             </div>
 
             {isMultiplayer &&
@@ -2455,8 +2458,8 @@ export default function PokerGame() {
                     currentPlayer={currentPlayerIndex}
                     onSelectPlayer={handleSwitchPlayer}
                   />
-                  {/* 🔥 Botão de renovar fichas no multiplayer */}
-                  {(multiplayerPlayers[currentPlayerIndex]?.chips ?? 0) <= 0 && (
+                  {(multiplayerPlayers[currentPlayerIndex]?.chips ?? 0) <=
+                    0 && (
                     <motion.button
                       onClick={resetSession}
                       style={{
@@ -2511,7 +2514,6 @@ export default function PokerGame() {
                   />
                 )}
 
-                {/* 🔥 ACTION BUTTONS */}
                 {g && (
                   <ActionButtons
                     disabled={actionButtonsDisabled}
@@ -2524,7 +2526,9 @@ export default function PokerGame() {
                     onAllIn={playerAllIn}
                     onReset={resetSession}
                     onNewHand={() => {
-                      console.log("🔍 [Page] onNewHand chamado! Iniciando nova mão...");
+                      console.log(
+                        "🔍 [Page] onNewHand chamado! Iniciando nova mão...",
+                      );
                       startNewHand(currentUser, undefined);
                     }}
                     playerMoney={g?.playerMoney || 0}
@@ -2587,7 +2591,13 @@ export default function PokerGame() {
                     playerBet={g?.playerBet ?? 0}
                     cpuBet={g?.cpuBet ?? 0}
                     nextRaise={nextRaise ?? 0}
-                    notification={notification ?? { msg: "", isError: false, visible: false }}
+                    notification={
+                      notification ?? {
+                        msg: "",
+                        isError: false,
+                        visible: false,
+                      }
+                    }
                     stageNames={stageNames ?? {}}
                     gameStatus={g?.gameStatus ?? ""}
                     winnerMsg={g?.winnerMsg ?? ""}
