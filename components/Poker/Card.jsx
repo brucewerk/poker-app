@@ -1,4 +1,4 @@
-// components/Poker/Card.jsx - COMPLETO CORRIGIDO
+// components/Poker/Card.jsx - COMPLETO CORRIGIDO (TAMANHO RESPONSIVO VIA CSS VARS)
 "use client";
 
 import { motion } from "framer-motion";
@@ -46,11 +46,32 @@ const Card = memo(function Card({
               ? "10"
               : card.rank;
 
-  // 🔥 CORRIGIDO: Garantir que todos os tamanhos tenham valores definidos
+  // 🔥 CORRIGIDO: Tamanhos agora usam as variáveis CSS responsivas (--card-width,
+  // --card-height, --card-font) já definidas em globals.css por breakpoint.
+  // Antes os tamanhos eram fixos em pixels e NUNCA respondiam ao tamanho da tela,
+  // fazendo a mesa (principalmente as 5 cartas comunitárias) ficar grande demais
+  // no celular e empurrar os botões de ação para baixo. As proporções abaixo
+  // (0.8333 / 1 / 1.1667) preservam a relação de tamanho original entre
+  // small/normal/large (50/60/70 no desktop).
   const sizeMap = {
-    small: { width: 50, height: 70, fontSize: "0.8rem", suitSize: "0.9rem" },
-    normal: { width: 60, height: 84, fontSize: "0.9rem", suitSize: "1rem" },
-    large: { width: 70, height: 98, fontSize: "1rem", suitSize: "1.2rem" },
+    small: {
+      width: "calc(var(--card-width) * 0.8333)",
+      height: "calc(var(--card-height) * 0.8333)",
+      fontSize: "calc(var(--card-font) * 0.8333)",
+      suitSize: "calc(var(--card-font) * 0.95)",
+    },
+    normal: {
+      width: "var(--card-width)",
+      height: "var(--card-height)",
+      fontSize: "var(--card-font)",
+      suitSize: "calc(var(--card-font) * 1.05)",
+    },
+    large: {
+      width: "calc(var(--card-width) * 1.1667)",
+      height: "calc(var(--card-height) * 1.1667)",
+      fontSize: "calc(var(--card-font) * 1.15)",
+      suitSize: "calc(var(--card-font) * 1.3)",
+    },
   };
 
   // 🔥 CORRIGIDO: Fallback para "normal" se o size não existir
@@ -92,7 +113,7 @@ const Card = memo(function Card({
 
   const cardStyles = getCardStyles();
 
-  // 🔥 CORRIGIDO: Calcular tamanhos em pixels para evitar NaN
+  // 🔥 Tamanhos (strings CSS calc()/var(), responsivos por breakpoint)
   const fontSize = sizeConfig.fontSize;
   const suitSize = sizeConfig.suitSize;
   const suitSizeLarge = `calc(${suitSize} * 1.8)`;

@@ -1,4 +1,4 @@
-// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO (MODO CLARO LEGÍVEL)
+// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO (DEALER/TURBO NA LINHA DA CPU)
 "use client";
 
 import { useState, useEffect, useMemo, memo, useRef } from "react";
@@ -26,10 +26,13 @@ const GameTable = memo(function GameTable({
   currentUser,
 }) {
   // 🔥 Otimização: Evitar re-renders desnecessários
-  const memoizedCommunityCards = useMemo(() => communityCards, [communityCards]);
+  const memoizedCommunityCards = useMemo(
+    () => communityCards,
+    [communityCards],
+  );
   const memoizedPlayerCards = useMemo(() => playerCards, [playerCards]);
   const memoizedCpuCards = useMemo(() => cpuCards, [cpuCards]);
-  
+
   const [potAnimationKey, setPotAnimationKey] = useState(0);
   const [showPotEffect, setShowPotEffect] = useState(false);
   const chipKeyCounter = useRef(0);
@@ -83,7 +86,7 @@ const GameTable = memo(function GameTable({
   const renderChips = useMemo(() => {
     const chipCount = Math.min(Math.floor(pot / 25), 20);
     if (chipCount === 0) return null;
-    
+
     const chips = [];
     for (let i = 0; i < chipCount; i++) {
       chipKeyCounter.current += 1;
@@ -136,45 +139,6 @@ const GameTable = memo(function GameTable({
       initial="idle"
     >
       <div className="game-table-felt" style={tableFeltStyle()}>
-        {/* Área do dealer com Turbo integrado ao lado direito */}
-        <div className="game-table-dealer" style={dealerAreaStyle()}>
-          <motion.span
-            className="game-table-dealer-text"
-            animate={{
-              opacity: [0.7, 0.9, 0.7],
-              scale: [1, 1.05, 1],
-            }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            🎯 DEALER
-          </motion.span>
-          {isTurbo && (
-            <motion.span
-              style={{
-                marginLeft: "12px",
-                padding: "2px 12px",
-                borderRadius: "12px",
-                background: "rgba(255, 152, 0, 0.2)",
-                border: "1px solid rgba(255, 152, 0, 0.3)",
-                color: "#ff9800",
-                fontSize: "0.55rem",
-                fontWeight: "700",
-                letterSpacing: "0.5px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-              animate={{
-                scale: [1, 1.08, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{ duration: 1.2, repeat: Infinity }}
-            >
-              🚀 TURBO
-            </motion.span>
-          )}
-        </div>
-
         {/* Cartas da CPU */}
         <div
           className="game-table-player-area game-table-player-area-cpu"
@@ -191,6 +155,20 @@ const GameTable = memo(function GameTable({
             >
               💰 {cpuBet}
             </motion.span>
+            {/* 🔥 DEALER e TURBO agora ficam na mesma linha da CPU, como últimos itens */}
+            <span className="game-table-dealer-inline">🎯 DEALER</span>
+            {isTurbo && (
+              <motion.span
+                className="game-table-turbo-inline"
+                animate={{
+                  scale: [1, 1.08, 1],
+                  opacity: [0.7, 1, 0.7],
+                }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+              >
+                🚀 TURBO
+              </motion.span>
+            )}
           </div>
           <div className="game-table-cards-row">
             {cpuCards && cpuCards.length > 0 ? (
@@ -451,26 +429,6 @@ function tableFeltStyle() {
   };
 }
 
-function dealerAreaStyle() {
-  return {
-    position: "absolute",
-    top: 10,
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: "var(--bg-element)",
-    padding: "6px 24px",
-    borderRadius: 24,
-    border: "1px solid var(--border-element)",
-    backdropFilter: "blur(8px)",
-    boxShadow: "0 4px 12px var(--shadow-element), 0 2px 6px rgba(0,0,0,0.05)",
-    transition: "var(--transition-theme)",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    zIndex: 100,
-  };
-}
-
 function cpuAreaStyle() {
   return {
     textAlign: "center",
@@ -510,10 +468,13 @@ function communityAreaStyle() {
   };
 }
 
+// 🔥 CORRIGIDO: placeholder agora usa exatamente o mesmo cálculo responsivo
+// do size="large" do componente Card, garantindo que a mesa NUNCA mude de
+// tamanho entre "sem cartas" e "com cartas".
 function emptyCardSlotStyle() {
   return {
-    width: 75,
-    height: 105,
+    width: "calc(var(--card-width) * 1.1667)",
+    height: "calc(var(--card-height) * 1.1667)",
     borderRadius: 8,
     background: "var(--bg-empty-card)",
     border: "2px dashed var(--border-empty-card)",

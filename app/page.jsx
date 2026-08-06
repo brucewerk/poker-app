@@ -1,4 +1,4 @@
-// app/page.jsx - VERSÃO COMPLETA COM CORREÇÕES (CHAT + ZOOM DESKTOP)
+// app/page.jsx - VERSÃO COMPLETA CORRIGIDA
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -36,7 +36,7 @@ import ToolbarButtons from "@/components/Poker/ToolbarButtons.jsx";
 import GameTable from "@/components/Poker/GameTable.jsx";
 import TournamentLobby from "@/components/Poker/TournamentLobby.jsx";
 import ResultModal from "@/components/Poker/ResultModal.jsx";
-import MobileMenu from "@/components/Poker/MobileMenu.jsx";
+import SideStatsToggles from "@/components/Poker/SideStatsToggles.jsx";
 import { useToast } from "@/components/Toast/ToastManager";
 import DesktopZoom from "@/components/Poker/DesktopZoom.jsx";
 
@@ -2221,6 +2221,19 @@ export default function PokerGame() {
   return (
     <>
       <DesktopZoom />
+
+      {/* 🔥 SIDE STATS TOGGLES - COM BOTÃO SAIR NO TOPO */}
+      <SideStatsToggles
+        pot={g?.pot || 0}
+        stage={g?.stage || "preflop"}
+        playerMoney={g?.playerMoney || 0}
+        cpuMoney={g?.cpuMoney || 0}
+        currentBet={g?.currentBet || 0}
+        isTurbo={isTurbo}
+        isMultiplayer={isMultiplayer && multiplayerModeActive}
+        currentUser={currentUser}
+      />
+
       <div
         style={{
           margin: 0,
@@ -2237,53 +2250,6 @@ export default function PokerGame() {
           boxSizing: "border-box",
         }}
       >
-        {currentUser && (
-          <div
-            style={{
-              position: "fixed",
-              top: 8,
-              right: 8,
-              zIndex: 100,
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <motion.button
-              onClick={() => signOut()}
-              style={{
-                background: "rgba(200,50,50,0.8)",
-                color: "white",
-                border: "none",
-                padding: "6px 12px",
-                borderRadius: 20,
-                cursor: "pointer",
-                fontWeight: "bold",
-                backdropFilter: "blur(4px)",
-                fontSize: "0.8rem",
-              }}
-              whileHover={{ scale: 1.05, background: "rgba(200,50,50,0.95)" }}
-              whileTap={{ scale: 0.95 }}
-            >
-              🚪 Sair
-            </motion.button>
-          </div>
-        )}
-
-        <MobileMenu
-          onOpenAchievements={() => setShowAchievementsModal(true)}
-          onOpenFindings={() => setShowFindingsModal(true)}
-          onOpenFriends={() => {
-            /* Friends functionality */
-          }}
-          onOpenMissions={() => {
-            /* Missions functionality */
-          }}
-          onOpenHistory={() => {
-            /* History functionality */
-          }}
-        />
-
         <ToolbarButtons
           isTurbo={isTurbo}
           onTurboToggle={handleTurboToggle}
@@ -2560,6 +2526,8 @@ export default function PokerGame() {
                     {g?.winnerMsg}
                   </motion.div>
                 )}
+
+                {/* 🔥 CORRIGIDO: link "BruCe" para https://klingklang.free.nf */}
                 <div
                   style={{
                     textAlign: "center",
@@ -2570,7 +2538,21 @@ export default function PokerGame() {
                     transition: "var(--transition-theme)",
                   }}
                 >
-                  Desenvolvido por BruCe - 2026
+                  Desenvolvido por{" "}
+                  <a
+                    href="https://klingklang.free.nf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="footer-credit-link"
+                    style={{
+                      color: "var(--gold)",
+                      textDecoration: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    BruCe
+                  </a>{" "}
+                  - 2026
                 </div>
               </div>
 

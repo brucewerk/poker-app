@@ -1,4 +1,4 @@
-// components/Poker/StatusPanel.jsx - CORRIGIDO PARA REALTIME
+// components/Poker/StatusPanel.jsx - CORRIGIDO PARA REALTIME + CONTRASTE MODO CLARO
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,10 +17,10 @@ export default function StatusPanel(props) {
     winnerMsg = "",
     isTurbo = false,
   } = props || {};
-  
+
   // 🔥 FORÇAR RE-RENDER COM KEY
   const updateKey = `${stage}-${pot}-${currentBet}-${playerBet}-${cpuBet}-${isTurbo}`;
-  
+
   const statusItems = [
     {
       id: "stage",
@@ -210,7 +210,11 @@ export default function StatusPanel(props) {
               background: "var(--gold-dim)",
               padding: "4px 12px",
               borderRadius: 12,
-              color: "gold",
+              /* 🔥 CORRIGIDO: "gold" fixo tinha baixo contraste no modo claro
+                 (fundo --gold-dim vira um verde-claro no tema claro e o texto
+                 amarelo puro quase não se lia). var(--gold) já se adapta:
+                 dourado no escuro, verde-escuro no claro. */
+              color: "var(--gold)",
               fontSize: "0.75rem",
               fontWeight: "700",
               transition: "var(--transition-theme)",
@@ -262,7 +266,8 @@ export default function StatusPanel(props) {
               borderRadius: 10,
               fontSize: "0.85rem",
               textAlign: "center",
-              color: "gold",
+              /* 🔥 CORRIGIDO: mesma razão do "Próximo aumento" acima */
+              color: "var(--gold)",
               fontWeight: "700",
               border: "1px solid rgba(255,215,0,0.3)",
               transition: "var(--transition-theme)",

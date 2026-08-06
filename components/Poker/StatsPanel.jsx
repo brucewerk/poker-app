@@ -1,4 +1,4 @@
-// components/Poker/StatsPanel.jsx - COMPLETO COM TÍTULO PADRONIZADO
+// components/Poker/StatsPanel.jsx - COMPLETO COM CONTRASTE MELHORADO NO MODO CLARO
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -83,7 +83,9 @@ export default function StatsPanel({
       <div style={miniChartStyle()}>
         {entries.slice(0, 6).map(([label, value], index) => (
           <div key={label} style={miniBarItemStyle()}>
-            <div style={miniBarLabelStyle()}>{label}</div>
+            <div className="mini-bar-label" style={miniBarLabelStyle()}>
+              {label}
+            </div>
             <div style={miniBarTrackStyle()}>
               <div
                 style={{
@@ -92,7 +94,9 @@ export default function StatsPanel({
                 }}
               />
             </div>
-            <div style={miniBarValueStyle()}>{value}</div>
+            <div className="mini-bar-value" style={miniBarValueStyle()}>
+              {value}
+            </div>
           </div>
         ))}
       </div>
@@ -119,7 +123,9 @@ export default function StatsPanel({
                   }}
                 />
               </div>
-              <div style={monthlyLabelStyle()}>{month.month}</div>
+              <div className="monthly-label" style={monthlyLabelStyle()}>
+                {month.month}
+              </div>
             </div>
           ))}
         </div>
@@ -367,11 +373,21 @@ export default function StatsPanel({
 
               {showAdvanced && (
                 <div style={advancedStatsStyle()}>
-                  <h4 style={advancedTitleStyle()}>🎯 Métricas Avançadas</h4>
+                  <h4
+                    className="chart-section-title"
+                    style={advancedTitleStyle()}
+                  >
+                    🎯 Métricas Avançadas
+                  </h4>
 
                   <div style={advancedGridStyle()}>
                     <div style={advancedMetricStyle()}>
-                      <span style={advancedLabelStyle()}>VPIP</span>
+                      <span
+                        className="advanced-label"
+                        style={advancedLabelStyle()}
+                      >
+                        VPIP
+                      </span>
                       <span
                         style={advancedValueStyle(
                           advancedStats.vpip > 40 ? "#ff9800" : "#4caf50",
@@ -379,11 +395,21 @@ export default function StatsPanel({
                       >
                         {advancedStats.vpip || 0}%
                       </span>
-                      <span style={advancedDescStyle()}>Mãos jogadas</span>
+                      <span
+                        className="advanced-desc"
+                        style={advancedDescStyle()}
+                      >
+                        Mãos jogadas
+                      </span>
                     </div>
 
                     <div style={advancedMetricStyle()}>
-                      <span style={advancedLabelStyle()}>PFR</span>
+                      <span
+                        className="advanced-label"
+                        style={advancedLabelStyle()}
+                      >
+                        PFR
+                      </span>
                       <span
                         style={advancedValueStyle(
                           advancedStats.pfr > 30 ? "#ff9800" : "#4caf50",
@@ -391,11 +417,21 @@ export default function StatsPanel({
                       >
                         {advancedStats.pfr || 0}%
                       </span>
-                      <span style={advancedDescStyle()}>Aumentos pré-flop</span>
+                      <span
+                        className="advanced-desc"
+                        style={advancedDescStyle()}
+                      >
+                        Aumentos pré-flop
+                      </span>
                     </div>
 
                     <div style={advancedMetricStyle()}>
-                      <span style={advancedLabelStyle()}>AF</span>
+                      <span
+                        className="advanced-label"
+                        style={advancedLabelStyle()}
+                      >
+                        AF
+                      </span>
                       <span
                         style={advancedValueStyle(
                           advancedStats.aggressionFactor > 2
@@ -405,13 +441,21 @@ export default function StatsPanel({
                       >
                         {advancedStats.aggressionFactor || 0}
                       </span>
-                      <span style={advancedDescStyle()}>Fator de agressão</span>
+                      <span
+                        className="advanced-desc"
+                        style={advancedDescStyle()}
+                      >
+                        Fator de agressão
+                      </span>
                     </div>
                   </div>
 
                   {advancedStats.handDistribution && (
                     <div style={chartSectionStyle()}>
-                      <div style={chartTitleStyle()}>
+                      <div
+                        className="chart-section-title"
+                        style={chartTitleStyle()}
+                      >
                         🃏 Distribuição de Mãos
                       </div>
                       <MiniBarChart data={advancedStats.handDistribution} />
@@ -420,7 +464,12 @@ export default function StatsPanel({
 
                   {advancedStats.monthlyProgress && (
                     <div style={chartSectionStyle()}>
-                      <div style={chartTitleStyle()}>📈 Progresso Mensal</div>
+                      <div
+                        className="chart-section-title"
+                        style={chartTitleStyle()}
+                      >
+                        📈 Progresso Mensal
+                      </div>
                       <MonthlyProgress data={advancedStats.monthlyProgress} />
                     </div>
                   )}
@@ -624,6 +673,8 @@ function advancedMetricStyle() {
   };
 }
 
+// 🔥 CORRIGIDO: cor base permanece cinza claro (bom no escuro); no modo claro
+// a classe "advanced-label" é forçada para quase-preto via globals.css.
 function advancedLabelStyle() {
   return {
     display: "block",
@@ -642,6 +693,7 @@ function advancedValueStyle(color = "#4caf50") {
   };
 }
 
+// 🔥 CORRIGIDO: idem acima ("advanced-desc")
 function advancedDescStyle() {
   return {
     display: "block",
@@ -659,6 +711,7 @@ function chartSectionStyle() {
   };
 }
 
+// 🔥 CORRIGIDO: classe "chart-section-title" ganha reforço de contraste no claro
 function chartTitleStyle() {
   return {
     fontSize: "0.7rem",
@@ -685,6 +738,7 @@ function miniBarItemStyle() {
   };
 }
 
+// 🔥 CORRIGIDO: classe "mini-bar-label"
 function miniBarLabelStyle() {
   return {
     fontSize: "0.55rem",
@@ -713,6 +767,7 @@ function miniBarFillStyle(color) {
   };
 }
 
+// 🔥 CORRIGIDO: classe "mini-bar-value"
 function miniBarValueStyle() {
   return {
     fontSize: "0.55rem",
@@ -768,6 +823,7 @@ function monthlyBarFillStyle() {
   };
 }
 
+// 🔥 CORRIGIDO: classe "monthly-label"
 function monthlyLabelStyle() {
   return {
     fontSize: "0.5rem",

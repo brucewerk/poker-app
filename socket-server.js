@@ -1,11 +1,18 @@
-// socket-server.js
+// socket-server.js - COMPLETO COM CHAT E CONVITES CORRIGIDOS
 const { Server } = require("socket.io");
 
 // ====================== ESTADO ======================
 const rooms = new Map();
+const onlineUsers = new Map(); // socketId -> username
+const userSockets = new Map(); // username -> socketId
+const pendingInvites = new Map(); // inviteId -> { from, to, roomId, timestamp }
 
 function generateRoomId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+function generateInviteId() {
+  return `invite_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 }
 
 function createDeck() {
@@ -201,6 +208,11 @@ async function broadcastRoomList() {
   const roomList = [];
 
   for (const [roomId, room] of rooms) {
+    // 🔥 FILTRAR SALAS DE CONVITE DA LISTA PÚBLICA
+    if (roomId.startsWith("ROOM_INVITE_")) {
+      continue; // Não mostrar salas de convite no lobby público
+    }
+
     const updatedPlayers = [];
     for (const player of room.players) {
       const currentChips = await getChipsFromDatabase(player.name);
@@ -215,7 +227,7 @@ async function broadcastRoomList() {
       roomId: roomId,
       players: updatedPlayers,
       playerCount: room.players.length,
-      maxPlayers: 4,
+      maxPlayers: room.maxPlayers || 4,
       isGameActive: !!room.gameState,
     });
   }
@@ -223,17 +235,64 @@ async function broadcastRoomList() {
   io.emit("room-list", roomList);
 }
 
+// ====================== BROADCAST USUÁRIOS ONLINE ======================
+function broadcastOnlineUsers() {
+  const onlineList = Array.from(onlineUsers.values());
+  io.emit("friends-online", { online: onlineList });
+  console.log(
+    `📡 friends-online emitido: ${onlineList.length} usuários online`,
+  );
+}
+
+// ====================== FUNÇÃO PARA ENVIAR CONVITE ======================
+function sendInviteToUser(toUsername, inviteData) {
+  const socketId = userSockets.get(toUsername);
+  if (socketId) {
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket) {
+      socket.emit("group-invite", inviteData);
+      console.log(`📤 Convite enviado para ${toUsername}`);
+      return true;
+    }
+  }
+  console.log(`❌ Usuário ${toUsername} não está online`);
+  return false;
+}
+
 // ====================== EVENTOS ======================
 io.on("connection", (socket) => {
   console.log(`🟢 Conectado: ${socket.id}`);
 
+  // 🔥 REGISTRAR USUÁRIO ONLINE
+  socket.on("friend-online", (data) => {
+    const { username } = data;
+    if (username) {
+      onlineUsers.set(socket.id, username);
+      userSockets.set(username, socket.id);
+      console.log(`👤 ${username} está online (${onlineUsers.size} online)`);
+      broadcastOnlineUsers();
+    }
+  });
+
+  // 🔥 LISTAR SALAS
   socket.on("list-rooms", async () => {
     await broadcastRoomList();
   });
 
+  // 🔥 CRIAR SALA
   socket.on("create-room", async (data) => {
-    const { playerName } = data;
-    const roomId = generateRoomId();
+    const {
+      playerName,
+      invitedPlayers,
+      maxPlayers,
+      roomId: customRoomId,
+    } = data;
+
+    // 🔥 SE FOR CONVITE, USAR ROOM_INVITE_ NO ID
+    const isInvite = invitedPlayers && invitedPlayers.length > 0;
+    const roomId =
+      customRoomId ||
+      (isInvite ? `ROOM_INVITE_${generateRoomId()}` : generateRoomId());
 
     const userChips = await getChipsFromDatabase(playerName);
 
@@ -250,23 +309,25 @@ io.on("connection", (socket) => {
       gameState: null,
       isSummaryVisible: false,
       summaryTimer: null,
-      messages: [], // 🔥 NOVO: histórico de chat da sala
+      messages: [],
+      maxPlayers: maxPlayers || (isInvite ? invitedPlayers.length + 1 : 4),
+      invitedPlayers: invitedPlayers || [],
+      isInviteRoom: isInvite,
     });
 
     socket.join(roomId);
     socket.emit("room-created", { roomId });
     socket.emit("room-update", rooms.get(roomId));
-
-    // 🔥 NOVO: enviar histórico de chat vazio ao criador
     socket.emit("chat-history", { roomId, messages: [] });
 
     await broadcastRoomList();
 
     console.log(
-      `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas)`,
+      `✅ Sala criada: ${roomId} por ${playerName} (${userChips} fichas)${isInvite ? " [CONVITE]" : ""}`,
     );
   });
 
+  // 🔥 ENTRAR NA SALA
   socket.on("join-room", async (data) => {
     const { roomId, playerName } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -284,14 +345,13 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (room.players.length >= 4) {
+    if (room.players.length >= (room.maxPlayers || 4)) {
       socket.emit("error", { message: "Sala lotada!" });
       return;
     }
 
     const userChips = await getChipsFromDatabase(playerName);
 
-    // 🔥 NOVO: garantir que a sala tem array de mensagens (salas antigas em memória)
     if (!room.messages) {
       room.messages = [];
     }
@@ -306,14 +366,11 @@ io.on("connection", (socket) => {
     socket.join(normalizedRoomId);
 
     io.to(normalizedRoomId).emit("room-update", room);
-
-    // 🔥 NOVO: enviar histórico de chat existente para quem entrou
     socket.emit("chat-history", {
       roomId: normalizedRoomId,
       messages: room.messages,
     });
 
-    // 🔥 NOVO: avisar a sala que alguém entrou (mensagem de sistema)
     const systemMessage = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
       playerId: "system",
@@ -335,7 +392,151 @@ io.on("connection", (socket) => {
     );
   });
 
-  // ====================== 🔥 NOVO: CHAT DA SALA ======================
+  // ====================== 🔥 CHAT PRIVADO (AMIGOS) ======================
+  socket.on("private-message", (data) => {
+    const { to, from, message } = data;
+
+    if (!to || !from || !message) {
+      console.log("⚠️ private-message: dados incompletos");
+      return;
+    }
+
+    console.log(`💬 Mensagem privada de ${from} para ${to}: ${message}`);
+
+    const targetSocketId = userSockets.get(to);
+    if (targetSocketId) {
+      const targetSocket = io.sockets.sockets.get(targetSocketId);
+      if (targetSocket) {
+        targetSocket.emit("private-message", {
+          from,
+          message,
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`✅ Mensagem entregue a ${to}`);
+      } else {
+        console.log(`❌ Socket ${to} não encontrado`);
+      }
+    } else {
+      console.log(`❌ Usuário ${to} não está online`);
+      socket.emit("error", {
+        message: `${to} não está online no momento.`,
+      });
+    }
+  });
+
+  // ====================== 🔥 CONVITE EM GRUPO ======================
+  socket.on("group-invite", (data) => {
+    const { inviteId, from, players, message, roomId } = data;
+
+    if (!from || !players || players.length === 0) {
+      console.log("⚠️ group-invite: dados incompletos");
+      socket.emit("error", { message: "Dados do convite incompletos" });
+      return;
+    }
+
+    console.log(`📤 Convite de ${from} para ${players.join(", ")}`);
+
+    const inviteData = {
+      inviteId: inviteId || generateInviteId(),
+      from,
+      players,
+      message: message || `${from} te convidou para uma partida de poker!`,
+      roomId: roomId || `ROOM_INVITE_${inviteId || generateInviteId()}`,
+      timestamp: new Date().toISOString(),
+    };
+
+    pendingInvites.set(inviteData.inviteId, {
+      ...inviteData,
+      fromSocketId: socket.id,
+      createdAt: Date.now(),
+    });
+
+    let sentCount = 0;
+    for (const player of players) {
+      const sent = sendInviteToUser(player, inviteData);
+      if (sent) sentCount++;
+    }
+
+    socket.emit("invite-sent", {
+      success: true,
+      inviteId: inviteData.inviteId,
+      players: players,
+      sentCount: sentCount,
+    });
+
+    console.log(
+      `✅ Convite ${inviteData.inviteId} enviado para ${sentCount} jogadores`,
+    );
+  });
+
+  // ====================== 🔥 ACEITAR CONVITE ======================
+  socket.on("accept-invite", (data) => {
+    const { inviteId, from } = data;
+
+    if (!inviteId || !from) {
+      console.log("⚠️ accept-invite: dados incompletos");
+      return;
+    }
+
+    console.log(`✅ ${from} aceitou o convite ${inviteId}`);
+
+    const invite = pendingInvites.get(inviteId);
+    if (!invite) {
+      socket.emit("error", { message: "Convite expirado ou não encontrado" });
+      return;
+    }
+
+    const creatorSocketId = userSockets.get(invite.from);
+    if (creatorSocketId) {
+      const creatorSocket = io.sockets.sockets.get(creatorSocketId);
+      if (creatorSocket) {
+        creatorSocket.emit("invite-accepted", {
+          inviteId,
+          from,
+          roomId: invite.roomId,
+        });
+        console.log(`📤 Notificação de aceite enviada para ${invite.from}`);
+      }
+    }
+
+    setTimeout(() => {
+      pendingInvites.delete(inviteId);
+    }, 5000);
+  });
+
+  // ====================== 🔥 RECUSAR CONVITE ======================
+  socket.on("decline-invite", (data) => {
+    const { inviteId, from } = data;
+
+    if (!inviteId || !from) {
+      console.log("⚠️ decline-invite: dados incompletos");
+      return;
+    }
+
+    console.log(`❌ ${from} recusou o convite ${inviteId}`);
+
+    const invite = pendingInvites.get(inviteId);
+    if (!invite) {
+      return;
+    }
+
+    const creatorSocketId = userSockets.get(invite.from);
+    if (creatorSocketId) {
+      const creatorSocket = io.sockets.sockets.get(creatorSocketId);
+      if (creatorSocket) {
+        creatorSocket.emit("invite-declined", {
+          inviteId,
+          from,
+          roomId: invite.roomId,
+        });
+        console.log(`📤 Notificação de recusa enviada para ${invite.from}`);
+      }
+    }
+
+    pendingInvites.delete(inviteId);
+  });
+
+  // ====================== CHAT DA SALA ======================
   socket.on("send-chat-message", (data) => {
     const { roomId, message } = data || {};
     if (!roomId) return;
@@ -356,7 +557,6 @@ io.on("connection", (socket) => {
     const trimmed = (message || "").toString().trim();
     if (!trimmed) return;
 
-    // 🔥 Limite de tamanho para evitar abuso
     const safeMessage = trimmed.slice(0, 300);
 
     const chatMessage = {
@@ -371,7 +571,6 @@ io.on("connection", (socket) => {
     if (!room.messages) room.messages = [];
     room.messages.push(chatMessage);
 
-    // 🔥 Manter só as últimas 100 mensagens em memória
     if (room.messages.length > 100) {
       room.messages = room.messages.slice(-100);
     }
@@ -381,6 +580,7 @@ io.on("connection", (socket) => {
     console.log(`💬 [${normalizedRoomId}] ${player.name}: ${safeMessage}`);
   });
 
+  // ====================== PLAYER READY ======================
   socket.on("player-ready", (data) => {
     const { roomId } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -393,18 +593,34 @@ io.on("connection", (socket) => {
       io.to(normalizedRoomId).emit("room-update", room);
 
       const allReady = room.players.every((p) => p.isReady);
+      // 🔥 PERMITIR INICIAR COM 2+ JOGADORES
       if (allReady && room.players.length >= 2) {
         startGame(normalizedRoomId);
+      } else if (allReady && room.players.length < 2) {
+        console.log(
+          `⚠️ Sala ${normalizedRoomId} tem ${room.players.length} jogadores, mínimo 2 para iniciar`,
+        );
+        io.to(normalizedRoomId).emit("error", {
+          message: `Precisa de pelo menos 2 jogadores para iniciar (atualmente ${room.players.length})`,
+        });
       }
     }
   });
 
+  // ====================== START GAME ======================
   function startGame(roomId) {
     const room = rooms.get(roomId);
     if (!room) return;
 
-    const deck = createDeck();
     const numPlayers = room.players.length;
+    if (numPlayers < 2) {
+      console.log(
+        `⚠️ Sala ${roomId} não tem jogadores suficientes (${numPlayers})`,
+      );
+      return;
+    }
+
+    const deck = createDeck();
 
     const gameState = {
       phase: "preflop",
@@ -414,7 +630,7 @@ io.on("connection", (socket) => {
         id: p.id,
         name: p.name,
         cards: [],
-        chips: p.chips,
+        chips: p.chips || 1000,
         bet: 0,
         isFolded: false,
         isAllIn: false,
@@ -474,9 +690,10 @@ io.on("connection", (socket) => {
 
     const safeGameState = sanitizeGameState(gameState);
     io.to(roomId).emit("game-started", safeGameState);
-    console.log(`🎮 Jogo iniciado na sala ${roomId}`);
+    console.log(`🎮 Jogo iniciado na sala ${roomId} (${numPlayers} jogadores)`);
   }
 
+  // ====================== PLAYER ACTION ======================
   socket.on("player-action", (data) => {
     const { roomId, action, amount } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -740,7 +957,7 @@ io.on("connection", (socket) => {
     );
   }
 
-  // ====================== FECHAR RESUMO (APENAS PARA QUEM CLICOU) ======================
+  // ====================== FECHAR RESUMO ======================
   socket.on("close-summary", async (data) => {
     const { roomId } = data;
     const normalizedRoomId = roomId.toUpperCase();
@@ -757,10 +974,8 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // 🔥 Marcar que este jogador já fechou
     player.hasClosedSummary = true;
 
-    // Atualizar no gameState também
     if (room.gameState) {
       const gamePlayer = room.gameState.players.find((p) => p.id === socket.id);
       if (gamePlayer) {
@@ -775,13 +990,11 @@ io.on("connection", (socket) => {
       `📊 ${player.name} fechou o resumo (${closedCount}/${totalPlayers})`,
     );
 
-    // 🔥 EMITIR APENAS PARA QUEM CLICOU
     socket.emit("summary-closed", {
       roomId: normalizedRoomId,
       playerId: socket.id,
     });
 
-    // 🔥 Verificar se TODOS os jogadores já fecharam
     const allClosed = room.players.every((p) => p.hasClosedSummary === true);
 
     if (allClosed) {
@@ -789,13 +1002,11 @@ io.on("connection", (socket) => {
         `✅ Todos os jogadores fecharam! Resetando sala ${normalizedRoomId}`,
       );
 
-      // Limpar timer se existir
       if (room.summaryTimer) {
         clearTimeout(room.summaryTimer);
         room.summaryTimer = null;
       }
 
-      // Resetar o jogo para todos
       if (room.gameState) {
         for (const p of room.gameState.players) {
           await saveChipsToDatabase(p.name, p.chips);
@@ -825,7 +1036,6 @@ io.on("connection", (socket) => {
         );
       }
     } else {
-      // 🔥 Notificar todos sobre o progresso (quem já fechou)
       io.to(normalizedRoomId).emit("summary-progress", {
         roomId: normalizedRoomId,
         closedCount: closedCount,
@@ -838,7 +1048,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ====================== ENCERRAR RODADA (COM TIMER DE 25s) ======================
+  // ====================== ENCERRAR RODADA ======================
   async function endRound(roomId) {
     const room = rooms.get(roomId);
     if (!room || !room.gameState) return;
@@ -892,7 +1102,6 @@ io.on("connection", (socket) => {
 
       room.isSummaryVisible = true;
 
-      // 🔥 Resetar estado de fechamento dos jogadores
       room.players.forEach((p) => {
         p.hasClosedSummary = false;
       });
@@ -900,7 +1109,6 @@ io.on("connection", (socket) => {
         p.hasClosedSummary = false;
       });
 
-      // 🔥 Emitir resultado
       const roundEndData = {
         winner: {
           name: winner.name,
@@ -921,25 +1129,21 @@ io.on("connection", (socket) => {
       console.log(`🏆 ${winner.name} venceu ${gameState.pot} fichas!`);
       console.log(`📊 Resumo enviado. Aguardando cliques individuais...`);
 
-      // 🔥 TIMER DE 25 SEGUNDOS (FALLBACK)
       if (room.summaryTimer) {
         clearTimeout(room.summaryTimer);
       }
 
       room.summaryTimer = setTimeout(async () => {
-        // Verificar se o resumo ainda está visível
         if (room.isSummaryVisible) {
           console.log(
             `⏰ Timer de 25s - Fechando resumo da sala ${roomId} (fallback)`,
           );
 
-          // Forçar fechamento para todos
           io.to(roomId).emit("summary-closed", {
             roomId: roomId,
             forced: true,
           });
 
-          // Resetar o jogo
           if (room.gameState) {
             for (const p of room.gameState.players) {
               await saveChipsToDatabase(p.name, p.chips);
@@ -968,7 +1172,7 @@ io.on("connection", (socket) => {
           }
         }
         room.summaryTimer = null;
-      }, 25000); // 🔥 25 SEGUNDOS
+      }, 25000);
     }
   }
 
@@ -1003,7 +1207,6 @@ io.on("connection", (socket) => {
     } else {
       io.to(normalizedRoomId).emit("room-update", room);
 
-      // 🔥 NOVO: avisar a sala que alguém saiu
       if (leavingPlayer && room.messages) {
         const systemMessage = {
           id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
@@ -1021,8 +1224,18 @@ io.on("connection", (socket) => {
     await broadcastRoomList();
   });
 
+  // ====================== DESCONEXÃO ======================
   socket.on("disconnect", () => {
     console.log(`🔴 Desconectado: ${socket.id}`);
+
+    const username = onlineUsers.get(socket.id);
+    if (username) {
+      onlineUsers.delete(socket.id);
+      userSockets.delete(username);
+      console.log(`👤 ${username} ficou offline (${onlineUsers.size} online)`);
+      broadcastOnlineUsers();
+    }
+
     rooms.forEach((room, roomId) => {
       const idx = room.players.findIndex((p) => p.id === socket.id);
       if (idx !== -1) {
@@ -1058,3 +1271,7 @@ console.log(`   ✅ Cada jogador fecha o resumo individualmente`);
 console.log(`   ✅ Timer de 25 segundos como fallback`);
 console.log(`   ✅ Indicador de progresso (quem já fechou)`);
 console.log(`   ✅ Chat em tempo real na sala de espera`);
+console.log(`   ✅ Detecção de usuários online (friends-online)`);
+console.log(`   ✅ Chat privado entre amigos (private-message)`);
+console.log(`   ✅ Convites para multiplayer (group-invite)`);
+console.log(`   ✅ Salas de convite não aparecem no lobby público`);
