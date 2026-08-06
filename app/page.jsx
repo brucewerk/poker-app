@@ -1,4 +1,4 @@
-// app/page.jsx - VERSÃO COMPLETA CORRIGIDA
+// app/page.jsx - VERSÃO COMPLETA (SEM StatusPanel)
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -15,7 +15,6 @@ import { calculateHandStrength } from "@/lib/poker/strength.js";
 import { getCpuDecision } from "@/lib/poker/cpu.js";
 import Card from "@/components/Poker/Card.jsx";
 import ActionButtons from "@/components/Poker/ActionButtons.jsx";
-import StatusPanel from "@/components/Poker/StatusPanel.jsx";
 import StatsPanel from "@/components/Poker/StatsPanel.jsx";
 import AchievementsModal from "@/components/Poker/AchievementsModal.jsx";
 import HandHistory from "@/components/Poker/HandHistory.jsx";
@@ -24,6 +23,7 @@ import FindingsModal from "@/components/Poker/FindingsModal.jsx";
 import FriendsList from "@/components/Poker/FriendsList.jsx";
 import MissionsPanel from "@/components/Poker/MissionsPanel.jsx";
 import OnlineLobby from "@/components/Poker/OnlineLobby.jsx";
+import SideStatsToggles from "@/components/Poker/SideStatsToggles.jsx";
 import OnlineGame from "@/components/Poker/OnlineGame.jsx";
 import { soundManager } from "@/lib/sound.js";
 import SoundToggle from "@/components/Poker/SoundToggle.jsx";
@@ -36,7 +36,6 @@ import ToolbarButtons from "@/components/Poker/ToolbarButtons.jsx";
 import GameTable from "@/components/Poker/GameTable.jsx";
 import TournamentLobby from "@/components/Poker/TournamentLobby.jsx";
 import ResultModal from "@/components/Poker/ResultModal.jsx";
-import SideStatsToggles from "@/components/Poker/SideStatsToggles.jsx";
 import { useToast } from "@/components/Toast/ToastManager";
 import DesktopZoom from "@/components/Poker/DesktopZoom.jsx";
 
@@ -2222,15 +2221,16 @@ export default function PokerGame() {
     <>
       <DesktopZoom />
 
-      {/* 🔥 SIDE STATS TOGGLES - COM BOTÃO SAIR NO TOPO */}
+      {/* 🔥 STATS NO TOPO - ÚNICA FONTE DE INFORMAÇÃO */}
       <SideStatsToggles
         pot={g?.pot || 0}
         stage={g?.stage || "preflop"}
+        stageNames={stageNames}
         playerMoney={g?.playerMoney || 0}
         cpuMoney={g?.cpuMoney || 0}
         currentBet={g?.currentBet || 0}
         isTurbo={isTurbo}
-        isMultiplayer={isMultiplayer && multiplayerModeActive}
+        isMultiplayerActive={isMultiplayer && multiplayerModeActive}
         currentUser={currentUser}
       />
 
@@ -2250,6 +2250,39 @@ export default function PokerGame() {
           boxSizing: "border-box",
         }}
       >
+        {currentUser && (
+          <div
+            style={{
+              position: "fixed",
+              top: 8,
+              right: 8,
+              zIndex: 100,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <motion.button
+              onClick={() => signOut()}
+              style={{
+                background: "rgba(200,50,50,0.8)",
+                color: "white",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: 20,
+                cursor: "pointer",
+                fontWeight: "bold",
+                backdropFilter: "blur(4px)",
+                fontSize: "0.8rem",
+              }}
+              whileHover={{ scale: 1.05, background: "rgba(200,50,50,0.95)" }}
+              whileTap={{ scale: 0.95 }}
+            >
+              🚪 Sair
+            </motion.button>
+          </div>
+        )}
+
         <ToolbarButtons
           isTurbo={isTurbo}
           onTurboToggle={handleTurboToggle}
@@ -2345,76 +2378,6 @@ export default function PokerGame() {
               padding: "12px 15px",
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: "var(--bg-header)",
-                backdropFilter: "blur(8px)",
-                borderRadius: 50,
-                padding: "8px 15px",
-                marginBottom: 15,
-                flexWrap: "wrap",
-                gap: 8,
-                transition: "var(--transition-theme)",
-              }}
-            >
-              {g && (
-                <>
-                  {[
-                    ["💰", g?.pot || 0],
-                    ["🎴", stageNames[g?.stage] || g?.stage || "preflop"],
-                    ["👤", g?.playerMoney || 0],
-                    ["🤖", g?.cpuMoney || 0],
-                    ["📊", `Aposta: ${g?.currentBet || 0}`],
-                    ["🚀", isTurbo ? "Turbo" : "Normal"],
-                    [
-                      "👥",
-                      isMultiplayer && multiplayerModeActive ? "2P" : "1P",
-                    ],
-                  ].map(([icon, val], i) => (
-                    <motion.div
-                      key={`header-${i}-${icon}`}
-                      style={{
-                        background: "var(--bg-button)",
-                        padding: "4px 12px",
-                        borderRadius: 40,
-                        color: "var(--text-primary)",
-                        fontWeight: "bold",
-                        fontSize: "0.85rem",
-                        whiteSpace: "nowrap",
-                        transition: "var(--transition-theme)",
-                      }}
-                      whileHover={{ scale: 1.03 }}
-                      transition={{ type: "spring", stiffness: 300 }}
-                    >
-                      <span
-                        style={{
-                          color:
-                            icon === "🚀"
-                              ? isTurbo
-                                ? "#ff9800"
-                                : "#888"
-                              : icon === "👥"
-                                ? isMultiplayer && multiplayerModeActive
-                                  ? "#4caf50"
-                                  : "#888"
-                                : "gold",
-                          fontSize: "1.1rem",
-                          fontWeight: 800,
-                          marginRight: 5,
-                        }}
-                      >
-                        {icon}
-                      </span>
-                      {val}
-                    </motion.div>
-                  ))}
-                </>
-              )}
-            </div>
-
             {isMultiplayer &&
               multiplayerModeActive &&
               multiplayerPlayers.length > 0 && (
@@ -2527,8 +2490,8 @@ export default function PokerGame() {
                   </motion.div>
                 )}
 
-                {/* 🔥 CORRIGIDO: link "BruCe" para https://klingklang.free.nf */}
                 <div
+                  className="footer-credit"
                   style={{
                     textAlign: "center",
                     marginTop: 12,
@@ -2544,11 +2507,6 @@ export default function PokerGame() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="footer-credit-link"
-                    style={{
-                      color: "var(--gold)",
-                      textDecoration: "none",
-                      fontWeight: 700,
-                    }}
                   >
                     BruCe
                   </a>{" "}
@@ -2565,28 +2523,6 @@ export default function PokerGame() {
                   gap: 8,
                 }}
               >
-                {g && (
-                  <StatusPanel
-                    stage={g?.stage ?? "preflop"}
-                    pot={g?.pot ?? 0}
-                    currentBet={g?.currentBet ?? 0}
-                    playerBet={g?.playerBet ?? 0}
-                    cpuBet={g?.cpuBet ?? 0}
-                    nextRaise={nextRaise ?? 0}
-                    notification={
-                      notification ?? {
-                        msg: "",
-                        isError: false,
-                        visible: false,
-                      }
-                    }
-                    stageNames={stageNames ?? {}}
-                    gameStatus={g?.gameStatus ?? ""}
-                    winnerMsg={g?.winnerMsg ?? ""}
-                    isTurbo={isTurbo ?? false}
-                  />
-                )}
-
                 {g && (
                   <StatsPanel
                     username={currentUser}

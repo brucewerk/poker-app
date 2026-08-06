@@ -18,6 +18,17 @@ export const metadata = {
   description: "Texas Hold'em Poker Game",
 };
 
+// 🔥 NOVO: viewport explícito. Garante que o navegador use a largura real
+// do dispositivo (device-width) e não uma largura virtual maior, o que
+// poderia fazer as media queries de mobile (max-width: 480px etc.) não
+// corresponderem corretamente em alguns WebViews/navegadores.
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({ children }) {
   return (
     <html

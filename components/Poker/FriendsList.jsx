@@ -13,7 +13,11 @@ const SOCKET_URL =
 let globalSocket = null;
 let globalOnlineUsers = [];
 
-export default function FriendsList({ username, onJoinGame, onNewChatMessage }) {
+export default function FriendsList({
+  username,
+  onJoinGame,
+  onNewChatMessage,
+}) {
   // ============================================================
   // 🔥 HOOKS
   // ============================================================
@@ -650,12 +654,16 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
           null,
         );
 
-        showCardFeedback(`❌ ${data.from} recusou o convite. Sala fechada.`, true, 4000);
-        
+        showCardFeedback(
+          `❌ ${data.from} recusou o convite. Sala fechada.`,
+          true,
+          4000,
+        );
+
         setPendingInvites((prev) =>
           prev.filter((n) => n.inviteId !== data.inviteId),
         );
-        
+
         const roomId = `ROOM_INVITE_${data.inviteId}`;
         if (isInLobby && currentRoomIdRef.current === roomId) {
           socket.emit("leave-room", { roomId: roomId });
@@ -760,10 +768,8 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
           () => openChat(data.from),
         );
 
-        const totalUnreadNow = Object.values(unreadChats).reduce(
-          (a, b) => a + b,
-          0
-        ) + 1;
+        const totalUnreadNow =
+          Object.values(unreadChats).reduce((a, b) => a + b, 0) + 1;
         if (totalUnreadNow > 0) {
           document.title = `💬 (${totalUnreadNow}) Poker by BruCe`;
         }
@@ -819,19 +825,90 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
       }
     });
 
+    // 🔥 CORREÇÃO: Tratamento seguro para erros do servidor - EVITA OBJETO VAZIO
     socket.on("error", (data) => {
-      if (data.message && data.message.includes("Sala não encontrada")) {
-        console.log(`⚠️ Sala não encontrada: ${data.message}`);
+      // 🔥 VERIFICAÇÃO DE SEGURANÇA - data pode ser undefined, null ou vazio
+      if (!data) {
+        console.warn("⚠️ Erro do servidor: resposta vazia ou inválida");
+        showCardFeedback(`⚠️ Erro desconhecido do servidor`, true, 4000);
+        return;
+      }
+
+      // Se data é um objeto vazio {}
+      if (typeof data === "object" && Object.keys(data).length === 0) {
+        console.warn("⚠️ Erro do servidor: objeto vazio recebido");
+        showCardFeedback(`⚠️ Erro desconhecido do servidor`, true, 4000);
+        return;
+      }
+
+      // Se data não é um objeto (string, número, etc)
+      if (typeof data !== "object") {
+        console.warn(`⚠️ Erro do servidor: tipo inesperado (${typeof data})`);
+        showCardFeedback(`⚠️ Erro desconhecido do servidor`, true, 4000);
+        return;
+      }
+
+      // Agora podemos acessar com segurança as propriedades
+      const errorMessage = data.message || data.error || "Erro desconhecido";
+
+      // Verifica se é um erro de sala não encontrada
+      if (errorMessage.includes("Sala não encontrada")) {
+        console.log(`⚠️ Sala não encontrada: ${errorMessage}`);
         if (isInLobby && !resettingRef.current) {
           console.log(`🔄 Resetando estado do lobby (sala não encontrada)`);
           resetLobbyState();
         }
-        showCardFeedback(`⚠️ ${data.message}`, true, 4000);
+        showCardFeedback(`⚠️ ${errorMessage}`, true, 4000);
         return;
       }
 
+      // Verifica se é um erro de sala lotada
+      if (
+        errorMessage.includes("Sala lotada") ||
+        errorMessage.includes("lotada")
+      ) {
+        console.log(`⚠️ ${errorMessage}`);
+        showCardFeedback(`⚠️ ${errorMessage}`, true, 4000);
+        return;
+      }
+
+      // Verifica se é um erro de jogador já na sala
+      if (
+        errorMessage.includes("já está") ||
+        errorMessage.includes("já nesta sala")
+      ) {
+        console.log(`⚠️ ${errorMessage}`);
+        showCardFeedback(`⚠️ ${errorMessage}`, true, 4000);
+        return;
+      }
+
+      // Verifica se é um erro de convite expirado
+      if (
+        errorMessage.includes("Convite expirado") ||
+        errorMessage.includes("expirado")
+      ) {
+        console.log(`⚠️ ${errorMessage}`);
+        showCardFeedback(`⚠️ ${errorMessage}`, true, 4000);
+        closeFloatingInvite();
+        setPendingInvites((prev) =>
+          prev.filter((n) => n.id !== pendingInviteId),
+        );
+        return;
+      }
+
+      // Verifica se é um erro de usuário não encontrado
+      if (
+        errorMessage.includes("não encontrado") ||
+        errorMessage.includes("não existe")
+      ) {
+        console.log(`⚠️ ${errorMessage}`);
+        showCardFeedback(`⚠️ ${errorMessage}`, true, 4000);
+        return;
+      }
+
+      // Erro genérico - só loga se não for objeto vazio
       console.error("❌ Erro do servidor (FriendsList):", data);
-      showCardFeedback(`❌ ${data.message || "Erro desconhecido"}`, true, 4000);
+      showCardFeedback(`❌ ${errorMessage}`, true, 4000);
     });
 
     if (socket.connected) {
@@ -864,7 +941,24 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [username, connectSocket, showCardFeedback, addNotification, openChat, resetLobbyState, onJoinGame, isInLobby, isProcessingInvite, isChatOpenRef, closeFloatingInvite, scrollChatToBottom, selectedChatFriend, showChat, unreadChats, onNewChatMessage]);
+  }, [
+    username,
+    connectSocket,
+    showCardFeedback,
+    addNotification,
+    openChat,
+    resetLobbyState,
+    onJoinGame,
+    isInLobby,
+    isProcessingInvite,
+    isChatOpenRef,
+    closeFloatingInvite,
+    scrollChatToBottom,
+    selectedChatFriend,
+    showChat,
+    unreadChats,
+    onNewChatMessage,
+  ]);
 
   // ============================================================
   // 🔥 useEffect - CLEANUP
@@ -897,12 +991,31 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
           `/api/friends?username=${encodeURIComponent(username)}`,
           { credentials: "include" },
         );
+
+        // 🔥 VERIFICA SE A RESPOSTA TEM CONTEÚDO
+        const contentLength = res.headers.get("content-length");
+        if (contentLength === "0" || res.status === 204) {
+          console.log("ℹ️ Resposta vazia do servidor (sem amigos)");
+          setFriends([]);
+          if (!silent) setLoading(false);
+          return;
+        }
+
         const data = await res.json();
 
+        // 🔥 VERIFICA SE DATA É VÁLIDA
+        if (!data || typeof data !== "object") {
+          console.warn("⚠️ Resposta inválida do servidor:", data);
+          setFriends([]);
+          if (!silent) setLoading(false);
+          return;
+        }
+
         if (data.success && isMounted.current) {
-          const onlineNames = globalOnlineUsers.length > 0
-            ? globalOnlineUsers
-            : onlineUsersRef.current;
+          const onlineNames =
+            globalOnlineUsers.length > 0
+              ? globalOnlineUsers
+              : onlineUsersRef.current;
 
           const validFriends = (data.friends || []).map((friend) => ({
             username: friend.username || "Desconhecido",
@@ -921,8 +1034,10 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
             console.info(`✅ ${validFriends.length} amigos carregados`);
           }
         } else {
-          if (!silent)
-            console.info(`ℹ️ ${data.error || "Erro ao carregar amigos"}`);
+          if (!silent) {
+            const errorMsg = data?.error || "Erro ao carregar amigos";
+            console.info(`ℹ️ ${errorMsg}`);
+          }
           setFriends([]);
         }
       } catch (error) {
@@ -1082,7 +1197,7 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
       }
 
       console.log(`❌ Recusando convite: ${inviteId}`);
-      
+
       const inviteData = pendingInvites.find((n) => n.inviteId === inviteId);
       const roomId = inviteData?.roomId || `ROOM_INVITE_${inviteId}`;
 
@@ -1198,7 +1313,7 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
     setSuccess("");
 
     console.log(`📤 Criando sala de convite ${roomId}...`);
-    
+
     socketRef.current.emit("create-room", {
       playerName: username,
       maxPlayers: selectedFriends.length + 1,
@@ -1229,11 +1344,11 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
     redirectTimeoutRef.current = setTimeout(() => {
       setIsWaitingForAccept(false);
       setPendingInviteId(null);
-      
+
       if (socketRef.current) {
         socketRef.current.emit("leave-room", { roomId: roomId });
       }
-      
+
       showCardFeedback(
         "⏰ Tempo esgotado. Ninguém aceitou o convite.",
         true,
@@ -2033,90 +2148,6 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
   };
 
   // ============================================================
-  // 🔥 CARD FEEDBACK
-  // ============================================================
-  const CardFeedback = () => {
-    if (!cardFeedback) return null;
-
-    return (
-      <motion.div
-        style={{
-          background: cardFeedback.isError
-            ? "rgba(244,67,54,0.12)"
-            : "rgba(255,215,0,0.12)",
-          border: cardFeedback.isError
-            ? "1px solid rgba(244,67,54,0.3)"
-            : "1px solid rgba(255,215,0,0.3)",
-          borderRadius: "12px",
-          padding: "10px 14px",
-          marginBottom: "8px",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          backdropFilter: "blur(4px)",
-          transition: "all 0.2s ease",
-          cursor: feedbackIsClickable ? "pointer" : "default",
-        }}
-        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{ type: "spring", stiffness: 400, damping: 30 }}
-        onClick={() => {
-          if (feedbackIsClickable && feedbackClickAction) {
-            feedbackClickAction();
-          }
-        }}
-      >
-        <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>
-          {cardFeedback.isError ? "⚠️" : "💬"}
-        </span>
-        <span
-          style={{
-            flex: 1,
-            fontSize: "0.85rem",
-            color: "var(--text-primary)",
-            fontWeight: "500",
-            wordBreak: "break-word",
-          }}
-        >
-          {cardFeedback.message}
-        </span>
-        {feedbackIsClickable && (
-          <span
-            style={{
-              fontSize: "0.9rem",
-              color: "var(--text-muted)",
-              opacity: 0.6,
-              flexShrink: 0,
-            }}
-          >
-            👆
-          </span>
-        )}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            clearCardFeedback();
-          }}
-          style={{
-            background: "none",
-            border: "none",
-            color: "var(--text-muted)",
-            cursor: "pointer",
-            fontSize: "0.9rem",
-            padding: "2px 6px",
-            opacity: 0.5,
-            transition: "opacity 0.3s ease",
-            flexShrink: 0,
-          }}
-        >
-          ✕
-        </button>
-      </motion.div>
-    );
-  };
-
-  // ============================================================
   // 🔥 FLOATING INVITE
   // ============================================================
   const FloatingInvite = () => {
@@ -2276,6 +2307,90 @@ export default function FriendsList({ username, onJoinGame, onNewChatMessage }) 
           </div>
         </motion.div>
       </div>
+    );
+  };
+
+  // ============================================================
+  // 🔥 CARD FEEDBACK
+  // ============================================================
+  const CardFeedback = () => {
+    if (!cardFeedback) return null;
+
+    return (
+      <motion.div
+        style={{
+          background: cardFeedback.isError
+            ? "rgba(244,67,54,0.12)"
+            : "rgba(255,215,0,0.12)",
+          border: cardFeedback.isError
+            ? "1px solid rgba(244,67,54,0.3)"
+            : "1px solid rgba(255,215,0,0.3)",
+          borderRadius: "12px",
+          padding: "10px 14px",
+          marginBottom: "8px",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          backdropFilter: "blur(4px)",
+          transition: "all 0.2s ease",
+          cursor: feedbackIsClickable ? "pointer" : "default",
+        }}
+        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        onClick={() => {
+          if (feedbackIsClickable && feedbackClickAction) {
+            feedbackClickAction();
+          }
+        }}
+      >
+        <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>
+          {cardFeedback.isError ? "⚠️" : "💬"}
+        </span>
+        <span
+          style={{
+            flex: 1,
+            fontSize: "0.85rem",
+            color: "var(--text-primary)",
+            fontWeight: "500",
+            wordBreak: "break-word",
+          }}
+        >
+          {cardFeedback.message}
+        </span>
+        {feedbackIsClickable && (
+          <span
+            style={{
+              fontSize: "0.9rem",
+              color: "var(--text-muted)",
+              opacity: 0.6,
+              flexShrink: 0,
+            }}
+          >
+            👆
+          </span>
+        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            clearCardFeedback();
+          }}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            fontSize: "0.9rem",
+            padding: "2px 6px",
+            opacity: 0.5,
+            transition: "opacity 0.3s ease",
+            flexShrink: 0,
+          }}
+        >
+          ✕
+        </button>
+      </motion.div>
     );
   };
 

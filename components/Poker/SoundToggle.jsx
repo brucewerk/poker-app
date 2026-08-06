@@ -1,4 +1,4 @@
-// components/Poker/SoundToggle.jsx - CONTROLE DE SOM PREMIUM
+// components/Poker/SoundToggle.jsx - CONTROLE DE SOM (POPUP ABRE PARA A ESQUERDA)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -12,7 +12,6 @@ export default function SoundToggle() {
   const isInitialized = useRef(false);
   const volumeTimeoutRef = useRef(null);
   const hideTimeoutRef = useRef(null);
-  const containerRef = useRef(null);
 
   useEffect(() => {
     if (isInitialized.current) return;
@@ -70,11 +69,9 @@ export default function SoundToggle() {
       document.removeEventListener("touchstart", initSound);
       if (hideTimeoutRef.current) {
         clearTimeout(hideTimeoutRef.current);
-        hideTimeoutRef.current = null;
       }
       if (volumeTimeoutRef.current) {
         clearTimeout(volumeTimeoutRef.current);
-        volumeTimeoutRef.current = null;
       }
     };
   }, []);
@@ -148,40 +145,26 @@ export default function SoundToggle() {
     }, 2000);
   };
 
+  const handleButtonClick = () => {
+    // 🔥 NOVO: em touch (mobile), o clique também abre o popup, já que não
+    // existe "hover". Ele fecha sozinho após alguns segundos.
+    toggleSound();
+    if (!isMuted) return; // ao mutar não precisa abrir o popup
+    setShowVolumeControl(true);
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    hideTimeoutRef.current = setTimeout(() => {
+      setShowVolumeControl(false);
+      hideTimeoutRef.current = null;
+    }, 3000);
+  };
+
   return (
-    <div
-      ref={containerRef}
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        alignItems: "center",
-        transform: "none !important",
-        transition: "none !important",
-      }}
-    >
+    <div style={containerStyle()}>
       <button
-        onClick={toggleSound}
+        onClick={handleButtonClick}
         className={`toolbar-btn ${isMuted ? "toolbar-btn-muted" : ""}`}
         title={isMuted ? "Ativar som" : "Desativar som"}
-        style={{
-          transform: "none !important",
-          transition:
-            "background 0.3s ease, border 0.3s ease, opacity 0.3s ease !important",
-          background: isMuted
-            ? "rgba(60,60,60,0.6)"
-            : isHovering
-              ? "rgba(255,215,0,0.15)"
-              : undefined,
-          border: isMuted
-            ? "1px solid rgba(255,255,255,0.05)"
-            : isHovering
-              ? "1px solid rgba(255,215,0,0.3)"
-              : undefined,
-          boxShadow:
-            isHovering && !isMuted
-              ? "0 4px 20px rgba(255,215,0,0.15)"
-              : undefined,
-        }}
+        style={buttonStyle(isMuted, isHovering)}
         onMouseEnter={handleButtonMouseEnter}
         onMouseLeave={handleButtonMouseLeave}
       >
@@ -193,30 +176,35 @@ export default function SoundToggle() {
         )}
       </button>
 
+      {/* 🔥 CORRIGIDO: popup agora é posicionado explicitamente à ESQUERDA
+          do botão (não mais dependente de uma classe externa não visível
+          aqui). Como os toggles ficam encostados na borda direita da tela,
+          abrir para a esquerda garante que o controle nunca fique cortado
+          fora da tela. */}
       {showVolumeControl && !isMuted && (
         <div
           className="toolbar-volume-popup"
-          onMouseEnter={handlePopupMouseEnter}
-          onMouseLeave={handlePopupMouseLeave}
           style={{
             position: "absolute",
-            left: "calc(100% + 8px)",
             top: "50%",
+            right: "calc(100% + 12px)",
             transform: "translateY(-50%)",
-            background: "rgba(0,0,0,0.9)",
-            padding: "6px 12px",
-            borderRadius: 8,
-            border: "1px solid rgba(255,215,0,0.2)",
-            backdropFilter: "blur(8px)",
             display: "flex",
             alignItems: "center",
-            gap: "8px",
-            zIndex: 200,
+            gap: "10px",
+            background: "rgba(0,0,0,0.88)",
+            padding: "8px 16px",
+            borderRadius: "24px",
+            border: "1px solid rgba(255,215,0,0.25)",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
             whiteSpace: "nowrap",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            zIndex: 200,
+            backdropFilter: "blur(6px)",
           }}
+          onMouseEnter={handlePopupMouseEnter}
+          onMouseLeave={handlePopupMouseLeave}
         >
-          <span style={{ color: "#888", fontSize: "0.8rem" }}>🔈</span>
+          <span style={{ color: "#888", fontSize: "0.9rem" }}>🔈</span>
           <input
             type="range"
             min="0"
@@ -227,21 +215,19 @@ export default function SoundToggle() {
             onMouseUp={handleVolumeMouseUp}
             onTouchEnd={handleVolumeMouseUp}
             style={{
-              width: "80px",
+              width: "110px",
               height: "4px",
-              background: "rgba(255,255,255,0.2)",
-              borderRadius: "2px",
-              appearance: "none",
-              outline: "none",
               accentColor: "#ffd700",
+              cursor: "pointer",
             }}
           />
           <span
             style={{
               color: "#ffd700",
-              fontSize: "0.7rem",
+              fontSize: "0.75rem",
               fontWeight: "bold",
-              minWidth: "32px",
+              minWidth: "34px",
+              textAlign: "center",
             }}
           >
             {Math.round(volume * 100)}%
@@ -250,4 +236,31 @@ export default function SoundToggle() {
       )}
     </div>
   );
+}
+
+// ====================== ESTILOS ======================
+
+function containerStyle() {
+  return {
+    position: "relative",
+    display: "inline-flex",
+    alignItems: "center",
+  };
+}
+
+function buttonStyle(isMuted, isHovering) {
+  return {
+    background: isMuted
+      ? "rgba(60,60,60,0.6)"
+      : isHovering
+        ? "rgba(255,215,0,0.15)"
+        : undefined,
+    border: isMuted
+      ? "1px solid rgba(255,255,255,0.05)"
+      : isHovering
+        ? "1px solid rgba(255,215,0,0.3)"
+        : undefined,
+    boxShadow:
+      isHovering && !isMuted ? "0 4px 20px rgba(255,215,0,0.15)" : undefined,
+  };
 }

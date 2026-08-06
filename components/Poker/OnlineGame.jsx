@@ -1,7 +1,7 @@
-// components/Poker/OnlineGame.jsx
+// components/Poker/OnlineGame.jsx - COM ROLAGEM AUTOMÁTICA E RESPONSIVO
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 
 function getRankDisplay(rank) {
@@ -37,16 +37,68 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   const [closedCount, setClosedCount] = useState(0);
   const [totalPlayers, setTotalPlayers] = useState(0);
 
-  // 🔥 NOVO: ESTADO DO CHAT
+  // 🔥 CHAT
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
+  const [showChat, setShowChat] = useState(true);
   const chatEndRef = useRef(null);
   const chatContainerRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
   // 🔥 REFS
   const resultLockedRef = useRef(false);
   const resultClosedRef = useRef(false);
   const isClosingRef = useRef(false);
+
+  // 🔥 FUNÇÃO PARA ROLAR O CHAT PARA O FINAL
+  const scrollChatToBottom = useCallback((force = false) => {
+    // Tentativa 1: usando o ref do final
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      return;
+    }
+
+    // Tentativa 2: usando o container de mensagens
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
+      return;
+    }
+
+    // Tentativa 3: usando o container do chat
+    if (chatContainerRef.current) {
+      const container = chatContainerRef.current.querySelector(
+        ".chat-messages-scroll",
+      );
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+        return;
+      }
+    }
+
+    // Tentativa 4: fallback com querySelector global
+    const container = document.querySelector(".chat-messages-scroll");
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, []);
+
+  // 🔥 ROLAR SEMPRE QUE NOVAS MENSAGENS CHEGAREM
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      setTimeout(() => scrollChatToBottom(true), 50);
+      setTimeout(() => scrollChatToBottom(true), 150);
+      setTimeout(() => scrollChatToBottom(true), 300);
+    }
+  }, [chatMessages, scrollChatToBottom]);
+
+  // 🔥 ROLAR QUANDO O CHAT FOR ABERTO/MAXIMIZADO
+  useEffect(() => {
+    if (showChat) {
+      setTimeout(() => scrollChatToBottom(true), 100);
+      setTimeout(() => scrollChatToBottom(true), 300);
+    }
+  }, [showChat, scrollChatToBottom]);
 
   useEffect(() => {
     console.log("🔄 OnlineGame montado, socket:", socket?.id);
@@ -82,11 +134,8 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       setIsMyTurn(data.playerId === socket.id);
     };
 
-    // 🔥 QUANDO O RESULTADO CHEGA
     const onRoundEnded = (data) => {
       console.log("📡 ROUND-ENDED recebido!");
-
-      // 🔒 TRAVAR O MODAL
       resultLockedRef.current = true;
       resultClosedRef.current = false;
       isClosingRef.current = false;
@@ -95,25 +144,18 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       setShowResult(true);
       setIsSummaryClosing(false);
 
-      // 🔥 Atualizar contadores
       const playersWithStatus = data.players || [];
       setTotalPlayers(playersWithStatus.length);
       const closed = playersWithStatus.filter((p) => p.hasClosedSummary).length;
       setClosedCount(closed);
-
-      console.log(
-        `📊 Modal aberto! ${closed}/${playersWithStatus.length} jogadores fecharam`,
-      );
     };
 
-    // 🔥 PROGRESSO - atualiza quem já fechou
     const onSummaryProgress = (data) => {
       console.log("📡 summary-progress:", data);
       if (data.roomId === roomId) {
         setClosedCount(data.closedCount || 0);
         setTotalPlayers(data.totalPlayers || 0);
 
-        // Atualizar resultado data com os novos status
         setResultData((prev) => {
           if (!prev) return prev;
           return {
@@ -124,7 +166,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
-    // 🔥 QUANDO TODOS FECHARAM OU TIMER
     const onSummaryClosed = (data) => {
       console.log("📡 summary-closed:", data);
       if (data.roomId === roomId) {
@@ -140,21 +181,22 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       }
     };
 
-    // 🔥 NOVO: HISTÓRICO DE CHAT AO ENTRAR NA SALA
+    // 🔥 CHAT: HISTÓRICO
     const onChatHistory = (data) => {
       console.log("📡 chat-history:", data);
       if (data.roomId === roomId || !data.roomId) {
         setChatMessages(data.messages || []);
+        setTimeout(() => scrollChatToBottom(true), 200);
       }
     };
 
-    // 🔥 NOVO: NOVA MENSAGEM DE CHAT
+    // 🔥 CHAT: NOVA MENSAGEM
     const onChatMessage = (message) => {
       console.log("📡 chat-message:", message);
       setChatMessages((prev) => [...prev, message]);
+      setTimeout(() => scrollChatToBottom(true), 100);
     };
 
-    // Limpar listeners antigos
     socket.off("room-update");
     socket.off("game-started");
     socket.off("game-update");
@@ -167,7 +209,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     socket.off("chat-message");
     socket.off("error");
 
-    // Registrar novos listeners
     socket.on("room-update", onRoomUpdate);
     socket.on("game-started", onGameStarted);
     socket.on("game-update", onGameUpdate);
@@ -190,16 +231,8 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       socket.off("chat-history", onChatHistory);
       socket.off("chat-message", onChatMessage);
     };
-  }, [socket, update, roomId]);
+  }, [socket, update, roomId, scrollChatToBottom]);
 
-  // 🔥 NOVO: AUTO-SCROLL DO CHAT AO RECEBER NOVA MENSAGEM
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatMessages]);
-
-  // 🔥 NOVO: ENVIAR MENSAGEM DE CHAT
   const sendChatMessage = () => {
     const trimmed = chatInput.trim();
     if (!trimmed) return;
@@ -208,9 +241,9 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       return;
     }
 
-    console.log(`📤 Enviando mensagem de chat: ${trimmed}`);
     socket.emit("send-chat-message", { roomId, message: trimmed });
     setChatInput("");
+    setTimeout(() => scrollChatToBottom(true), 100);
   };
 
   const handleChatKeyDown = (e) => {
@@ -220,50 +253,47 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
     }
   };
 
-  // 🔥 FECHAR RESUMO - APENAS PARA QUEM CLICOU
   const handleCloseSummary = () => {
     if (isClosingRef.current) return;
     if (resultClosedRef.current) return;
     if (!resultLockedRef.current) return;
 
-    console.log("🖱️ USUÁRIO CLICOU EM FECHAR!");
     isClosingRef.current = true;
     setIsSummaryClosing(true);
-
-    console.log(`📤 Emitindo close-summary para sala ${roomId}`);
     socket.emit("close-summary", { roomId });
   };
 
   const handleAction = (action, amount = 0) => {
-    console.log(`📤 Enviando ação: ${action}`, { roomId, action, amount });
     socket.emit("player-action", { roomId, action, amount });
   };
 
   const toggleReady = () => {
-    console.log(`📤 Toggle ready para sala ${roomId}`);
     socket.emit("player-ready", { roomId });
   };
 
   const leaveRoom = async () => {
-    console.log(`📤 Saindo da sala ${roomId}`);
     socket.emit("leave-room", { roomId });
-
     await update();
-    console.log("🔄 Sessão atualizada ao sair da sala");
-
     onLeave(true);
   };
 
-  // 🔥 NOVO: RENDERIZAR O PAINEL DE CHAT (REUTILIZÁVEL)
+  // 🔥 RENDER DO CHAT
   function renderChatPanel() {
     return (
-      <div style={chatContainerStyle()}>
-        <div style={chatHeaderStyle()}>💬 Chat da Sala</div>
-        <div style={chatMessagesStyle()} ref={chatContainerRef}>
+      <div style={chatContainerStyle()} ref={chatContainerRef}>
+        <div style={chatHeaderStyle()}>
+          <span>💬 Chat da Sala</span>
+          <span style={{ fontSize: "0.7rem", color: "#888" }}>
+            {chatMessages.length} msgs
+          </span>
+        </div>
+        <div
+          className="chat-messages-scroll"
+          style={chatMessagesStyle()}
+          ref={messagesContainerRef}
+        >
           {chatMessages.length === 0 && (
-            <p style={chatEmptyStyle()}>
-              Nenhuma mensagem ainda. Diga olá! 👋
-            </p>
+            <p style={chatEmptyStyle()}>Nenhuma mensagem ainda. Diga olá! 👋</p>
           )}
           {chatMessages.map((msg) => {
             const isMine = msg.playerId === socket?.id;
@@ -322,9 +352,7 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
       <div style={resultOverlayStyle()}>
         <div style={resultModalStyle()}>
           <h2 style={resultTitleStyle()}>🏆 RESULTADO DA PARTIDA</h2>
-
           <div style={resultPotStyle()}>💰 Pote: {resultData.pot} fichas</div>
-
           <div style={resultCommunityStyle()}>
             <span style={{ color: "#888", marginRight: "10px" }}>
               Cartas da mesa:
@@ -338,7 +366,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
               <span style={{ color: "#666" }}>(nenhuma)</span>
             )}
           </div>
-
           <div style={resultPlayersStyle()}>
             {resultData.results.map((r, i) => (
               <div key={i} style={resultPlayerItemStyle(r.isWinner)}>
@@ -352,12 +379,9 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
               </div>
             ))}
           </div>
-
           <div style={resultWinnerStyle()}>
             🎉 {resultData.winner.name} venceu {resultData.pot} fichas!
           </div>
-
-          {/* 🔥 INDICADOR DE PROGRESSO */}
           <div style={resultStatusStyle()}>
             <span style={{ color: "#888", fontSize: "0.85rem" }}>
               👥 {closed}/{total} jogadores já fecharam
@@ -366,8 +390,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
               ⏳ Fechamento automático em 25s
             </span>
           </div>
-
-          {/* 🔥 BARRA DE PROGRESSO */}
           <div style={progressBarContainerStyle()}>
             <div
               style={{
@@ -376,8 +398,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
               }}
             />
           </div>
-
-          {/* 🔥 BOTÃO DE FECHAR */}
           <div style={resultButtonsStyle()}>
             <button
               onClick={handleCloseSummary}
@@ -394,7 +414,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
                   : "✕ FECHAR RESUMO"}
             </button>
           </div>
-
           <p style={resultHintStyle()}>
             {isAllClosed
               ? "✅ Todos os jogadores já fecharam! Aguarde..."
@@ -402,19 +421,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
                 ? "⏳ Fechando o resumo..."
                 : `💡 Clique no botão para fechar. Aguarde os outros (${closed}/${total})`}
           </p>
-
-          <div
-            style={{
-              textAlign: "center",
-              fontSize: "0.7rem",
-              color: "#4caf50",
-              marginTop: "10px",
-              paddingTop: "10px",
-              borderTop: "1px solid rgba(76,175,80,0.3)",
-            }}
-          >
-            🔒 Resumo travado - Aguardando sua ação
-          </div>
         </div>
       </div>
     );
@@ -439,15 +445,15 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
                 <div key={index} style={playerItemStyle(player.isReady)}>
                   <span>{player.name}</span>
                   <span>{player.id === socket?.id ? " 👈 (você)" : ""}</span>
-                  <span>{player.isReady ? "✅ Pronto" : "⏳ Aguardando..."}</span>
+                  <span>
+                    {player.isReady ? "✅ Pronto" : "⏳ Aguardando..."}
+                  </span>
                 </div>
               ))}
             </div>
-
             <button onClick={toggleReady} style={readyButtonStyle()}>
               {isReady ? "⏳ Aguardando..." : "✅ Pronto para jogar"}
             </button>
-
             <p style={infoStyle()}>
               {players.length >= 2
                 ? "🎮 Todos prontos? O jogo vai começar!"
@@ -455,7 +461,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             </p>
           </div>
 
-          {/* 🔥 NOVO: PAINEL DE CHAT NA SALA DE ESPERA */}
           <div style={lobbyRightColStyle()}>{renderChatPanel()}</div>
         </div>
       </div>
@@ -477,7 +482,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
 
       <div style={tableStyle()}>
         <div style={potStyle()}>💰 Pote: {gameState.pot}</div>
-
         <div style={communityStyle()}>
           {gameState.communityCards && gameState.communityCards.length > 0 ? (
             gameState.communityCards.map((card, i) => (
@@ -487,7 +491,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             <span style={{ color: "#666" }}>Aguardando cartas...</span>
           )}
         </div>
-
         <div style={playersTableStyle()}>
           {gameState.players.map((player, index) => {
             const isCurrent = player.id === socket?.id;
@@ -519,7 +522,6 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
             );
           })}
         </div>
-
         <div style={turnIndicatorStyle()}>
           {isCurrentPlayerMe && !currentPlayer?.isFolded ? (
             <span style={{ color: "#4caf50", fontWeight: "bold" }}>
@@ -573,7 +575,8 @@ export default function OnlineGame({ roomId, playerName, socket, onLeave }) {
   );
 }
 
-// ====================== ESTILOS ======================
+// ====================== ESTILOS RESPONSIVOS ======================
+
 function resultOverlayStyle() {
   return {
     position: "fixed",
@@ -583,16 +586,16 @@ function resultOverlayStyle() {
     justifyContent: "center",
     alignItems: "center",
     zIndex: 2000,
-    padding: 20,
+    padding: "clamp(10px, 3vw, 20px)",
   };
 }
 
 function resultModalStyle() {
   return {
     background: "linear-gradient(145deg,#1a3a2a,#0a2a1a)",
-    padding: "30px 40px",
-    borderRadius: 30,
-    maxWidth: 500,
+    padding: "clamp(20px, 4vw, 40px)",
+    borderRadius: "clamp(20px, 3vw, 30px)",
+    maxWidth: "clamp(340px, 90vw, 500px)",
     width: "100%",
     color: "white",
     border: "3px solid gold",
@@ -606,14 +609,14 @@ function resultTitleStyle() {
     textAlign: "center",
     color: "gold",
     margin: "0 0 15px",
-    fontSize: "1.8rem",
+    fontSize: "clamp(1.2rem, 4vw, 1.8rem)",
   };
 }
 
 function resultPotStyle() {
   return {
     textAlign: "center",
-    fontSize: "1.3rem",
+    fontSize: "clamp(1rem, 3vw, 1.3rem)",
     color: "#ffd700",
     marginBottom: "15px",
   };
@@ -622,10 +625,11 @@ function resultPotStyle() {
 function resultCommunityStyle() {
   return {
     textAlign: "center",
-    padding: "10px",
+    padding: "clamp(6px, 1.5vw, 10px)",
     background: "rgba(0,0,0,0.3)",
     borderRadius: 15,
     marginBottom: "15px",
+    fontSize: "clamp(0.8rem, 2vw, 1rem)",
   };
 }
 
@@ -633,7 +637,7 @@ function resultPlayersStyle() {
   return {
     display: "flex",
     flexDirection: "column",
-    gap: "10px",
+    gap: "8px",
     marginBottom: "20px",
   };
 }
@@ -643,10 +647,12 @@ function resultPlayerItemStyle(isWinner) {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: "10px 15px",
+    padding: "clamp(6px, 1.5vw, 10px) clamp(10px, 2vw, 15px)",
     borderRadius: 10,
     background: isWinner ? "rgba(255,215,0,0.15)" : "rgba(255,255,255,0.05)",
     border: isWinner ? "1px solid gold" : "1px solid rgba(255,255,255,0.1)",
+    flexWrap: "wrap",
+    gap: "4px",
   };
 }
 
@@ -654,14 +660,14 @@ function resultPlayerNameStyle(isWinner) {
   return {
     fontWeight: "bold",
     color: isWinner ? "gold" : "#fff",
-    fontSize: "1rem",
+    fontSize: "clamp(0.8rem, 2vw, 1rem)",
   };
 }
 
 function resultPlayerHandStyle(isWinner) {
   return {
     color: isWinner ? "#4caf50" : "#aaa",
-    fontSize: "0.9rem",
+    fontSize: "clamp(0.7rem, 1.5vw, 0.9rem)",
   };
 }
 
@@ -671,7 +677,7 @@ function resultWinnerBadgeStyle() {
     color: "#1a3a2a",
     padding: "2px 10px",
     borderRadius: 12,
-    fontSize: "0.7rem",
+    fontSize: "clamp(0.5rem, 1.2vw, 0.7rem)",
     fontWeight: "bold",
   };
 }
@@ -679,13 +685,12 @@ function resultWinnerBadgeStyle() {
 function resultWinnerStyle() {
   return {
     textAlign: "center",
-    fontSize: "1.1rem",
+    fontSize: "clamp(0.9rem, 2.5vw, 1.1rem)",
     color: "#ffd700",
     marginBottom: "20px",
   };
 }
 
-// 🔥 ESTILOS DE PROGRESSO
 function resultStatusStyle() {
   return {
     display: "flex",
@@ -734,8 +739,8 @@ function resultButtonStyle() {
     background: "radial-gradient(#f7d97c,#d6a12e)",
     border: "none",
     fontWeight: "bold",
-    fontSize: "1rem",
-    padding: "12px 30px",
+    fontSize: "clamp(0.8rem, 2vw, 1rem)",
+    padding: "clamp(10px, 2vw, 12px) clamp(20px, 4vw, 30px)",
     borderRadius: 60,
     cursor: "pointer",
     boxShadow: "0 4px 0 #7a4c1a",
@@ -748,24 +753,25 @@ function resultButtonStyle() {
 function resultHintStyle() {
   return {
     textAlign: "center",
-    fontSize: "0.75rem",
+    fontSize: "clamp(0.6rem, 1.5vw, 0.75rem)",
     color: "#888",
     marginTop: "10px",
   };
 }
 
-// ====================== ESTILOS EXISTENTES ======================
+// ====================== LOBBY / GAME ESTILOS ======================
+
 function lobbyStyle() {
   return {
     background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
-    borderRadius: 30,
-    padding: 20,
-    minHeight: "400px",
+    borderRadius: "clamp(20px, 4vw, 30px)",
+    padding: "clamp(12px, 2vw, 20px)",
+    minHeight: "clamp(300px, 60vh, 400px)",
     color: "white",
     position: "fixed",
     inset: 0,
     zIndex: 1000,
-    margin: 20,
+    margin: "clamp(8px, 2vw, 20px)",
     overflowY: "auto",
   };
 }
@@ -773,14 +779,14 @@ function lobbyStyle() {
 function gameStyle() {
   return {
     background: "linear-gradient(145deg,#0a2f1f 0%,#064e2b 100%)",
-    borderRadius: 30,
-    padding: 20,
-    minHeight: "500px",
+    borderRadius: "clamp(20px, 4vw, 30px)",
+    padding: "clamp(12px, 2vw, 20px)",
+    minHeight: "clamp(350px, 70vh, 500px)",
     color: "white",
     position: "fixed",
     inset: 0,
     zIndex: 1000,
-    margin: 20,
+    margin: "clamp(8px, 2vw, 20px)",
     overflowY: "auto",
   };
 }
@@ -790,7 +796,9 @@ function headerStyle() {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "20px",
+    marginBottom: "clamp(12px, 2vw, 20px)",
+    flexWrap: "wrap",
+    gap: "8px",
   };
 }
 
@@ -798,6 +806,7 @@ function titleStyle() {
   return {
     color: "gold",
     margin: 0,
+    fontSize: "clamp(0.9rem, 2.5vw, 1.3rem)",
   };
 }
 
@@ -806,38 +815,38 @@ function leaveButtonStyle() {
     background: "rgba(244,67,54,0.3)",
     border: "1px solid #f44336",
     borderRadius: 20,
-    padding: "8px 16px",
+    padding: "clamp(6px, 1vw, 8px) clamp(12px, 2vw, 16px)",
     color: "white",
     cursor: "pointer",
+    fontSize: "clamp(0.7rem, 1.5vw, 0.9rem)",
   };
 }
 
-// 🔥 NOVO: LAYOUT EM DUAS COLUNAS PARA O LOBBY (JOGADORES + CHAT)
 function lobbyBodyStyle() {
   return {
     display: "flex",
-    gap: "20px",
+    gap: "clamp(12px, 2vw, 20px)",
     flexWrap: "wrap",
   };
 }
 
 function lobbyLeftColStyle() {
   return {
-    flex: 1,
-    minWidth: 260,
+    flex: "1 1 220px",
+    minWidth: "200px",
   };
 }
 
 function lobbyRightColStyle() {
   return {
-    flex: 1,
-    minWidth: 280,
+    flex: "1 1 260px",
+    minWidth: "240px",
   };
 }
 
 function playersListStyle() {
   return {
-    marginBottom: "20px",
+    marginBottom: "clamp(12px, 2vw, 20px)",
   };
 }
 
@@ -845,11 +854,14 @@ function playerItemStyle(isReady) {
   return {
     display: "flex",
     justifyContent: "space-between",
-    padding: "10px 15px",
+    padding: "clamp(6px, 1.2vw, 10px) clamp(10px, 2vw, 15px)",
     marginBottom: "8px",
     background: isReady ? "rgba(76,175,80,0.2)" : "rgba(255,255,255,0.05)",
     borderRadius: 10,
     border: isReady ? "1px solid #4caf50" : "1px solid rgba(255,255,255,0.1)",
+    fontSize: "clamp(0.7rem, 1.5vw, 0.85rem)",
+    flexWrap: "wrap",
+    gap: "4px",
   };
 }
 
@@ -858,8 +870,8 @@ function readyButtonStyle() {
     background: "radial-gradient(#f7d97c,#d6a12e)",
     border: "none",
     fontWeight: "bold",
-    fontSize: "1rem",
-    padding: "12px 20px",
+    fontSize: "clamp(0.8rem, 2vw, 1rem)",
+    padding: "clamp(10px, 2vw, 12px) 20px",
     borderRadius: 60,
     cursor: "pointer",
     boxShadow: "0 4px 0 #7a4c1a",
@@ -873,30 +885,35 @@ function infoStyle() {
     textAlign: "center",
     color: "#aaa",
     marginTop: "15px",
+    fontSize: "clamp(0.7rem, 1.5vw, 0.85rem)",
   };
 }
 
-// ====================== 🔥 NOVO: ESTILOS DO CHAT ======================
+// ====================== CHAT ESTILOS ======================
+
 function chatContainerStyle() {
   return {
     background: "rgba(0,0,0,0.3)",
-    borderRadius: 20,
+    borderRadius: "clamp(12px, 2vw, 20px)",
     border: "1px solid rgba(255,215,0,0.2)",
     display: "flex",
     flexDirection: "column",
-    height: "360px",
+    height: "clamp(250px, 50vh, 360px)",
     overflow: "hidden",
   };
 }
 
 function chatHeaderStyle() {
   return {
-    padding: "10px 15px",
+    padding: "clamp(6px, 1vw, 10px) clamp(10px, 2vw, 15px)",
     background: "rgba(255,215,0,0.1)",
     color: "gold",
     fontWeight: "bold",
-    fontSize: "0.9rem",
+    fontSize: "clamp(0.7rem, 1.5vw, 0.9rem)",
     borderBottom: "1px solid rgba(255,215,0,0.2)",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
   };
 }
 
@@ -904,10 +921,10 @@ function chatMessagesStyle() {
   return {
     flex: 1,
     overflowY: "auto",
-    padding: "10px 12px",
+    padding: "clamp(6px, 1vw, 10px) clamp(8px, 1.5vw, 12px)",
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
+    gap: "4px",
   };
 }
 
@@ -915,7 +932,7 @@ function chatEmptyStyle() {
   return {
     textAlign: "center",
     color: "#888",
-    fontSize: "0.8rem",
+    fontSize: "clamp(0.6rem, 1.2vw, 0.8rem)",
     marginTop: "10px",
   };
 }
@@ -924,7 +941,7 @@ function chatSystemMessageStyle() {
   return {
     textAlign: "center",
     color: "#888",
-    fontSize: "0.7rem",
+    fontSize: "clamp(0.5rem, 1vw, 0.7rem)",
     fontStyle: "italic",
     margin: "4px 0",
   };
@@ -945,7 +962,7 @@ function chatBubbleStyle(isMine) {
       ? "1px solid rgba(76,175,80,0.4)"
       : "1px solid rgba(255,255,255,0.1)",
     borderRadius: 12,
-    padding: "6px 10px",
+    padding: "clamp(4px, 1vw, 6px) clamp(8px, 1.5vw, 10px)",
     display: "flex",
     flexDirection: "column",
     gap: "2px",
@@ -954,7 +971,7 @@ function chatBubbleStyle(isMine) {
 
 function chatAuthorStyle(isMine) {
   return {
-    fontSize: "0.65rem",
+    fontSize: "clamp(0.5rem, 1vw, 0.65rem)",
     fontWeight: "bold",
     color: isMine ? "#4caf50" : "#ffd700",
   };
@@ -962,7 +979,7 @@ function chatAuthorStyle(isMine) {
 
 function chatTextStyle() {
   return {
-    fontSize: "0.85rem",
+    fontSize: "clamp(0.7rem, 1.5vw, 0.85rem)",
     color: "#fff",
     wordBreak: "break-word",
   };
@@ -972,7 +989,7 @@ function chatInputRowStyle() {
   return {
     display: "flex",
     gap: "8px",
-    padding: "10px",
+    padding: "clamp(6px, 1vw, 10px)",
     borderTop: "1px solid rgba(255,215,0,0.15)",
   };
 }
@@ -980,58 +997,66 @@ function chatInputRowStyle() {
 function chatInputStyle() {
   return {
     flex: 1,
-    padding: "8px 12px",
+    padding: "clamp(6px, 1vw, 8px) clamp(8px, 1.5vw, 12px)",
     borderRadius: 15,
     border: "1px solid rgba(255,215,0,0.2)",
     background: "rgba(0,0,0,0.3)",
     color: "white",
-    fontSize: "0.85rem",
+    fontSize: "clamp(0.7rem, 1.5vw, 0.85rem)",
     outline: "none",
+    minWidth: "60px",
   };
 }
 
 function chatSendButtonStyle(enabled) {
   return {
-    background: enabled ? "radial-gradient(#f7d97c,#d6a12e)" : "rgba(255,255,255,0.1)",
+    background: enabled
+      ? "radial-gradient(#f7d97c,#d6a12e)"
+      : "rgba(255,255,255,0.1)",
     border: "none",
     borderRadius: "50%",
-    width: 36,
-    height: 36,
-    minWidth: 36,
+    width: "clamp(32px, 5vw, 36px)",
+    height: "clamp(32px, 5vw, 36px)",
+    minWidth: "clamp(32px, 5vw, 36px)",
     color: enabled ? "#2e241f" : "#666",
     fontWeight: "bold",
     cursor: enabled ? "pointer" : "not-allowed",
-    fontSize: "1rem",
+    fontSize: "clamp(0.8rem, 1.5vw, 1rem)",
   };
 }
 
 function tableStyle() {
   return {
     background: "rgba(0,20,0,0.3)",
-    borderRadius: 30,
-    padding: 20,
-    minHeight: "300px",
+    borderRadius: "clamp(20px, 3vw, 30px)",
+    padding: "clamp(12px, 2vw, 20px)",
+    minHeight: "clamp(200px, 40vh, 300px)",
   };
 }
 
 function potStyle() {
   return {
     textAlign: "center",
-    fontSize: "1.5rem",
+    fontSize: "clamp(1.2rem, 3vw, 1.5rem)",
     color: "gold",
-    marginBottom: "15px",
+    marginBottom: "clamp(10px, 2vw, 15px)",
   };
 }
 
 function communityStyle() {
   return {
     textAlign: "center",
-    fontSize: "2rem",
-    marginBottom: "20px",
-    padding: "15px",
+    fontSize: "clamp(1.5rem, 4vw, 2rem)",
+    marginBottom: "clamp(12px, 2vw, 20px)",
+    padding: "clamp(10px, 2vw, 15px)",
     background: "rgba(0,0,0,0.2)",
     borderRadius: 15,
-    minHeight: "60px",
+    minHeight: "clamp(50px, 8vw, 60px)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "5px",
   };
 }
 
@@ -1039,7 +1064,7 @@ function playersTableStyle() {
   return {
     display: "flex",
     flexWrap: "wrap",
-    gap: "15px",
+    gap: "clamp(8px, 1.5vw, 15px)",
     justifyContent: "center",
   };
 }
@@ -1049,8 +1074,9 @@ function playerGameStyle(isCurrent, isFolded) {
     background: isCurrent ? "rgba(255,215,0,0.2)" : "rgba(255,255,255,0.05)",
     border: isCurrent ? "2px solid gold" : "1px solid rgba(255,255,255,0.1)",
     borderRadius: 15,
-    padding: "15px",
-    minWidth: "150px",
+    padding: "clamp(10px, 1.5vw, 15px)",
+    minWidth: "clamp(120px, 20vw, 150px)",
+    flex: "1 1 120px",
     textAlign: "center",
     opacity: isFolded ? 0.4 : 1,
   };
@@ -1060,45 +1086,48 @@ function playerNameStyle() {
   return {
     fontWeight: "bold",
     marginBottom: "8px",
+    fontSize: "clamp(0.7rem, 1.5vw, 0.85rem)",
   };
 }
 
 function playerCardsStyle() {
   return {
     marginBottom: "8px",
+    fontSize: "clamp(0.8rem, 1.8vw, 1rem)",
   };
 }
 
 function playerChipsStyle() {
   return {
     color: "#4caf50",
+    fontSize: "clamp(0.7rem, 1.5vw, 0.85rem)",
   };
 }
 
 function playerBetStyle() {
   return {
     color: "#ff9800",
-    fontSize: "0.8rem",
+    fontSize: "clamp(0.6rem, 1.2vw, 0.8rem)",
   };
 }
 
 function turnIndicatorStyle() {
   return {
     textAlign: "center",
-    padding: "15px",
-    marginTop: "15px",
+    padding: "clamp(10px, 2vw, 15px)",
+    marginTop: "clamp(10px, 2vw, 15px)",
     background: "rgba(0,0,0,0.3)",
     borderRadius: 15,
-    fontSize: "1.2rem",
+    fontSize: "clamp(0.9rem, 2vw, 1.2rem)",
   };
 }
 
 function actionsStyle() {
   return {
     display: "flex",
-    gap: "10px",
+    gap: "clamp(6px, 1vw, 10px)",
     justifyContent: "center",
-    marginTop: "20px",
+    marginTop: "clamp(12px, 2vw, 20px)",
     flexWrap: "wrap",
   };
 }
@@ -1107,11 +1136,14 @@ function actionButtonStyle(color) {
   return {
     background: color,
     border: "none",
-    padding: "10px 20px",
+    padding: "clamp(6px, 1vw, 10px) clamp(10px, 2vw, 20px)",
     borderRadius: 30,
     color: "white",
     fontWeight: "bold",
     cursor: "pointer",
+    fontSize: "clamp(0.6rem, 1.2vw, 0.85rem)",
+    flex: "1 1 auto",
+    minWidth: "clamp(50px, 10vw, 70px)",
   };
 }
 
@@ -1119,25 +1151,25 @@ function cardStyle(isRed, isFaceDown) {
   if (isFaceDown) {
     return {
       display: "inline-block",
-      padding: "10px 15px",
-      margin: "0 5px",
+      padding: "clamp(6px, 1vw, 10px) clamp(10px, 1.5vw, 15px)",
+      margin: "0 3px",
       background: "#2b5797",
       borderRadius: 8,
       color: "white",
       fontWeight: "bold",
-      fontSize: "1.2rem",
-      minWidth: "50px",
+      fontSize: "clamp(0.8rem, 2vw, 1.2rem)",
+      minWidth: "clamp(35px, 6vw, 50px)",
     };
   }
   return {
     display: "inline-block",
-    padding: "10px 15px",
-    margin: "0 5px",
+    padding: "clamp(6px, 1vw, 10px) clamp(10px, 1.5vw, 15px)",
+    margin: "0 3px",
     background: "white",
     borderRadius: 8,
     color: isRed ? "#c33" : "#1f2a2f",
     fontWeight: "bold",
-    fontSize: "1.2rem",
-    minWidth: "50px",
+    fontSize: "clamp(0.8rem, 2vw, 1.2rem)",
+    minWidth: "clamp(35px, 6vw, 50px)",
   };
 }
