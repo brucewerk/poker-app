@@ -1,4 +1,4 @@
-// components/Poker/SideStatsToggles.jsx - VERSÃO FINAL (vertical, legível, não cobre)
+// components/Poker/SideStatsToggles.jsx - VERSÃO FINAL (vertical, legível, não cobre, com tema claro)
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,6 +18,7 @@ export default function SideStatsToggles({
   const [isMinimized, setIsMinimized] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
 
   useEffect(() => {
     const checkScreen = () => {
@@ -27,9 +28,28 @@ export default function SideStatsToggles({
       setIsLandscape(width > height && width < 900);
     };
 
+    const checkTheme = () => {
+      const theme = document.documentElement.getAttribute("data-theme");
+      setIsDarkTheme(theme !== "light");
+    };
+
     checkScreen();
+    checkTheme();
     window.addEventListener("resize", checkScreen);
-    return () => window.removeEventListener("resize", checkScreen);
+    window.addEventListener("themechange", checkTheme);
+
+    // Observer para mudanças no atributo data-theme
+    const observer = new MutationObserver(() => checkTheme());
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+
+    return () => {
+      window.removeEventListener("resize", checkScreen);
+      window.removeEventListener("themechange", checkTheme);
+      observer.disconnect();
+    };
   }, []);
 
   const stageLabel = stageNames[stage] || stage || "Pré-flop";
@@ -84,16 +104,22 @@ export default function SideStatsToggles({
           top: "10px",
           left: "12px",
           zIndex: 200,
-          background: "rgba(0,0,0,0.75)",
+          background: isDarkTheme
+            ? "rgba(0,0,0,0.75)"
+            : "rgba(255,255,255,0.85)",
           backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,215,0,0.3)",
+          border: isDarkTheme
+            ? "1px solid rgba(255,215,0,0.3)"
+            : "1px solid rgba(0,0,0,0.15)",
           borderRadius: "50%",
           width: "38px",
           height: "38px",
           color: "gold",
           cursor: "pointer",
           fontSize: "1.1rem",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+          boxShadow: isDarkTheme
+            ? "0 4px 16px rgba(0,0,0,0.3)"
+            : "0 4px 16px rgba(0,0,0,0.08)",
           transition: "all 0.3s ease",
           display: "flex",
           alignItems: "center",
@@ -141,11 +167,15 @@ export default function SideStatsToggles({
         alignItems: "stretch",
         gap: isMobile ? "3px" : "5px",
         padding: isMobile ? "6px 8px" : "10px 14px",
-        background: "rgba(0,0,0,0.88)",
+        background: isDarkTheme ? "rgba(0,0,0,0.88)" : "rgba(255,255,255,0.95)",
         backdropFilter: "blur(18px)",
         borderRadius: isMobile ? "12px" : "16px",
-        border: "1px solid rgba(255,215,0,0.2)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+        border: isDarkTheme
+          ? "1px solid rgba(255,215,0,0.2)"
+          : "1px solid rgba(0,0,0,0.1)",
+        boxShadow: isDarkTheme
+          ? "0 8px 32px rgba(0,0,0,0.5)"
+          : "0 8px 32px rgba(0,0,0,0.1)",
         maxHeight: isMobile ? "calc(100vh - 65px)" : "calc(100vh - 70px)",
         overflowY: "auto",
         overflowX: "hidden",
@@ -164,14 +194,16 @@ export default function SideStatsToggles({
           justifyContent: "space-between",
           alignItems: "center",
           paddingBottom: isMobile ? "4px" : "6px",
-          borderBottom: "1px solid rgba(255,215,0,0.1)",
+          borderBottom: isDarkTheme
+            ? "1px solid rgba(255,215,0,0.1)"
+            : "1px solid rgba(0,0,0,0.08)",
           marginBottom: isMobile ? "4px" : "6px",
         }}
       >
         <span
           style={{
             fontSize: isMobile ? "0.55rem" : "0.7rem",
-            color: "rgba(255,215,0,0.6)",
+            color: isDarkTheme ? "rgba(255,215,0,0.6)" : "rgba(0,0,0,0.5)",
             fontWeight: "600",
             letterSpacing: "0.5px",
           }}
@@ -183,15 +215,21 @@ export default function SideStatsToggles({
           style={{
             background: "none",
             border: "none",
-            color: "rgba(255,215,0,0.4)",
+            color: isDarkTheme ? "rgba(255,215,0,0.4)" : "rgba(0,0,0,0.3)",
             cursor: "pointer",
             fontSize: isMobile ? "0.6rem" : "0.8rem",
             padding: "2px 8px",
             transition: "color 0.3s ease",
             borderRadius: "4px",
           }}
-          onMouseEnter={(e) => (e.target.style.color = "gold")}
-          onMouseLeave={(e) => (e.target.style.color = "rgba(255,215,0,0.4)")}
+          onMouseEnter={(e) =>
+            (e.target.style.color = isDarkTheme ? "gold" : "#000")
+          }
+          onMouseLeave={(e) =>
+            (e.target.style.color = isDarkTheme
+              ? "rgba(255,215,0,0.4)"
+              : "rgba(0,0,0,0.3)")
+          }
           title="Minimizar"
         >
           ✕
@@ -206,18 +244,24 @@ export default function SideStatsToggles({
             flexDirection: "row",
             alignItems: "center",
             gap: isMobile ? "6px" : "10px",
-            background: "rgba(0,0,0,0.25)",
+            background: isDarkTheme ? "rgba(0,0,0,0.25)" : "rgba(0,0,0,0.04)",
             borderRadius: "8px",
             padding: isMobile ? "3px 8px" : "5px 12px",
-            border: "1px solid rgba(255,255,255,0.04)",
+            border: isDarkTheme
+              ? "1px solid rgba(255,255,255,0.04)"
+              : "1px solid rgba(0,0,0,0.04)",
             transition: "all 0.2s ease",
             width: "100%",
             minWidth: isMobile ? "80px" : "130px",
           }}
           whileHover={{
             scale: 1.02,
-            background: "rgba(255,215,0,0.06)",
-            border: "1px solid rgba(255,215,0,0.1)",
+            background: isDarkTheme
+              ? "rgba(255,215,0,0.06)"
+              : "rgba(0,0,0,0.04)",
+            border: isDarkTheme
+              ? "1px solid rgba(255,215,0,0.1)"
+              : "1px solid rgba(0,0,0,0.08)",
           }}
         >
           <span
@@ -233,7 +277,7 @@ export default function SideStatsToggles({
           <span
             style={{
               fontSize: isMobile ? "0.5rem" : "0.65rem",
-              color: "rgba(255,255,255,0.5)",
+              color: isDarkTheme ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)",
               fontWeight: "600",
               minWidth: isMobile ? "45px" : "70px",
               letterSpacing: "0.2px",
@@ -244,11 +288,11 @@ export default function SideStatsToggles({
           <span
             style={{
               fontSize: isMobile ? "0.6rem" : "0.8rem",
-              color: "#ffffff",
+              color: isDarkTheme ? "#ffffff" : "#0a2f1f",
               fontWeight: "700",
               textAlign: "right",
               flex: 1,
-              textShadow: "0 1px 4px rgba(0,0,0,0.3)",
+              textShadow: isDarkTheme ? "0 1px 4px rgba(0,0,0,0.3)" : "none",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
