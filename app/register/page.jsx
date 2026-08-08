@@ -26,12 +26,21 @@ export default function RegisterPage() {
   useEffect(() => {
     const originalError = console.error;
     console.error = (...args) => {
-      // 🔥 Filtrar erros de registro que são esperados
-      const message = args[0];
-      if (typeof message === "string" && 
-          (message.includes("400") || message.includes("Bad Request") || 
-           message.includes("POST http://localhost:3000/api/register"))) {
-        console.info("📝 Registro tratado:", message);
+      // 🔥 CORRIGIDO: o filtro antigo dependia da string literal
+      // "POST http://localhost:3000/api/register", que nunca corresponde
+      // em produção (domínio diferente). Agora verifica todos os
+      // argumentos e usa padrões que funcionam em qualquer domínio.
+      const combined = args
+        .map((a) => (typeof a === "string" ? a : ""))
+        .join(" ");
+
+      const isExpectedRegisterNoise =
+        combined.includes("400") ||
+        combined.includes("Bad Request") ||
+        combined.includes("/api/register");
+
+      if (isExpectedRegisterNoise) {
+        console.info("📝 Registro tratado:", combined || args[0]);
         return;
       }
       originalError.apply(console, args);

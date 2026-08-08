@@ -25,12 +25,27 @@ export default function LoginPage() {
   useEffect(() => {
     const originalError = console.error;
     console.error = (...args) => {
-      // 🔥 Filtrar erros de autenticação que são esperados
-      const message = args[0];
-      if (typeof message === "string" && 
-          (message.includes("401") || message.includes("Unauthorized") || 
-           message.includes("POST http://localhost:3000/api/auth"))) {
-        console.info("🔐 Autenticação tratada:", message);
+      // 🔥 CORRIGIDO: o filtro antigo só reconhecia a string literal
+      // "POST http://localhost:3000/api/auth" - nunca funcionava em
+      // produção (domínio diferente) e não reconhecia o formato real do
+      // NextAuth (ex: "[next-auth][error][CLIENT_FETCH_ERROR]"), então
+      // esses erros esperados (ex: sessão ainda não carregada, tentativa
+      // de login inválida) acabavam aparecendo no console mesmo assim.
+      // Agora verificamos todos os argumentos, não só o primeiro, e
+      // cobrimos os padrões reais de mensagem do NextAuth.
+      const combined = args
+        .map((a) => (typeof a === "string" ? a : ""))
+        .join(" ");
+
+      const isExpectedAuthNoise =
+        combined.includes("401") ||
+        combined.includes("Unauthorized") ||
+        combined.includes("/api/auth") ||
+        combined.includes("[next-auth]") ||
+        combined.includes("CLIENT_FETCH_ERROR");
+
+      if (isExpectedAuthNoise) {
+        console.info("🔐 Autenticação tratada:", combined || args[0]);
         return;
       }
       originalError.apply(console, args);
