@@ -460,14 +460,14 @@ export default function TournamentGame({ tournament, onLeave, username }) {
 function containerStyle() {
   return {
     background: "var(--bg-modal)",
-    borderRadius: 30,
-    padding: "20px",
-    minHeight: "500px",
+    borderRadius: "clamp(16px, 3vw, 30px)",
+    padding: "clamp(10px, 2.5vw, 20px)",
+    minHeight: "clamp(320px, 70vh, 500px)",
     color: "var(--text-primary)",
     position: "fixed",
     inset: 0,
     zIndex: 1000,
-    margin: "20px",
+    margin: "clamp(6px, 2vw, 20px)",
     overflowY: "auto",
     transition: "var(--transition-theme)",
   };
@@ -482,7 +482,7 @@ function overlayStyle() {
     justifyContent: "center",
     alignItems: "center",
     zIndex: 2000,
-    padding: 20,
+    padding: "clamp(8px, 2vw, 20px)",
     backdropFilter: "blur(8px)",
   };
 }
@@ -679,7 +679,7 @@ function turnIndicatorStyle() {
 function actionsStyle() {
   return {
     display: "flex",
-    gap: "10px",
+    gap: "clamp(5px, 1.5vw, 10px)",
     justifyContent: "center",
     flexWrap: "wrap",
     marginTop: "10px",
@@ -690,13 +690,14 @@ function actionButtonStyle(color) {
   return {
     background: color,
     border: "none",
-    padding: "10px 20px",
+    padding: "clamp(9px, 2vh, 12px) clamp(12px, 3vw, 20px)",
+    minHeight: "clamp(38px, 6vh, 46px)",
     borderRadius: 30,
     color: "white",
     fontWeight: "bold",
     cursor: "pointer",
     transition: "all 0.3s ease",
-    fontSize: "0.9rem",
+    fontSize: "clamp(0.65rem, 2vw, 0.9rem)",
   };
 }
 

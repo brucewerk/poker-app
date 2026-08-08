@@ -141,11 +141,12 @@ body {
 /* SMARTPHONE RETRATO (Vertical) - Ajustes mais agressivos */
 @media (max-width: 480px) and (orientation: portrait) {
   :root {
-    --card-width: 34px;
-    --card-height: 48px;
-    --card-font: 0.5rem;
-    --action-btn-min-height: 34px;
-    --action-btn-font: 0.6rem;
+    /* 🔥 CORRIGIDO: cartas e botões estavam pequenos demais - aumentados */
+    --card-width: 40px;
+    --card-height: 56px;
+    --card-font: 0.56rem;
+    --action-btn-min-height: 42px;
+    --action-btn-font: 0.66rem;
     --header-font: 0.75rem;
   }
 
@@ -227,31 +228,25 @@ body {
     padding: 1px 8px !important;
   }
 
-  /* ACTION BUTTONS */
+  /* ACTION BUTTONS - 🔥 CORRIGIDO: maiores e mais tocáveis */
   .action-buttons-grid {
     grid-template-columns: repeat(5, 1fr) !important;
-    gap: 3px !important;
+    gap: 4px !important;
   }
 
   .action-btn {
-    padding: 4px 2px !important;
-    font-size: 0.5rem !important;
-    min-height: 30px !important;
-    border-radius: 4px !important;
-  }
-
-  .action-btn-icon {
-    font-size: 0.6rem !important;
-  }
-
-  .action-btn span:last-child {
-    font-size: 0.3rem !important;
+    /* 🔥 font-size e min-height agora vêm de var(--action-btn-font) e
+       var(--action-btn-min-height) definidas no :root deste breakpoint
+       (linhas acima) — controladas centralmente pela regra base .action-btn.
+       Aqui só ajustamos padding/raio, que são específicos deste layout. */
+    padding: 5px 3px !important;
+    border-radius: 6px !important;
   }
 
   .action-btn-reset {
-    padding: 6px 10px !important;
-    font-size: 0.6rem !important;
-    min-height: 32px !important;
+    padding: 7px 10px !important;
+    font-size: 0.64rem !important;
+    min-height: var(--action-btn-min-height, 42px) !important;
   }
 
   .action-history {
@@ -322,60 +317,84 @@ body {
 /* SMARTPHONE PAISAGEM (Deitado) - OTIMIZADO */
 @media (max-width: 900px) and (orientation: landscape) {
   :root {
-    --card-width: 38px;
-    --card-height: 54px;
-    --card-font: 0.6rem;
-    --action-btn-min-height: 30px;
-    --action-btn-font: 0.55rem;
+    /* 🔥 CORRIGIDO: como o layout do felt passa a ser em LINHA (CPU | mesa |
+       jogador lado a lado, em vez de empilhado), cada coluna tem mais altura
+       disponível — por isso as cartas podem ser maiores sem estourar a tela
+       e sem cobrir os botões de ação (que ficam sempre abaixo do felt). */
+    --card-width: 46px;
+    --card-height: 65px;
+    --card-font: 0.62rem;
+    --action-btn-min-height: 38px;
+    --action-btn-font: 0.62rem;
     --header-font: 0.7rem;
   }
 
+  /* 🔥 CORRIGIDO: overflow "auto" em vez de "hidden" como rede de segurança.
+     Com o layout em linha isso raramente é necessário, mas em aparelhos
+     muito baixos (ex: iPhone SE deitado) garante que dá pra rolar até os
+     botões em vez de ficarem inacessíveis. */
   body {
-    overflow-y: hidden !important;
+    overflow-y: auto !important;
   }
 
   .game-table-container {
     padding: 4px !important;
     border-radius: 16px !important;
-    max-height: 100vh !important;
   }
 
+  /* 🔥 A MUDANÇA PRINCIPAL: o felt passa a organizar CPU, mesa e jogador
+     em uma LINHA horizontal (não mais empilhados verticalmente). Isso é o
+     que resolve definitivamente o problema relatado: as cartas cobrindo a
+     mesa e os botões de ação no modo paisagem. */
   .game-table-felt {
     padding: 6px 8px !important;
-    min-height: 200px !important;
-    max-height: 70vh !important;
+    min-height: 155px !important;
     border-radius: 16px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+  }
+
+  /* CPU (esquerda) e Jogador (direita) viram colunas laterais estreitas */
+  .game-table-player-area-cpu {
+    order: 1;
+    flex: 0 0 26% !important;
+    margin: 0 !important;
+    padding: 4px 6px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
   }
 
-  .game-table-player-area-cpu {
-    margin-bottom: 4px !important;
-    padding: 4px 8px !important;
-    flex: 0 0 auto !important;
-  }
-
-  .game-table-community-area {
-    padding: 6px 8px !important;
-    margin: 4px 0 !important;
-    flex: 0 0 auto !important;
-  }
-
   .game-table-player-area-player {
-    margin-top: 4px !important;
-    padding: 4px 8px !important;
-    flex: 0 0 auto !important;
+    order: 3;
+    flex: 0 0 26% !important;
+    margin: 0 !important;
+    padding: 4px 6px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+  }
+
+  /* Mesa/comunidade ocupa o centro, com o espaço restante */
+  .game-table-community-area {
+    order: 2;
+    flex: 1 1 auto !important;
+    margin: 0 !important;
+    padding: 5px 8px !important;
+    min-width: 0 !important;
   }
 
   .game-table-cards-row {
     gap: 3px !important;
-    min-height: 35px !important;
+    min-height: 40px !important;
   }
 
   .game-table-community-cards-row {
-    gap: 4px !important;
-    min-height: 68px !important;
+    gap: 3px !important;
+    min-height: 60px !important;
   }
 
   .game-table-dealer {
@@ -426,64 +445,61 @@ body {
   }
 
   .game-table-player-label {
-    font-size: 0.5rem !important;
+    font-size: 0.55rem !important;
     gap: 4px !important;
+    flex-direction: column !important;
   }
 
   .game-table-player-name {
-    font-size: 0.55rem !important;
+    font-size: 0.6rem !important;
   }
 
   .game-table-chips-label {
-    font-size: 0.5rem !important;
+    font-size: 0.55rem !important;
   }
 
   .game-table-stage-badge {
-    font-size: 0.45rem !important;
+    font-size: 0.48rem !important;
     padding: 1px 6px !important;
   }
 
   .game-table-community-label-wrapper {
-    font-size: 0.45rem !important;
+    font-size: 0.48rem !important;
     gap: 4px !important;
   }
 
   .game-table-hand-badge {
-    font-size: 0.45rem !important;
+    font-size: 0.48rem !important;
     padding: 1px 6px !important;
     margin-top: 2px !important;
   }
 
   .game-table-cpu-thought {
-    font-size: 0.45rem !important;
-    padding: 2px 8px !important;
+    font-size: 0.46rem !important;
+    padding: 2px 6px !important;
     margin-top: 2px !important;
+    max-width: 100% !important;
   }
 
+  /* 🔥 CORRIGIDO: botões de ação maiores e mais tocáveis. Como o felt agora
+     é compacto (layout em linha), sobra altura de sobra para os botões
+     ficarem sempre visíveis e confortáveis abaixo da mesa. */
   .action-buttons-container {
-    gap: 4px !important;
+    gap: 5px !important;
     max-width: 100% !important;
+    margin-top: 6px !important;
   }
 
   .action-buttons-grid {
     grid-template-columns: repeat(5, 1fr) !important;
-    gap: 3px !important;
+    gap: 4px !important;
   }
 
   .action-btn {
-    padding: 3px 2px !important;
-    font-size: 0.45rem !important;
-    min-height: 24px !important;
-    border-radius: 4px !important;
+    /* font-size/min-height controlados via var() na regra base .action-btn */
+    padding: 4px 3px !important;
+    border-radius: 6px !important;
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2) !important;
-  }
-
-  .action-btn-icon {
-    font-size: 0.5rem !important;
-  }
-
-  .action-btn span:last-child {
-    font-size: 0.3rem !important;
   }
 
   .action-btn:hover:not(:disabled) {
@@ -497,9 +513,9 @@ body {
   }
 
   .action-btn-reset {
-    padding: 4px 8px !important;
-    font-size: 0.5rem !important;
-    min-height: 26px !important;
+    padding: 5px 10px !important;
+    font-size: 0.56rem !important;
+    min-height: var(--action-btn-min-height, 38px) !important;
     box-shadow: 0 2px 0 #7a4c1a !important;
   }
 
@@ -591,21 +607,13 @@ body {
     max-height: 80vh !important;
   }
 
-  .result-modal {
-    padding: 15px 20px !important;
-    max-width: 90% !important;
-    max-height: 80vh !important;
-  }
-
-  .result-modal h2 {
-    font-size: 1.2rem !important;
-  }
-
-  .result-modal .result-card {
-    width: 32px !important;
-    height: 44px !important;
-    font-size: 0.5rem !important;
-  }
+  /* 🔥 CORRIGIDO: as regras antigas com !important para .result-modal e
+     .result-card foram removidas daqui. Elas sobrescreviam (por causa do
+     !important, que sempre vence estilo inline) os tamanhos fluidos em
+     clamp() definidos diretamente no componente ResultModal.jsx, impedindo
+     o modal de encolher corretamente no celular deitado e causando a
+     rolagem indesejada. Agora o próprio componente cuida 100% do
+     dimensionamento responsivo, em qualquer orientação. */
 }
 
 /* TABLET RETRATO */
@@ -647,17 +655,8 @@ body {
   }
 
   .action-btn {
+    /* font-size/min-height controlados via var() na regra base .action-btn */
     padding: 6px 4px !important;
-    font-size: 0.55rem !important;
-    min-height: 32px !important;
-  }
-
-  .action-btn-icon {
-    font-size: 0.7rem !important;
-  }
-
-  .action-btn span:last-child {
-    font-size: 0.4rem !important;
   }
 }
 
@@ -1343,12 +1342,24 @@ body {
   border-radius: 8px !important;
   padding: 8px 4px !important;
   font-weight: 700;
-  font-size: clamp(0.5rem, 0.7rem, 0.75rem) !important;
+  /* 🔥 CORRIGIDO (bug crítico de cascata): esta regra não tem media query,
+     então ela SEMPRE se aplica - e por vir DEPOIS das regras de
+     @media (portrait/landscape/tablet) no arquivo, ela vencia a cascata
+     independente do tamanho de tela (mesma especificidade + !important =
+     vence quem vem por último no arquivo), anulando silenciosamente todos
+     os ajustes de tamanho por breakpoint feitos anteriormente. Agora usa
+     var(--action-btn-font)/var(--action-btn-min-height), que são
+     redefinidas corretamente a cada breakpoint em globals.css, então o
+     valor correto sempre "vence" não importa a ordem das regras. Também
+     corrigido um clamp() inválido (clamp(0.5rem, 0.7rem, 0.75rem) sempre
+     resultava exatamente em 0.7rem, pois o valor do meio precisa ser uma
+     unidade relativa ao viewport para variar - aqui era um rem fixo). */
+  font-size: var(--action-btn-font, 0.75rem) !important;
   cursor: pointer;
   color: #ffffff;
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
-  min-height: clamp(36px, 5vh, 48px) !important;
+  min-height: var(--action-btn-min-height, 44px) !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   display: flex !important;
   flex-direction: column !important;
@@ -1390,12 +1401,13 @@ body {
 }
 
 .action-btn-icon {
-  font-size: clamp(0.7rem, 1.2vw, 1rem) !important;
+  /* 🔥 CORRIGIDO: clamp() válido (meio em vw, escala de verdade) */
+  font-size: clamp(0.7rem, 2.2vw, 1.05rem) !important;
   line-height: 1 !important;
 }
 
 .action-btn span:last-child {
-  font-size: clamp(0.35rem, 0.6vw, 0.65rem) !important;
+  font-size: clamp(0.4rem, 1.4vw, 0.68rem) !important;
 }
 
 .action-btn-fold {
@@ -1878,7 +1890,74 @@ body {
   animation: glowPulse 2s ease-in-out infinite;
 }
 
-/* ====================== CHAT ====================== */
+/* ====================== TOAST SYSTEM ====================== */
+.toast-container {
+  transition: var(--transition-theme);
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  /* 🔥 NOVO: em pé, empurra os toasts para baixo da toolbar (que ocupa a
+     faixa direita entre ~56px e ~330px do topo) e usa quase a largura
+     inteira da tela, evitando que fiquem cortados ou colados nos botões
+     da toolbar. */
+  .toast-container {
+    top: 8px !important;
+    right: 8px !important;
+    left: 8px !important;
+    max-width: none !important;
+    width: auto !important;
+  }
+
+  .toast-card {
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 10px 12px !important;
+    gap: 10px !important;
+  }
+
+  .toast-icon {
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 1.4rem !important;
+  }
+
+  .toast-message {
+    font-size: 0.78rem !important;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  /* 🔥 NOVO: em pé deitado a altura é curta - encolher e subir os toasts
+     para não brigar com a mesa/botões de ação logo abaixo. */
+  .toast-container {
+    top: 4px !important;
+    right: 6px !important;
+    left: auto !important;
+    max-width: 60vw !important;
+    width: auto !important;
+    gap: 6px !important;
+  }
+
+  .toast-card {
+    min-width: 0 !important;
+    max-width: 60vw !important;
+    padding: 6px 10px !important;
+    gap: 8px !important;
+    border-radius: 10px !important;
+  }
+
+  .toast-icon {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 1.1rem !important;
+  }
+
+  .toast-message {
+    font-size: 0.66rem !important;
+  }
+}
+
+
 .chat-container {
   max-height: 300px;
   font-size: 0.9rem;

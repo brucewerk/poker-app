@@ -137,7 +137,7 @@ export default function ActionButtons({
           className="action-btn action-btn-fold"
           style={{
             padding: "6px 3px",
-            fontSize: "clamp(0.55rem, 0.8rem, 0.85rem)",
+            fontSize: "clamp(0.6rem, 2vw, 0.85rem)",
             minHeight: "clamp(38px, 5.5vh, 50px)",
             borderRadius: "8px",
             border: "none",
@@ -185,7 +185,7 @@ export default function ActionButtons({
           className={`action-btn ${toCall <= 0 ? "action-btn-check" : "action-btn-call"}`}
           style={{
             padding: "6px 3px",
-            fontSize: "clamp(0.55rem, 0.8rem, 0.85rem)",
+            fontSize: "clamp(0.6rem, 2vw, 0.85rem)",
             minHeight: "clamp(38px, 5.5vh, 50px)",
             borderRadius: "8px",
             border: "none",
@@ -236,7 +236,7 @@ export default function ActionButtons({
           className="action-btn action-btn-raise"
           style={{
             padding: "6px 3px",
-            fontSize: "clamp(0.55rem, 0.8rem, 0.85rem)",
+            fontSize: "clamp(0.6rem, 2vw, 0.85rem)",
             minHeight: "clamp(38px, 5.5vh, 50px)",
             borderRadius: "8px",
             border: "none",
@@ -282,7 +282,7 @@ export default function ActionButtons({
           className="action-btn action-btn-allin"
           style={{
             padding: "6px 3px",
-            fontSize: "clamp(0.55rem, 0.8rem, 0.85rem)",
+            fontSize: "clamp(0.6rem, 2vw, 0.85rem)",
             minHeight: "clamp(38px, 5.5vh, 50px)",
             borderRadius: "8px",
             border: "none",
@@ -330,7 +330,7 @@ export default function ActionButtons({
           className="action-btn"
           style={{
             padding: "6px 3px",
-            fontSize: "clamp(0.55rem, 0.8rem, 0.85rem)",
+            fontSize: "clamp(0.6rem, 2vw, 0.85rem)",
             minHeight: "clamp(38px, 5.5vh, 50px)",
             borderRadius: "8px",
             border: "none",

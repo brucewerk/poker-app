@@ -142,6 +142,29 @@ export default function Chat({
     }
   }, [unreadCount, onUnreadChange]);
 
+  // 🔥 NOVO: carregar histórico de mensagens ao entrar na sala. Antes o
+  // Chat.jsx só escutava novas mensagens ("chat-message"), então quem
+  // entrava numa sala com conversa em andamento via uma tela vazia até
+  // que uma mensagem NOVA chegasse - o histórico nunca era exibido.
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleChatHistory = (data) => {
+      if (data.roomId && data.roomId !== roomId) return;
+      console.log("📡 Chat: Histórico recebido:", data?.messages?.length || 0);
+      if (Array.isArray(data?.messages)) {
+        setMessages(data.messages.slice(-100));
+        setTimeout(() => scrollChatToBottom(true), 150);
+      }
+    };
+
+    socket.on("chat-history", handleChatHistory);
+
+    return () => {
+      socket.off("chat-history", handleChatHistory);
+    };
+  }, [socket, roomId, scrollChatToBottom]);
+
   // 🔥 RECEBER MENSAGENS
   useEffect(() => {
     if (!socket) {
@@ -151,7 +174,13 @@ export default function Chat({
 
     const handleChatMessage = (data) => {
       console.log("📡 Chat: Mensagem recebida:", data);
-      const isOwnMessage = data.player === playerName;
+      // 🔥 CORRIGIDO: o servidor (socket-server.js) envia o campo como
+      // "playerName", não "player". Antes disso o "isOwnMessage" nunca
+      // dava certo (sempre false, mesmo para a própria mensagem), então
+      // toda mensagem enviada pelo próprio jogador tocava som de
+      // notificação e contava como não lida, e o nome de quem mandou
+      // nunca aparecia corretamente.
+      const isOwnMessage = data.playerName === playerName;
 
       setMessages((prev) => {
         const newMessages = [...prev, data];
@@ -170,7 +199,7 @@ export default function Chat({
 
         if (onNewMessage) {
           onNewMessage({
-            from: data.player,
+            from: data.playerName,
             message: data.message,
             timestamp: data.timestamp,
           });
@@ -351,6 +380,7 @@ export default function Chat({
   // ============================================================
   return (
     <motion.div
+      className="chat-container"
       style={{
         background: "var(--bg-modal)",
         borderRadius: "12px",
@@ -359,6 +389,12 @@ export default function Chat({
         height: "400px",
         width: "100%",
         maxWidth: "400px",
+        // 🔥 CORRIGIDO: "right:20px" + "width:100%" num elemento fixo sem
+        // "left" definido podia empurrar a caixa para fora da tela à
+        // esquerda em celulares estreitos (largura real menor que 400px).
+        // "left: auto" + max-width real já resolvido pela classe
+        // "chat-container" (definida em globals.css) evita esse vazamento.
+        left: "auto",
         border: "2px solid var(--border-gold)",
         position: "fixed",
         bottom: "20px",
@@ -376,6 +412,7 @@ export default function Chat({
     >
       {/* HEADER */}
       <div
+        className="chat-header"
         style={{
           padding: "10px 15px",
           background: "rgba(255,215,0,0.08)",
@@ -483,7 +520,7 @@ export default function Chat({
           </div>
         )}
         {messages.map((msg, index) => {
-          const isOwn = msg.player === playerName || msg.isOwn === true;
+          const isOwn = msg.playerName === playerName || msg.isOwn === true;
           const isSystem = msg.isSystem === true;
 
           return (
@@ -524,7 +561,7 @@ export default function Chat({
                     fontSize: "0.75rem",
                   }}
                 >
-                  {isSystem ? "📢" : isOwn ? "👤 Você" : msg.player}
+                  {isSystem ? "📢" : isOwn ? "👤 Você" : msg.playerName}
                 </span>
                 <span
                   style={{
@@ -639,6 +676,7 @@ export default function Chat({
           <input
             ref={inputRef}
             type="text"
+            className="chat-input"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             placeholder="Digite uma mensagem..."

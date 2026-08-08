@@ -1136,14 +1136,15 @@ function actionButtonStyle(color) {
   return {
     background: color,
     border: "none",
-    padding: "clamp(6px, 1vw, 10px) clamp(10px, 2vw, 20px)",
+    padding: "clamp(9px, 2vh, 12px) clamp(10px, 2vw, 20px)",
+    minHeight: "clamp(38px, 6vh, 46px)",
     borderRadius: 30,
     color: "white",
     fontWeight: "bold",
     cursor: "pointer",
-    fontSize: "clamp(0.6rem, 1.2vw, 0.85rem)",
+    fontSize: "clamp(0.65rem, 1.6vw, 0.85rem)",
     flex: "1 1 auto",
-    minWidth: "clamp(50px, 10vw, 70px)",
+    minWidth: "clamp(56px, 12vw, 70px)",
   };
 }
 

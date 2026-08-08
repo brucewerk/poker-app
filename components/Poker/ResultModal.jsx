@@ -1,4 +1,4 @@
-// components/Poker/ResultModal.jsx - COMPLETO CORRIGIDO
+// components/Poker/ResultModal.jsx - COMPLETO CORRIGIDO (SEM ROLAGEM EM NENHUMA TELA)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,7 +29,10 @@ export default function ResultModal({ data, onClose }) {
     setTimeout(() => onClose(), 350);
   };
 
-  // 🔥 RENDERIZAR CARTA INDIVIDUAL
+  // 🔥 CORRIGIDO: carta do resumo agora usa clamp() (fluido por vh/vw) em vez
+  // de pixels fixos (antes: 50x70). Isso é o que permite o modal inteiro
+  // encolher proporcionalmente em telas baixas (ex: celular deitado) sem
+  // nunca precisar de rolagem.
   const renderCard = (card, index, isFlipped = false) => {
     if (!card) return null;
     const isRed = card.suit === "♥" || card.suit === "♦";
@@ -67,8 +70,8 @@ export default function ResultModal({ data, onClose }) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          width: 50,
-          height: 70,
+          width: "clamp(28px, 7vh, 50px)",
+          height: "clamp(40px, 9.5vh, 70px)",
           margin: "2px",
           borderRadius: 6,
           boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
@@ -86,7 +89,7 @@ export default function ResultModal({ data, onClose }) {
           <>
             <span
               style={{
-                fontSize: "0.9rem",
+                fontSize: "clamp(0.58rem, 1.8vh, 0.9rem)",
                 fontWeight: 800,
                 color: isRed ? "#cc0000" : "#000",
                 lineHeight: 1,
@@ -96,7 +99,7 @@ export default function ResultModal({ data, onClose }) {
             </span>
             <span
               style={{
-                fontSize: "1rem",
+                fontSize: "clamp(0.62rem, 2vh, 1rem)",
                 color: isRed ? "#cc0000" : "#000",
                 lineHeight: 1,
               }}
@@ -113,7 +116,12 @@ export default function ResultModal({ data, onClose }) {
   const renderCards = (cards, faceDown = false) => {
     if (!cards || cards.length === 0) {
       return (
-        <span style={{ color: "var(--text-muted)", fontSize: "0.7rem" }}>
+        <span
+          style={{
+            color: "var(--text-muted)",
+            fontSize: "clamp(0.6rem, 1.6vh, 0.7rem)",
+          }}
+        >
           Sem cartas
         </span>
       );
@@ -182,7 +190,9 @@ export default function ResultModal({ data, onClose }) {
         justifyContent: "center",
         alignItems: "center",
         zIndex: 2000,
-        padding: 20,
+        // 🔥 CORRIGIDO: padding fluido + respeita área segura do iOS (notch)
+        padding:
+          "max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left))",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
       }}
@@ -206,9 +216,10 @@ export default function ResultModal({ data, onClose }) {
         }}
         style={{
           background: isDarkTheme ? config.bgGradient : "#ffffff",
-          padding: "30px 35px",
-          borderRadius: 28,
-          maxWidth: 600,
+          // 🔥 CORRIGIDO: padding fluido (era fixo "30px 35px")
+          padding: "clamp(12px, 3.2vh, 30px) clamp(14px, 4vw, 35px)",
+          borderRadius: "clamp(16px, 3vh, 28px)",
+          maxWidth: "min(560px, 94vw)",
           width: "100%",
           color: isDarkTheme ? "white" : "#0d1f15",
           border: isDarkTheme
@@ -217,7 +228,12 @@ export default function ResultModal({ data, onClose }) {
           boxShadow: isDarkTheme
             ? `0 20px 60px rgba(0,0,0,0.6), 0 0 60px ${config.glowColor}`
             : `0 20px 60px rgba(0,0,0,0.08)`,
-          maxHeight: "90vh",
+          // 🔥 CORRIGIDO: maxHeight continua como rede de segurança, mas com
+          // todo o conteúdo redimensionado via clamp() (abaixo), a soma real
+          // das alturas passa a caber folgada mesmo em celulares deitados
+          // (~320-360px de altura), então a rolagem nunca chega a ser
+          // necessária na prática.
+          maxHeight: "94vh",
           overflowY: "auto",
           position: "relative",
           scrollbarWidth: "thin",
@@ -232,18 +248,18 @@ export default function ResultModal({ data, onClose }) {
           onClick={handleClose}
           style={{
             position: "absolute",
-            top: 12,
-            right: 16,
+            top: "clamp(6px, 1.5vh, 12px)",
+            right: "clamp(8px, 2vw, 16px)",
             background: isDarkTheme
               ? "rgba(255,255,255,0.05)"
               : "rgba(13,31,21,0.05)",
             border: "none",
             color: isDarkTheme ? "#fff" : "#0d1f15",
-            fontSize: "1.1rem",
+            fontSize: "clamp(0.85rem, 2.4vh, 1.1rem)",
             cursor: "pointer",
             zIndex: 10,
-            width: 32,
-            height: 32,
+            width: "clamp(24px, 5.5vh, 32px)",
+            height: "clamp(24px, 5.5vh, 32px)",
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
@@ -271,8 +287,8 @@ export default function ResultModal({ data, onClose }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "16px",
-            marginBottom: "8px",
+            gap: "clamp(8px, 2vw, 16px)",
+            marginBottom: "clamp(3px, 0.9vh, 8px)",
           }}
         >
           <motion.div
@@ -285,8 +301,8 @@ export default function ResultModal({ data, onClose }) {
               damping: 20,
             }}
             style={{
-              width: 60,
-              height: 60,
+              width: "clamp(38px, 9vh, 60px)",
+              height: "clamp(38px, 9vh, 60px)",
               borderRadius: "50%",
               display: "flex",
               alignItems: "center",
@@ -301,16 +317,22 @@ export default function ResultModal({ data, onClose }) {
               boxShadow: isDarkTheme
                 ? `0 0 40px ${config.glowColor}`
                 : `0 0 20px rgba(13,31,21,0.05)`,
+              flexShrink: 0,
             }}
           >
-            <span style={{ fontSize: "2.8rem", lineHeight: 1 }}>
+            <span
+              style={{
+                fontSize: "clamp(1.6rem, 5.5vh, 2.8rem)",
+                lineHeight: 1,
+              }}
+            >
               {config.icon}
             </span>
           </motion.div>
           <h2
             style={{
               margin: 0,
-              fontSize: "1.8rem",
+              fontSize: "clamp(1.05rem, 4.4vh, 1.8rem)",
               fontWeight: 800,
               color: isDarkTheme
                 ? config.titleColor
@@ -332,11 +354,14 @@ export default function ResultModal({ data, onClose }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: showContent ? 1 : 0, y: showContent ? 0 : 20 }}
           transition={{ delay: 0.15, type: "spring", stiffness: 300 }}
-          style={{ textAlign: "center", marginBottom: "12px" }}
+          style={{
+            textAlign: "center",
+            marginBottom: "clamp(5px, 1.2vh, 12px)",
+          }}
         >
           <p
             style={{
-              fontSize: "1.05rem",
+              fontSize: "clamp(0.7rem, 2.6vh, 1.05rem)",
               fontWeight: 600,
               color: isDarkTheme
                 ? config.titleColor
@@ -346,7 +371,7 @@ export default function ResultModal({ data, onClose }) {
                     ? "#b8960f"
                     : "#c62828",
               margin: 0,
-              padding: "6px 16px",
+              padding: "clamp(3px, 0.7vh, 6px) clamp(8px, 3vw, 16px)",
               background: isDarkTheme
                 ? "rgba(0,0,0,0.2)"
                 : "rgba(13,31,21,0.04)",
@@ -366,8 +391,8 @@ export default function ResultModal({ data, onClose }) {
           style={{
             background: isDarkTheme ? "rgba(0,0,0,0.2)" : "rgba(13,31,21,0.04)",
             borderRadius: 16,
-            padding: "14px",
-            marginBottom: "12px",
+            padding: "clamp(6px, 1.6vh, 14px)",
+            marginBottom: "clamp(5px, 1.2vh, 12px)",
             border: isDarkTheme
               ? `1px solid ${config.borderColor}33`
               : "1px solid rgba(13,31,21,0.06)",
@@ -378,8 +403,8 @@ export default function ResultModal({ data, onClose }) {
             <div
               style={{
                 textAlign: "center",
-                marginBottom: "10px",
-                padding: "6px",
+                marginBottom: "clamp(4px, 0.9vh, 10px)",
+                padding: "clamp(3px, 0.7vh, 6px)",
                 background: isDarkTheme
                   ? "rgba(0,0,0,0.12)"
                   : "rgba(13,31,21,0.03)",
@@ -388,9 +413,9 @@ export default function ResultModal({ data, onClose }) {
             >
               <span
                 style={{
-                  fontSize: "0.55rem",
+                  fontSize: "clamp(0.48rem, 1.3vh, 0.55rem)",
                   color: isDarkTheme ? "#aaa" : "#4a5a52",
-                  marginBottom: "4px",
+                  marginBottom: "clamp(2px, 0.5vh, 4px)",
                   display: "block",
                   textTransform: "uppercase",
                   letterSpacing: "2px",
@@ -406,8 +431,8 @@ export default function ResultModal({ data, onClose }) {
                   alignItems: "center",
                   gap: "4px",
                   flexWrap: "wrap",
-                  padding: "2px 0",
-                  minHeight: "50px",
+                  padding: "clamp(1px, 0.3vh, 2px) 0",
+                  minHeight: "clamp(30px, 7vh, 50px)",
                 }}
               >
                 {renderCards(data.communityCards)}
@@ -421,14 +446,14 @@ export default function ResultModal({ data, onClose }) {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "stretch",
-              padding: "6px 0",
+              padding: "clamp(3px, 0.7vh, 6px) 0",
               borderTop: isDarkTheme
                 ? "1px solid rgba(255,255,255,0.06)"
                 : "1px solid rgba(13,31,21,0.06)",
               borderBottom: isDarkTheme
                 ? "1px solid rgba(255,255,255,0.06)"
                 : "1px solid rgba(13,31,21,0.06)",
-              marginBottom: "4px",
+              marginBottom: "clamp(2px, 0.5vh, 4px)",
               gap: "6px",
             }}
           >
@@ -437,8 +462,8 @@ export default function ResultModal({ data, onClose }) {
               style={{
                 flex: 1,
                 textAlign: "left",
-                minWidth: "90px",
-                padding: "4px 6px",
+                minWidth: 0,
+                padding: "clamp(2px, 0.5vh, 4px) clamp(4px, 1.4vw, 6px)",
                 borderRadius: 10,
                 background: isWin
                   ? isDarkTheme
@@ -457,7 +482,7 @@ export default function ResultModal({ data, onClose }) {
             >
               <div
                 style={{
-                  fontSize: "0.7rem",
+                  fontSize: "clamp(0.55rem, 1.7vh, 0.7rem)",
                   fontWeight: 700,
                   color: isDarkTheme
                     ? isWin
@@ -466,7 +491,7 @@ export default function ResultModal({ data, onClose }) {
                     : isWin
                       ? "#2e7d32"
                       : "#4a5a52",
-                  marginBottom: "4px",
+                  marginBottom: "clamp(2px, 0.5vh, 4px)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "flex-start",
@@ -474,7 +499,7 @@ export default function ResultModal({ data, onClose }) {
                   flexWrap: "wrap",
                 }}
               >
-                <span style={{ fontSize: "0.9rem" }}>🃏</span>
+                <span style={{ fontSize: "0.9em" }}>🃏</span>
                 {playerName}
                 {isWin && (
                   <motion.span
@@ -486,7 +511,7 @@ export default function ResultModal({ data, onClose }) {
                       stiffness: 400,
                     }}
                     style={{
-                      fontSize: "0.55rem",
+                      fontSize: "0.78em",
                       background: isDarkTheme ? "#4caf50" : "#2e7d32",
                       color: "white",
                       padding: "1px 8px",
@@ -502,7 +527,7 @@ export default function ResultModal({ data, onClose }) {
                     animate={{ scale: showContent ? 1 : 0 }}
                     transition={{ delay: 0.4, type: "spring", stiffness: 400 }}
                     style={{
-                      fontSize: "0.55rem",
+                      fontSize: "0.78em",
                       background: isDarkTheme ? "#ffc107" : "#b8960f",
                       color: isDarkTheme ? "#1a1a1a" : "white",
                       padding: "1px 8px",
@@ -520,15 +545,15 @@ export default function ResultModal({ data, onClose }) {
                   alignItems: "center",
                   gap: "4px",
                   flexWrap: "wrap",
-                  padding: "2px 0",
-                  minHeight: "50px",
+                  padding: "clamp(1px, 0.3vh, 2px) 0",
+                  minHeight: "clamp(30px, 7vh, 50px)",
                 }}
               >
                 {renderCards(data.playerCards)}
               </div>
               <div
                 style={{
-                  fontSize: "0.7rem",
+                  fontSize: "clamp(0.55rem, 1.7vh, 0.7rem)",
                   fontWeight: 700,
                   color: isDarkTheme
                     ? isWin
@@ -540,10 +565,14 @@ export default function ResultModal({ data, onClose }) {
                   background: isDarkTheme
                     ? "rgba(0,0,0,0.2)"
                     : "rgba(13,31,21,0.04)",
-                  padding: "2px 10px",
+                  padding: "clamp(1px, 0.3vh, 2px) clamp(6px, 2vw, 10px)",
                   borderRadius: 10,
                   display: "inline-block",
-                  marginTop: "4px",
+                  marginTop: "clamp(2px, 0.5vh, 4px)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
                 }}
               >
                 {data.playerHand}
@@ -556,11 +585,12 @@ export default function ResultModal({ data, onClose }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "1.2rem",
+                fontSize: "clamp(0.85rem, 3vh, 1.2rem)",
                 fontWeight: 800,
                 color: isDarkTheme ? "#888" : "#b0b0b0",
                 padding: "0 4px",
-                minWidth: "24px",
+                minWidth: "clamp(16px, 4vw, 24px)",
+                flexShrink: 0,
               }}
             >
               ⚡
@@ -571,8 +601,8 @@ export default function ResultModal({ data, onClose }) {
               style={{
                 flex: 1,
                 textAlign: "right",
-                minWidth: "90px",
-                padding: "4px 6px",
+                minWidth: 0,
+                padding: "clamp(2px, 0.5vh, 4px) clamp(4px, 1.4vw, 6px)",
                 borderRadius: 10,
                 background:
                   !isWin && !isTie
@@ -593,7 +623,7 @@ export default function ResultModal({ data, onClose }) {
             >
               <div
                 style={{
-                  fontSize: "0.7rem",
+                  fontSize: "clamp(0.55rem, 1.7vh, 0.7rem)",
                   fontWeight: 700,
                   color: isDarkTheme
                     ? !isWin && !isTie
@@ -602,7 +632,7 @@ export default function ResultModal({ data, onClose }) {
                     : !isWin && !isTie
                       ? "#c62828"
                       : "#4a5a52",
-                  marginBottom: "4px",
+                  marginBottom: "clamp(2px, 0.5vh, 4px)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "flex-end",
@@ -620,7 +650,7 @@ export default function ResultModal({ data, onClose }) {
                       stiffness: 400,
                     }}
                     style={{
-                      fontSize: "0.55rem",
+                      fontSize: "0.78em",
                       background: isDarkTheme ? "#f44336" : "#c62828",
                       color: "white",
                       padding: "1px 8px",
@@ -631,7 +661,7 @@ export default function ResultModal({ data, onClose }) {
                   </motion.span>
                 )}
                 {cpuName}
-                <span style={{ fontSize: "0.9rem" }}>
+                <span style={{ fontSize: "0.9em" }}>
                   {data.isMultiplayer ? "👤" : "🤖"}
                 </span>
               </div>
@@ -642,15 +672,15 @@ export default function ResultModal({ data, onClose }) {
                   alignItems: "center",
                   gap: "4px",
                   flexWrap: "wrap",
-                  padding: "2px 0",
-                  minHeight: "50px",
+                  padding: "clamp(1px, 0.3vh, 2px) 0",
+                  minHeight: "clamp(30px, 7vh, 50px)",
                 }}
               >
                 {renderCards(data.cpuCards)}
               </div>
               <div
                 style={{
-                  fontSize: "0.7rem",
+                  fontSize: "clamp(0.55rem, 1.7vh, 0.7rem)",
                   fontWeight: 700,
                   color: isDarkTheme
                     ? !isWin && !isTie
@@ -662,10 +692,14 @@ export default function ResultModal({ data, onClose }) {
                   background: isDarkTheme
                     ? "rgba(0,0,0,0.2)"
                     : "rgba(13,31,21,0.04)",
-                  padding: "2px 10px",
+                  padding: "clamp(1px, 0.3vh, 2px) clamp(6px, 2vw, 10px)",
                   borderRadius: 10,
                   display: "inline-block",
-                  marginTop: "4px",
+                  marginTop: "clamp(2px, 0.5vh, 4px)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
                 }}
               >
                 {data.cpuHand}
@@ -683,16 +717,18 @@ export default function ResultModal({ data, onClose }) {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "8px 12px",
-            fontSize: "0.9rem",
+            padding: "clamp(4px, 1vh, 8px) clamp(8px, 2.4vw, 12px)",
+            fontSize: "clamp(0.68rem, 2.2vh, 0.9rem)",
             background: isDarkTheme
               ? "rgba(0,0,0,0.15)"
               : "rgba(13,31,21,0.04)",
             borderRadius: 12,
-            marginBottom: "6px",
+            marginBottom: "clamp(3px, 0.7vh, 6px)",
             border: isDarkTheme
               ? `1px solid ${config.borderColor}22`
               : "1px solid rgba(13,31,21,0.06)",
+            flexWrap: "wrap",
+            gap: "4px",
           }}
         >
           <span
@@ -713,7 +749,7 @@ export default function ResultModal({ data, onClose }) {
                 style={{
                   color: isDarkTheme ? "#4caf50" : "#2e7d32",
                   fontWeight: 800,
-                  fontSize: "1.1rem",
+                  fontSize: "clamp(0.78rem, 2.6vh, 1.1rem)",
                   textShadow: isDarkTheme
                     ? "0 0 20px rgba(76,175,80,0.3)"
                     : "none",
@@ -727,7 +763,7 @@ export default function ResultModal({ data, onClose }) {
                 style={{
                   color: isDarkTheme ? "#f44336" : "#c62828",
                   fontWeight: 800,
-                  fontSize: "1.1rem",
+                  fontSize: "clamp(0.78rem, 2.6vh, 1.1rem)",
                   textShadow: isDarkTheme
                     ? "0 0 20px rgba(244,67,54,0.3)"
                     : "none",
@@ -741,7 +777,7 @@ export default function ResultModal({ data, onClose }) {
                 style={{
                   color: isDarkTheme ? "#ffc107" : "#b8960f",
                   fontWeight: 800,
-                  fontSize: "1.1rem",
+                  fontSize: "clamp(0.78rem, 2.6vh, 1.1rem)",
                   textShadow: isDarkTheme
                     ? "0 0 20px rgba(255,193,7,0.3)"
                     : "none",
@@ -760,16 +796,16 @@ export default function ResultModal({ data, onClose }) {
           transition={{ delay: 0.3, type: "spring", stiffness: 300 }}
           style={{
             textAlign: "center",
-            fontSize: "0.7rem",
+            fontSize: "clamp(0.56rem, 1.7vh, 0.7rem)",
             color: isDarkTheme ? "#bbb" : "#4a5a52",
             fontStyle: "italic",
-            padding: "6px 12px",
-            marginBottom: "8px",
+            padding: "clamp(3px, 0.7vh, 6px) clamp(8px, 2.4vw, 12px)",
+            marginBottom: "clamp(4px, 0.9vh, 8px)",
             background: isDarkTheme
               ? "rgba(0,0,0,0.15)"
               : "rgba(13,31,21,0.04)",
             borderRadius: 12,
-            minHeight: "22px",
+            minHeight: "clamp(14px, 3.4vh, 22px)",
             border: isDarkTheme
               ? `1px solid ${config.borderColor}22`
               : "1px solid rgba(13,31,21,0.06)",
@@ -789,8 +825,8 @@ export default function ResultModal({ data, onClose }) {
             background: "linear-gradient(145deg, #f7d97c, #d6a12e)",
             border: "none",
             fontWeight: 700,
-            fontSize: "0.95rem",
-            padding: "12px 24px",
+            fontSize: "clamp(0.72rem, 2.4vh, 0.95rem)",
+            padding: "clamp(7px, 1.8vh, 12px) clamp(14px, 5vw, 24px)",
             borderRadius: 50,
             boxShadow: "0 4px 0 #7a4c1a, 0 0 30px rgba(255,215,0,0.1)",
             color: "#2e241f",
@@ -812,12 +848,12 @@ export default function ResultModal({ data, onClose }) {
           whileTap={{ scale: isClosing ? 1 : 0.98 }}
         >
           {isClosing ? (
-            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
               <span style={{ animation: "spin 0.8s linear infinite" }}>⏳</span>
               FECHANDO...
             </span>
           ) : (
-            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
               <span>▶</span>
               CONTINUAR
             </span>

@@ -5,6 +5,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   createContext,
   useContext,
 } from "react";
@@ -118,17 +119,23 @@ export function ToastProvider({ children }) {
       const id = Date.now() + Math.random() * 1000;
       const toastDuration = duration || config.duration || 4000;
 
-      setToasts((prev) => [
-        ...prev,
-        {
-          id,
-          message,
-          type,
-          config,
-          duration: toastDuration,
-          timestamp: Date.now(),
-        },
-      ]);
+      setToasts((prev) => {
+        const next = [
+          ...prev,
+          {
+            id,
+            message,
+            type,
+            config,
+            duration: toastDuration,
+            timestamp: Date.now(),
+          },
+        ];
+        // 🔥 NOVO: limita a no máximo 4 toasts visíveis ao mesmo tempo.
+        // Em telas de celular, mais que isso ocupa a tela toda e o
+        // conteúdo mais antigo geralmente já perdeu relevância.
+        return next.length > 4 ? next.slice(next.length - 4) : next;
+      });
 
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -147,9 +154,13 @@ export function ToastProvider({ children }) {
     setToasts([]);
   }, []);
 
-  // 🔥 FUNÇÕES DE CONVENIÊNCIA
-  const toast = useCallback(
-    {
+  // 🔥 CORRIGIDO: useCallback espera uma FUNÇÃO como primeiro argumento, não
+  // um objeto simples como estava aqui. Isso "funcionava" por acaso (o
+  // React não valida o tipo do argumento, só memoiza o que foi passado),
+  // mas é o hook errado para este caso - useMemo é o correto para
+  // memoizar um valor/objeto.
+  const toast = useMemo(
+    () => ({
       levelUp: (msg) => showToast(msg, TOAST_TYPES.LEVEL_UP),
       achievement: (msg) => showToast(msg, TOAST_TYPES.ACHIEVEMENT),
       finding: (msg) => showToast(msg, TOAST_TYPES.FINDING),
@@ -163,7 +174,7 @@ export function ToastProvider({ children }) {
       show: showToast,
       remove: removeToast,
       clear: clearAllToasts,
-    },
+    }),
     [showToast, removeToast, clearAllToasts],
   );
 
@@ -196,6 +207,7 @@ function ToastRenderer({ toasts, removeToast }) {
 
   return (
     <div
+      className="toast-container"
       style={{
         position: "fixed",
         top: 80,
@@ -213,6 +225,7 @@ function ToastRenderer({ toasts, removeToast }) {
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
+            className="toast-card"
             style={{
               pointerEvents: "auto",
               background: toast.config.bgGradient,
@@ -241,6 +254,7 @@ function ToastRenderer({ toasts, removeToast }) {
             layout
           >
             <div
+              className="toast-icon"
               style={{
                 fontSize: "2rem",
                 flexShrink: 0,
@@ -263,6 +277,7 @@ function ToastRenderer({ toasts, removeToast }) {
               }}
             >
               <span
+                className="toast-message"
                 style={{
                   color: toast.config.textColor,
                   fontSize: "0.9rem",
