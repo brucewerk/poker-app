@@ -2,6 +2,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
+import { safeGetItem, safeSetItem } from "@/lib/safeStorage";
 
 const ThemeContext = createContext();
 
@@ -12,31 +13,50 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     setMounted(true);
 
-    // 🔥 RECUPERAR TEMA SALVO DO LOCALSTORAGE
-    const savedTheme = localStorage.getItem("poker-theme");
+    // 🔥 CORRIGIDO (bug crítico): este efeito roda no carregamento inicial
+    // do app inteiro (ThemeProvider envolve toda a aplicação). Antes ele
+    // chamava localStorage.getItem/.setItem diretamente, sem tratamento de
+    // erro. No Safari do iPad (modo privado, ou com "Impedir rastreamento
+    // entre sites" combinado com certas políticas, ou armazenamento
+    // bloqueado por perfil MDM/gerenciado), localStorage.setItem() lança
+    // uma exceção - e como não havia tema salvo na primeira visita, o
+    // código SEMPRE tentava salvar um tema logo de cara, o que travava a
+    // aplicação inteira bem no início, antes de qualquer coisa renderizar
+    // (exatamente o sintoma relatado: "só aparece o fundo verde").
+    // Agora usamos os wrappers seguros (safeGetItem/safeSetItem), que
+    // nunca lançam - se o armazenamento estiver bloqueado, o app
+    // simplesmente segue usando o tema em memória sem persistir entre
+    // sessões, em vez de travar por completo.
+    const savedTheme = safeGetItem("poker-theme");
 
     // 🔥 SE TIVER TEMA SALVO, USA ELE
     if (savedTheme) {
       setTheme(savedTheme);
       document.documentElement.setAttribute("data-theme", savedTheme);
-      console.log(`🎨 Tema carregado: ${savedTheme}`);
       return;
     }
 
     // 🔥 SE NÃO TIVER TEMA SALVO, USA PREFERÊNCIA DO SISTEMA
-    if (
-      window.matchMedia &&
-      window.matchMedia("(prefers-color-scheme: light)").matches
-    ) {
+    let prefersLight = false;
+    try {
+      prefersLight =
+        typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: light)").matches;
+    } catch (e) {
+      // matchMedia pode falhar em alguns webviews restritos - seguimos
+      // com o padrão (escuro) sem travar o app.
+      prefersLight = false;
+    }
+
+    if (prefersLight) {
       setTheme("light");
       document.documentElement.setAttribute("data-theme", "light");
-      localStorage.setItem("poker-theme", "light");
-      console.log("🎨 Tema claro detectado (preferência do sistema)");
+      safeSetItem("poker-theme", "light");
     } else {
       setTheme("dark");
       document.documentElement.setAttribute("data-theme", "dark");
-      localStorage.setItem("poker-theme", "dark");
-      console.log("🎨 Tema escuro (padrão)");
+      safeSetItem("poker-theme", "dark");
     }
   }, []);
 
@@ -44,18 +64,16 @@ export function ThemeProvider({ children }) {
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
     setTheme(newTheme);
-    localStorage.setItem("poker-theme", newTheme);
+    safeSetItem("poker-theme", newTheme);
     document.documentElement.setAttribute("data-theme", newTheme);
-    console.log(`🎨 Tema alterado para: ${newTheme}`);
   };
 
   // 🔥 FUNÇÃO PARA FORÇAR UM TEMA ESPECÍFICO (USADO EM CASOS ESPECIAIS)
   const setThemeForced = (newTheme) => {
     if (newTheme !== "dark" && newTheme !== "light") return;
     setTheme(newTheme);
-    localStorage.setItem("poker-theme", newTheme);
+    safeSetItem("poker-theme", newTheme);
     document.documentElement.setAttribute("data-theme", newTheme);
-    console.log(`🎨 Tema forçado para: ${newTheme}`);
   };
 
   // 🔥 EVITAR HIDRATAÇÃO INCORRETA

@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { safeGetItem, safeSetItem } from "@/lib/safeStorage";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -17,7 +18,10 @@ export default function RegisterPage() {
   const [theme, setTheme] = useState("dark");
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") || "dark";
+    // 🔥 CORRIGIDO: mesmo problema do login/page.jsx - localStorage direto
+    // (risco de travar no Safari/iPad) e chave "theme" divergente da
+    // usada no resto do app ("poker-theme"). Ver ThemeContext.jsx.
+    const savedTheme = safeGetItem("poker-theme", "dark");
     setTheme(savedTheme);
     document.documentElement.setAttribute("data-theme", savedTheme);
   }, []);
@@ -54,7 +58,7 @@ export default function RegisterPage() {
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
     setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
+    safeSetItem("poker-theme", newTheme);
     document.documentElement.setAttribute("data-theme", newTheme);
   };
 

@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { safeSetItem } from "@/lib/safeStorage";
 
 export default function TurboButton({ onToggle, isTurbo: externalIsTurbo }) {
   const [isTurbo, setIsTurbo] = useState(externalIsTurbo || false);
@@ -15,7 +16,7 @@ export default function TurboButton({ onToggle, isTurbo: externalIsTurbo }) {
   const toggleTurbo = () => {
     const newState = !isTurbo;
     setIsTurbo(newState);
-    localStorage.setItem("turbo-mode", String(newState));
+    safeSetItem("turbo-mode", String(newState));
     if (onToggle) {
       onToggle(newState);
     }

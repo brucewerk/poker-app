@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { soundManager } from "@/lib/sound";
+import { safeGetItem, safeSetItem } from "@/lib/safeStorage";
 
 export default function SoundToggle() {
   const [isMuted, setIsMuted] = useState(false);
@@ -17,7 +18,7 @@ export default function SoundToggle() {
     if (isInitialized.current) return;
     isInitialized.current = true;
 
-    const savedMuted = localStorage.getItem("sound-muted");
+    const savedMuted = safeGetItem("sound-muted");
     const muted = savedMuted === "true";
     setIsMuted(muted);
     soundManager.setMuted(muted);
@@ -80,7 +81,7 @@ export default function SoundToggle() {
     const newMuted = !isMuted;
     setIsMuted(newMuted);
     soundManager.setMuted(newMuted);
-    localStorage.setItem("sound-muted", String(newMuted));
+    safeSetItem("sound-muted", String(newMuted));
 
     if (!newMuted) {
       console.info("🔊 Ativando som...");

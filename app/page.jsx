@@ -38,6 +38,7 @@ import TournamentLobby from "@/components/Poker/TournamentLobby.jsx";
 import ResultModal from "@/components/Poker/ResultModal.jsx";
 import { useToast } from "@/components/Toast/ToastManager";
 import DesktopZoom from "@/components/Poker/DesktopZoom.jsx";
+import { safeGetItem } from "@/lib/safeStorage";
 
 // ====================== ESTADO INICIAL ======================
 const INITIAL_GAME = {
@@ -556,7 +557,7 @@ export default function PokerGame() {
 
   // ====================== CARREGAR MODO TURBO ======================
   useEffect(() => {
-    const saved = localStorage.getItem("turbo-mode");
+    const saved = safeGetItem("turbo-mode");
     if (saved !== null) {
       setIsTurbo(saved === "true");
     }
@@ -2164,6 +2165,7 @@ export default function PokerGame() {
   if (isLoading && status === "loading") {
     return (
       <div
+        className="app-full-height"
         style={{
           minHeight: "100vh",
           background: "var(--bg-primary)",
@@ -2192,6 +2194,7 @@ export default function PokerGame() {
   if (!gameInitialized.current && status === "authenticated") {
     return (
       <div
+        className="app-full-height"
         style={{
           minHeight: "100vh",
           background: "var(--bg-primary)",
@@ -2235,6 +2238,7 @@ export default function PokerGame() {
       />
 
       <div
+        className="app-full-height"
         style={{
           margin: 0,
           minHeight: "100vh",

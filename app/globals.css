@@ -355,6 +355,11 @@ body {
     align-items: stretch !important;
     justify-content: space-between !important;
     gap: 6px !important;
+    /* 🔥 CORRIGIDO: wrap habilitado apenas para permitir que o controle de
+       troca de jogador (modo 2P no mesmo aparelho) caia para uma nova
+       linha abaixo, em vez de tentar espremer como uma 4ª coluna na
+       mesma linha de CPU/mesa/jogador (que somam ~100% da largura). */
+    flex-wrap: wrap !important;
   }
 
   /* CPU (esquerda) e Jogador (direita) viram colunas laterais estreitas */
@@ -385,6 +390,16 @@ body {
     margin: 0 !important;
     padding: 5px 8px !important;
     min-width: 0 !important;
+  }
+
+  /* 🔥 CORRIGIDO: sem "order" explícito, este elemento (só existe no modo
+     2 jogadores no mesmo aparelho) tinha order:0 por padrão e pulava para
+     ANTES da CPU na linha, quebrando visualmente o layout. Agora vem por
+     último e ocupa a largura toda em uma linha própria abaixo. */
+  .game-table-multiplayer-controls {
+    order: 4 !important;
+    flex-basis: 100% !important;
+    margin: 4px 0 0 0 !important;
   }
 
   .game-table-cards-row {
@@ -668,14 +683,42 @@ body {
     --card-font: 0.75rem;
   }
 
+  /* 🔥 CORRIGIDO: min-height fixo de 400px não considerava que, em
+     paisagem (ex: iPad 1024×768), a barra de endereço/chrome do Safari
+     reduz a altura real disponível - somado à barra de status, botões de
+     ação e rodapé, o total ultrapassava a tela e forçava rolagem. Agora
+     é fluido por vh, encolhendo automaticamente conforme o espaço real. */
   .game-table-felt {
-    padding: 16px 14px !important;
-    min-height: 400px !important;
+    padding: clamp(10px, 2.2vh, 16px) 14px !important;
+    min-height: clamp(220px, 52vh, 400px) !important;
   }
 
   .action-buttons-grid {
     grid-template-columns: repeat(5, 1fr) !important;
     gap: 8px !important;
+  }
+}
+
+/* 🔥 NOVO: tablets especificamente em PAISAGEM com altura reduzida (ex:
+   iPad com a barra do Safari visível, ou iPad Mini) - reforça o encolhimento
+   fluido acima com um teto ainda mais conservador quando a altura real é
+   curta, para nunca precisar de rolagem para jogar. */
+@media (min-width: 821px) and (max-width: 1200px) and (orientation: landscape) and (max-height: 800px) {
+  .game-table-felt {
+    min-height: clamp(190px, 46vh, 340px) !important;
+    padding: clamp(8px, 1.8vh, 14px) 12px !important;
+  }
+
+  .game-table-cards-row {
+    min-height: clamp(50px, 11vh, 80px) !important;
+  }
+
+  .game-table-community-cards-row {
+    min-height: clamp(70px, 15vh, 110px) !important;
+  }
+
+  .action-btn {
+    min-height: clamp(38px, 6.5vh, 48px) !important;
   }
 }
 
@@ -1991,12 +2034,26 @@ body {
 /* ====================== AUTH (LOGIN/REGISTER) ====================== */
 .auth-container {
   min-height: 100vh;
+  /* 🔥 NOVO: 100dvh (altura dinâmica do viewport) resolve o "salto" comum
+     no Safari mobile, onde 100vh sempre assume a barra de endereço
+     recolhida - com ela visível, 100vh sobra além do espaço real visível.
+     Navegadores sem suporte a dvh simplesmente ignoram esta linha e
+     mantêm o 100vh acima como fallback (nada quebra). */
+  min-height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: center;
   background: var(--bg-primary);
   padding: 20px;
   transition: var(--transition-theme);
+}
+
+/* 🔥 NOVO: mesmo tratamento vh->dvh para as telas de carregamento e o
+   wrapper principal do jogo (app/page.jsx), evitando que a barra de
+   endereço do Safari mobile deixe uma sobra de espaço/rolagem residual. */
+.app-full-height {
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .auth-card {

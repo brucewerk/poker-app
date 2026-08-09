@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { safeGetItem, safeSetItem } from "@/lib/safeStorage";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,7 +17,15 @@ export default function LoginPage() {
   const [theme, setTheme] = useState("dark");
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") || "dark";
+    // 🔥 CORRIGIDO: duas falhas aqui.
+    // 1) localStorage direto (sem try/catch) podia travar a tela de login
+    //    por completo no Safari do iPad em modo privado/restrito - agora
+    //    usa o wrapper seguro, que nunca lança.
+    // 2) A chave usada era "theme", mas o resto do app (ThemeContext.jsx)
+    //    usa "poker-theme" - o tema escolhido aqui nunca refletia no app
+    //    principal depois do login, e vice-versa. Unificado na mesma
+    //    chave usada em todo o resto da aplicação.
+    const savedTheme = safeGetItem("poker-theme", "dark");
     setTheme(savedTheme);
     document.documentElement.setAttribute("data-theme", savedTheme);
   }, []);
@@ -59,7 +68,7 @@ export default function LoginPage() {
   const toggleTheme = () => {
     const newTheme = theme === "dark" ? "light" : "dark";
     setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
+    safeSetItem("poker-theme", newTheme);
     document.documentElement.setAttribute("data-theme", newTheme);
   };
 
