@@ -1,4 +1,4 @@
-// components/Poker/ResultModal.jsx - COMPLETO CORRIGIDO (SEM ROLAGEM EM NENHUMA TELA)
+// components/Poker/ResultModal.jsx - CORRIGIDO (SEM whileHover/whileTap em elementos DOM)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -13,11 +13,19 @@ export default function ResultModal({ data, onClose }) {
   const [showContent, setShowContent] = useState(false);
 
   useEffect(() => {
+    // 🔥 CORREÇÃO: Impede rolagem do body
     document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
+    document.body.style.height = "100%";
+
     const timer = setTimeout(() => setShowContent(true), 100);
 
     return () => {
       document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.height = "";
       clearTimeout(timer);
     };
   }, []);
@@ -29,10 +37,7 @@ export default function ResultModal({ data, onClose }) {
     setTimeout(() => onClose(), 350);
   };
 
-  // 🔥 CORRIGIDO: carta do resumo agora usa clamp() (fluido por vh/vw) em vez
-  // de pixels fixos (antes: 50x70). Isso é o que permite o modal inteiro
-  // encolher proporcionalmente em telas baixas (ex: celular deitado) sem
-  // nunca precisar de rolagem.
+  // 🔥 Renderiza cartas com tamanho fixo em porcentagem
   const renderCard = (card, index, isFlipped = false) => {
     if (!card) return null;
     const isRed = card.suit === "♥" || card.suit === "♦";
@@ -49,10 +54,15 @@ export default function ResultModal({ data, onClose }) {
                 ? "10"
                 : card.rank;
 
+    const isSmallScreen =
+      typeof window !== "undefined" && window.innerHeight < 500;
+    const cardSize = isSmallScreen ? "28px" : "40px";
+    const cardHeight = isSmallScreen ? "40px" : "56px";
+    const fontSize = isSmallScreen ? "0.5rem" : "0.7rem";
+
     return (
       <motion.div
         key={`card-${index}-${card.rank}${card.suit}`}
-        className="result-card"
         initial={{ opacity: 0, scale: 0.8, rotateY: isFlipped ? 180 : 0 }}
         animate={{
           opacity: showContent ? 1 : 0,
@@ -70,39 +80,26 @@ export default function ResultModal({ data, onClose }) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          width: "clamp(28px, 7vh, 50px)",
-          height: "clamp(40px, 9.5vh, 70px)",
-          margin: "2px",
-          borderRadius: 6,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+          width: cardSize,
+          height: cardHeight,
+          margin: "1px",
+          borderRadius: 4,
+          boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
           flexShrink: 0,
-          position: "relative",
           background: isFlipped
-            ? "repeating-linear-gradient(45deg, #2b5797, #2b5797 8px, #1d3f6e 8px, #1d3f6e 16px)"
+            ? "repeating-linear-gradient(45deg, #2b5797, #2b5797 6px, #1d3f6e 6px, #1d3f6e 12px)"
             : "linear-gradient(145deg, #ffffff, #f0f0f0)",
-          border: isFlipped ? "2px solid #1a3a6e" : "1px solid #ddd",
+          border: isFlipped ? "1px solid #1a3a6e" : "1px solid #ddd",
           color: isRed ? "#cc0000" : "#000",
-          transition: "var(--transition-theme)",
         }}
       >
         {!isFlipped && (
           <>
-            <span
-              style={{
-                fontSize: "clamp(0.58rem, 1.8vh, 0.9rem)",
-                fontWeight: 800,
-                color: isRed ? "#cc0000" : "#000",
-                lineHeight: 1,
-              }}
-            >
+            <span style={{ fontSize, fontWeight: 800, lineHeight: 1 }}>
               {rankDisplay}
             </span>
             <span
-              style={{
-                fontSize: "clamp(0.62rem, 2vh, 1rem)",
-                color: isRed ? "#cc0000" : "#000",
-                lineHeight: 1,
-              }}
+              style={{ fontSize: `calc(${fontSize} * 1.2)`, lineHeight: 1 }}
             >
               {card.suit}
             </span>
@@ -112,18 +109,10 @@ export default function ResultModal({ data, onClose }) {
     );
   };
 
-  // 🔥 RENDERIZAR CARTAS
   const renderCards = (cards, faceDown = false) => {
     if (!cards || cards.length === 0) {
       return (
-        <span
-          style={{
-            color: "var(--text-muted)",
-            fontSize: "clamp(0.6rem, 1.6vh, 0.7rem)",
-          }}
-        >
-          Sem cartas
-        </span>
+        <span style={{ color: "#999", fontSize: "0.6rem" }}>Sem cartas</span>
       );
     }
     return cards.map((card, i) => renderCard(card, i, faceDown));
@@ -137,8 +126,6 @@ export default function ResultModal({ data, onClose }) {
       bgGradient: "linear-gradient(145deg, #0d3b1e, #1a6a3a)",
       borderColor: "#4caf50",
       glowColor: "rgba(76, 175, 80, 0.3)",
-      badge: "VENCEDOR",
-      badgeColor: "#4caf50",
     },
     loss: {
       icon: "💔",
@@ -147,8 +134,6 @@ export default function ResultModal({ data, onClose }) {
       bgGradient: "linear-gradient(145deg, #3b0d0d, #6a1a1a)",
       borderColor: "#f44336",
       glowColor: "rgba(244, 67, 54, 0.3)",
-      badge: "ELIMINADO",
-      badgeColor: "#f44336",
     },
     tie: {
       icon: "🤝",
@@ -157,8 +142,6 @@ export default function ResultModal({ data, onClose }) {
       bgGradient: "linear-gradient(145deg, #3b3a0d, #6a6a1a)",
       borderColor: "#ffc107",
       glowColor: "rgba(255, 193, 7, 0.3)",
-      badge: "EMPATE",
-      badgeColor: "#ffc107",
     },
   };
 
@@ -167,707 +150,354 @@ export default function ResultModal({ data, onClose }) {
     : isTie
       ? resultConfig.tie
       : resultConfig.loss;
-
   const playerName = data.playerName || "Você";
   const cpuName = data.cpuName || "CPU";
 
-  // 🔥 CORES DO TEMA CLARO E ESCURO
   const isDarkTheme =
     typeof window !== "undefined" &&
     document.documentElement.getAttribute("data-theme") === "dark";
 
+  const isSmallScreen =
+    typeof window !== "undefined" && window.innerHeight < 500;
+
   return (
     <motion.div
-      className="result-overlay"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: isClosing ? 0 : 1 }}
-      transition={{ duration: 0.3 }}
       style={{
         position: "fixed",
         inset: 0,
-        background: isDarkTheme ? "rgba(0,0,0,0.88)" : "rgba(0,0,0,0.5)",
+        background: isDarkTheme ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.6)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         zIndex: 2000,
-        // 🔥 CORRIGIDO: padding fluido + respeita área segura do iOS (notch)
-        padding:
-          "max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left))",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+        padding: "8px",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
       }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: isClosing ? 0 : 1 }}
+      transition={{ duration: 0.2 }}
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
       <motion.div
-        className="result-modal"
-        initial={{ scale: 0.85, rotateX: -10, opacity: 0 }}
-        animate={{
-          scale: isClosing ? 0.92 : 1,
-          rotateX: isClosing ? -5 : 0,
-          opacity: isClosing ? 0 : 1,
-        }}
-        transition={{
-          type: "spring",
-          stiffness: 400,
-          damping: 30,
-          duration: 0.4,
-        }}
         style={{
           background: isDarkTheme ? config.bgGradient : "#ffffff",
-          // 🔥 CORRIGIDO: padding fluido (era fixo "30px 35px")
-          padding: "clamp(12px, 3.2vh, 30px) clamp(14px, 4vw, 35px)",
-          borderRadius: "clamp(16px, 3vh, 28px)",
-          maxWidth: "min(560px, 94vw)",
+          padding: isSmallScreen ? "8px 12px" : "16px 24px",
+          borderRadius: isSmallScreen ? "12px" : "20px",
+          maxWidth: isSmallScreen ? "100%" : "480px",
           width: "100%",
+          maxHeight: "95vh",
+          overflow: "hidden",
           color: isDarkTheme ? "white" : "#0d1f15",
           border: isDarkTheme
             ? `2px solid ${config.borderColor}`
-            : `2px solid rgba(13, 31, 21, 0.12)`,
-          boxShadow: isDarkTheme
-            ? `0 20px 60px rgba(0,0,0,0.6), 0 0 60px ${config.glowColor}`
-            : `0 20px 60px rgba(0,0,0,0.08)`,
-          // 🔥 CORRIGIDO: maxHeight como rede de segurança
-          maxHeight: "94vh",
-          overflowY: "auto",
+            : "1px solid rgba(0,0,0,0.08)",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.4)",
           position: "relative",
-          scrollbarWidth: "thin",
-          scrollbarColor: isDarkTheme
-            ? "rgba(255,255,255,0.1) transparent"
-            : "rgba(13,31,21,0.1) transparent",
-          transition: "var(--transition-theme)",
+          display: "flex",
+          flexDirection: "column",
         }}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{
+          scale: isClosing ? 0.95 : 1,
+          opacity: isClosing ? 0 : 1,
+        }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
       >
-        {/* Botão Fechar */}
+        {/* Botão Fechar - usando motion.button para animações */}
         <motion.button
           onClick={handleClose}
           style={{
             position: "absolute",
-            top: "clamp(6px, 1.5vh, 12px)",
-            right: "clamp(8px, 2vw, 16px)",
-            background: isDarkTheme
-              ? "rgba(255,255,255,0.05)"
-              : "rgba(13,31,21,0.05)",
+            top: isSmallScreen ? "4px" : "8px",
+            right: isSmallScreen ? "4px" : "8px",
+            background: "rgba(255,255,255,0.1)",
             border: "none",
-            color: isDarkTheme ? "#fff" : "#0d1f15",
-            fontSize: "clamp(0.85rem, 2.4vh, 1.1rem)",
+            color: isDarkTheme ? "#fff" : "#333",
+            fontSize: isSmallScreen ? "0.8rem" : "1rem",
             cursor: "pointer",
-            zIndex: 10,
-            width: "clamp(24px, 5.5vh, 32px)",
-            height: "clamp(24px, 5.5vh, 32px)",
+            width: isSmallScreen ? "24px" : "28px",
+            height: isSmallScreen ? "24px" : "28px",
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            transition: "all 0.3s ease",
             opacity: 0.6,
+            zIndex: 10,
           }}
-          whileHover={{
-            background: isDarkTheme
-              ? "rgba(255,255,255,0.15)"
-              : "rgba(13,31,21,0.1)",
-            rotate: 90,
-          }}
+          whileHover={{ opacity: 1, scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
           ✕
         </motion.button>
 
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: showContent ? 1 : 0, y: showContent ? 0 : 20 }}
-          transition={{ delay: 0.1, type: "spring", stiffness: 300 }}
+        {/* Header - Compacto */}
+        <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "clamp(8px, 2vw, 16px)",
-            marginBottom: "clamp(3px, 0.9vh, 8px)",
+            gap: isSmallScreen ? "6px" : "12px",
+            marginBottom: isSmallScreen ? "4px" : "8px",
           }}
         >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: showContent ? 1 : 0 }}
-            transition={{
-              delay: 0.2,
-              type: "spring",
-              stiffness: 400,
-              damping: 20,
-            }}
-            style={{
-              width: "clamp(38px, 9vh, 60px)",
-              height: "clamp(38px, 9vh, 60px)",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: isDarkTheme
-                ? "rgba(0,0,0,0.2)"
-                : "rgba(13,31,21,0.06)",
-              backdropFilter: "blur(4px)",
-              border: isDarkTheme
-                ? `2px solid ${config.borderColor}`
-                : `2px solid rgba(13,31,21,0.15)`,
-              boxShadow: isDarkTheme
-                ? `0 0 40px ${config.glowColor}`
-                : `0 0 20px rgba(13,31,21,0.05)`,
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                fontSize: "clamp(1.6rem, 5.5vh, 2.8rem)",
-                lineHeight: 1,
-              }}
-            >
-              {config.icon}
-            </span>
-          </motion.div>
+          <span style={{ fontSize: isSmallScreen ? "1.4rem" : "2rem" }}>
+            {config.icon}
+          </span>
           <h2
             style={{
               margin: 0,
-              fontSize: "clamp(1.05rem, 4.4vh, 1.8rem)",
+              fontSize: isSmallScreen ? "1rem" : "1.5rem",
               fontWeight: 800,
-              color: isDarkTheme
-                ? config.titleColor
-                : isWin
-                  ? "#2e7d32"
-                  : isTie
-                    ? "#b8960f"
-                    : "#c62828",
-              textShadow: isDarkTheme ? `0 0 30px ${config.glowColor}` : "none",
-              letterSpacing: "1px",
+              color: config.titleColor,
             }}
           >
             {config.title}
           </h2>
-        </motion.div>
+        </div>
 
         {/* Mensagem */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: showContent ? 1 : 0, y: showContent ? 0 : 20 }}
-          transition={{ delay: 0.15, type: "spring", stiffness: 300 }}
+        <p
           style={{
             textAlign: "center",
-            marginBottom: "clamp(5px, 1.2vh, 12px)",
+            fontSize: isSmallScreen ? "0.65rem" : "0.85rem",
+            fontWeight: 600,
+            color: config.titleColor,
+            margin: isSmallScreen ? "2px 0 4px 0" : "4px 0 8px 0",
+            padding: isSmallScreen ? "2px 8px" : "4px 12px",
+            background: "rgba(0,0,0,0.1)",
+            borderRadius: 12,
           }}
         >
-          <p
-            style={{
-              fontSize: "clamp(0.7rem, 2.6vh, 1.05rem)",
-              fontWeight: 600,
-              color: isDarkTheme
-                ? config.titleColor
-                : isWin
-                  ? "#2e7d32"
-                  : isTie
-                    ? "#b8960f"
-                    : "#c62828",
-              margin: 0,
-              padding: "clamp(3px, 0.7vh, 6px) clamp(8px, 3vw, 16px)",
-              background: isDarkTheme
-                ? "rgba(0,0,0,0.2)"
-                : "rgba(13,31,21,0.04)",
-              borderRadius: 20,
-              display: "inline-block",
-            }}
-          >
-            {data.winnerMsg}
-          </p>
-        </motion.div>
+          {data.winnerMsg}
+        </p>
 
-        {/* Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: showContent ? 1 : 0, y: showContent ? 0 : 20 }}
-          transition={{ delay: 0.2, type: "spring", stiffness: 300 }}
-          style={{
-            background: isDarkTheme ? "rgba(0,0,0,0.2)" : "rgba(13,31,21,0.04)",
-            borderRadius: 16,
-            padding: "clamp(6px, 1.6vh, 14px)",
-            marginBottom: "clamp(5px, 1.2vh, 12px)",
-            border: isDarkTheme
-              ? `1px solid ${config.borderColor}33`
-              : "1px solid rgba(13,31,21,0.06)",
-          }}
-        >
-          {/* Community Cards */}
-          {data.communityCards && data.communityCards.length > 0 && (
-            <div
-              style={{
-                textAlign: "center",
-                marginBottom: "clamp(4px, 0.9vh, 10px)",
-                padding: "clamp(3px, 0.7vh, 6px)",
-                background: isDarkTheme
-                  ? "rgba(0,0,0,0.12)"
-                  : "rgba(13,31,21,0.03)",
-                borderRadius: 10,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "clamp(0.48rem, 1.3vh, 0.55rem)",
-                  color: isDarkTheme ? "#aaa" : "#4a5a52",
-                  marginBottom: "clamp(2px, 0.5vh, 4px)",
-                  display: "block",
-                  textTransform: "uppercase",
-                  letterSpacing: "2px",
-                  fontWeight: 600,
-                }}
-              >
-                🔥 MESA
-              </span>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  gap: "4px",
-                  flexWrap: "wrap",
-                  padding: "clamp(1px, 0.3vh, 2px) 0",
-                  minHeight: "clamp(30px, 7vh, 50px)",
-                }}
-              >
-                {renderCards(data.communityCards)}
-              </div>
-            </div>
-          )}
-
-          {/* Comparação lado a lado */}
+        {/* Community Cards */}
+        {data.communityCards && data.communityCards.length > 0 && (
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "stretch",
-              padding: "clamp(3px, 0.7vh, 6px) 0",
-              borderTop: isDarkTheme
-                ? "1px solid rgba(255,255,255,0.06)"
-                : "1px solid rgba(13,31,21,0.06)",
-              borderBottom: isDarkTheme
-                ? "1px solid rgba(255,255,255,0.06)"
-                : "1px solid rgba(13,31,21,0.06)",
-              marginBottom: "clamp(2px, 0.5vh, 4px)",
-              gap: "6px",
+              textAlign: "center",
+              marginBottom: isSmallScreen ? "2px" : "4px",
+              padding: isSmallScreen ? "2px 4px" : "4px 8px",
+              background: "rgba(0,0,0,0.06)",
+              borderRadius: 8,
             }}
           >
-            {/* Jogador */}
-            <div
+            <span
               style={{
-                flex: 1,
-                textAlign: "left",
-                minWidth: 0,
-                padding: "clamp(2px, 0.5vh, 4px) clamp(4px, 1.4vw, 6px)",
-                borderRadius: 10,
-                background: isWin
-                  ? isDarkTheme
-                    ? "rgba(76,175,80,0.12)"
-                    : "rgba(46,125,50,0.08)"
-                  : isDarkTheme
-                    ? "rgba(255,255,255,0.03)"
-                    : "rgba(13,31,21,0.02)",
-                border: isWin
-                  ? isDarkTheme
-                    ? `1px solid ${config.borderColor}44`
-                    : "1px solid rgba(46,125,50,0.15)"
-                  : "1px solid transparent",
-                position: "relative",
+                fontSize: isSmallScreen ? "0.4rem" : "0.55rem",
+                color: isDarkTheme ? "#aaa" : "#666",
+                display: "block",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+                fontWeight: 600,
               }}
             >
-              <div
-                style={{
-                  fontSize: "clamp(0.55rem, 1.7vh, 0.7rem)",
-                  fontWeight: 700,
-                  color: isDarkTheme
-                    ? isWin
-                      ? "#4caf50"
-                      : "#aaa"
-                    : isWin
-                      ? "#2e7d32"
-                      : "#4a5a52",
-                  marginBottom: "clamp(2px, 0.5vh, 4px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-start",
-                  gap: "4px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span style={{ fontSize: "0.9em" }}>🃏</span>
-                {playerName}
-                {isWin && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: showContent ? 1 : 0 }}
-                    transition={{
-                      delay: 0.4,
-                      type: "spring",
-                      stiffness: 400,
-                    }}
-                    style={{
-                      fontSize: "0.78em",
-                      background: isDarkTheme ? "#4caf50" : "#2e7d32",
-                      color: "white",
-                      padding: "1px 8px",
-                      borderRadius: 10,
-                    }}
-                  >
-                    VENCEDOR
-                  </motion.span>
-                )}
-                {isTie && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: showContent ? 1 : 0 }}
-                    transition={{ delay: 0.4, type: "spring", stiffness: 400 }}
-                    style={{
-                      fontSize: "0.78em",
-                      background: isDarkTheme ? "#ffc107" : "#b8960f",
-                      color: isDarkTheme ? "#1a1a1a" : "white",
-                      padding: "1px 8px",
-                      borderRadius: 10,
-                    }}
-                  >
-                    EMPATE
-                  </motion.span>
-                )}
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-start",
-                  alignItems: "center",
-                  gap: "4px",
-                  flexWrap: "wrap",
-                  padding: "clamp(1px, 0.3vh, 2px) 0",
-                  minHeight: "clamp(30px, 7vh, 50px)",
-                }}
-              >
-                {renderCards(data.playerCards)}
-              </div>
-              <div
-                style={{
-                  fontSize: "clamp(0.55rem, 1.7vh, 0.7rem)",
-                  fontWeight: 700,
-                  color: isDarkTheme
-                    ? isWin
-                      ? "#4caf50"
-                      : "#aaa"
-                    : isWin
-                      ? "#2e7d32"
-                      : "#4a5a52",
-                  background: isDarkTheme
-                    ? "rgba(0,0,0,0.2)"
-                    : "rgba(13,31,21,0.04)",
-                  padding: "clamp(1px, 0.3vh, 2px) clamp(6px, 2vw, 10px)",
-                  borderRadius: 10,
-                  display: "inline-block",
-                  marginTop: "clamp(2px, 0.5vh, 4px)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: "100%",
-                }}
-              >
-                {data.playerHand}
-              </div>
-            </div>
-
-            {/* VS */}
+              🔥 MESA
+            </span>
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
                 justifyContent: "center",
-                fontSize: "clamp(0.85rem, 3vh, 1.2rem)",
-                fontWeight: 800,
-                color: isDarkTheme ? "#888" : "#b0b0b0",
-                padding: "0 4px",
-                minWidth: "clamp(16px, 4vw, 24px)",
-                flexShrink: 0,
+                gap: "2px",
+                padding: isSmallScreen ? "2px 0" : "4px 0",
               }}
             >
-              ⚡
-            </div>
-
-            {/* CPU / Oponente */}
-            <div
-              style={{
-                flex: 1,
-                textAlign: "right",
-                minWidth: 0,
-                padding: "clamp(2px, 0.5vh, 4px) clamp(4px, 1.4vw, 6px)",
-                borderRadius: 10,
-                background:
-                  !isWin && !isTie
-                    ? isDarkTheme
-                      ? "rgba(244,67,54,0.12)"
-                      : "rgba(198,40,40,0.08)"
-                    : isDarkTheme
-                      ? "rgba(255,255,255,0.03)"
-                      : "rgba(13,31,21,0.02)",
-                border:
-                  !isWin && !isTie
-                    ? isDarkTheme
-                      ? `1px solid ${config.borderColor}44`
-                      : "1px solid rgba(198,40,40,0.15)"
-                    : "1px solid transparent",
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "clamp(0.55rem, 1.7vh, 0.7rem)",
-                  fontWeight: 700,
-                  color: isDarkTheme
-                    ? !isWin && !isTie
-                      ? "#f44336"
-                      : "#aaa"
-                    : !isWin && !isTie
-                      ? "#c62828"
-                      : "#4a5a52",
-                  marginBottom: "clamp(2px, 0.5vh, 4px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: "4px",
-                  flexWrap: "wrap",
-                }}
-              >
-                {!isWin && !isTie && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: showContent ? 1 : 0 }}
-                    transition={{
-                      delay: 0.4,
-                      type: "spring",
-                      stiffness: 400,
-                    }}
-                    style={{
-                      fontSize: "0.78em",
-                      background: isDarkTheme ? "#f44336" : "#c62828",
-                      color: "white",
-                      padding: "1px 8px",
-                      borderRadius: 10,
-                    }}
-                  >
-                    ELIMINADO
-                  </motion.span>
-                )}
-                {cpuName}
-                <span style={{ fontSize: "0.9em" }}>
-                  {data.isMultiplayer ? "👤" : "🤖"}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  alignItems: "center",
-                  gap: "4px",
-                  flexWrap: "wrap",
-                  padding: "clamp(1px, 0.3vh, 2px) 0",
-                  minHeight: "clamp(30px, 7vh, 50px)",
-                }}
-              >
-                {renderCards(data.cpuCards)}
-              </div>
-              <div
-                style={{
-                  fontSize: "clamp(0.55rem, 1.7vh, 0.7rem)",
-                  fontWeight: 700,
-                  color: isDarkTheme
-                    ? !isWin && !isTie
-                      ? "#f44336"
-                      : "#aaa"
-                    : !isWin && !isTie
-                      ? "#c62828"
-                      : "#4a5a52",
-                  background: isDarkTheme
-                    ? "rgba(0,0,0,0.2)"
-                    : "rgba(13,31,21,0.04)",
-                  padding: "clamp(1px, 0.3vh, 2px) clamp(6px, 2vw, 10px)",
-                  borderRadius: 10,
-                  display: "inline-block",
-                  marginTop: "clamp(2px, 0.5vh, 4px)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: "100%",
-                }}
-              >
-                {data.cpuHand}
-              </div>
+              {renderCards(data.communityCards)}
             </div>
           </div>
-        </motion.div>
+        )}
+
+        {/* Comparação lado a lado - Compacta */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "stretch",
+            padding: isSmallScreen ? "2px 0" : "4px 0",
+            gap: isSmallScreen ? "4px" : "8px",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            marginBottom: isSmallScreen ? "2px" : "4px",
+          }}
+        >
+          {/* Jogador */}
+          <div
+            style={{
+              flex: 1,
+              textAlign: "left",
+              padding: isSmallScreen ? "2px 4px" : "4px 8px",
+              borderRadius: 8,
+              background: isWin ? "rgba(76,175,80,0.08)" : "transparent",
+            }}
+          >
+            <div
+              style={{
+                fontSize: isSmallScreen ? "0.5rem" : "0.65rem",
+                fontWeight: 700,
+                color: isWin ? "#4caf50" : "#999",
+                marginBottom: isSmallScreen ? "1px" : "2px",
+              }}
+            >
+              🃏 {playerName} {isWin && "🏆"}
+            </div>
+            <div style={{ display: "flex", gap: "2px", flexWrap: "wrap" }}>
+              {renderCards(data.playerCards)}
+            </div>
+            <div
+              style={{
+                fontSize: isSmallScreen ? "0.45rem" : "0.6rem",
+                fontWeight: 600,
+                color: isWin ? "#4caf50" : "#999",
+                marginTop: isSmallScreen ? "1px" : "2px",
+                background: "rgba(0,0,0,0.05)",
+                padding: isSmallScreen ? "1px 4px" : "2px 8px",
+                borderRadius: 8,
+                display: "inline-block",
+              }}
+            >
+              {data.playerHand}
+            </div>
+          </div>
+
+          {/* VS */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              fontSize: isSmallScreen ? "0.6rem" : "0.9rem",
+              fontWeight: 800,
+              color: "#666",
+              padding: "0 2px",
+            }}
+          >
+            ⚡
+          </div>
+
+          {/* CPU */}
+          <div
+            style={{
+              flex: 1,
+              textAlign: "right",
+              padding: isSmallScreen ? "2px 4px" : "4px 8px",
+              borderRadius: 8,
+              background:
+                !isWin && !isTie ? "rgba(244,67,54,0.08)" : "transparent",
+            }}
+          >
+            <div
+              style={{
+                fontSize: isSmallScreen ? "0.5rem" : "0.65rem",
+                fontWeight: 700,
+                color: !isWin && !isTie ? "#f44336" : "#999",
+                marginBottom: isSmallScreen ? "1px" : "2px",
+              }}
+            >
+              {!isWin && !isTie && "💀"} {cpuName}{" "}
+              {data.isMultiplayer ? "👤" : "🤖"}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: "2px",
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+              }}
+            >
+              {renderCards(data.cpuCards)}
+            </div>
+            <div
+              style={{
+                fontSize: isSmallScreen ? "0.45rem" : "0.6rem",
+                fontWeight: 600,
+                color: !isWin && !isTie ? "#f44336" : "#999",
+                marginTop: isSmallScreen ? "1px" : "2px",
+                background: "rgba(0,0,0,0.05)",
+                padding: isSmallScreen ? "1px 4px" : "2px 8px",
+                borderRadius: 8,
+                display: "inline-block",
+              }}
+            >
+              {data.cpuHand}
+            </div>
+          </div>
+        </div>
 
         {/* Pote */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: showContent ? 1 : 0, y: showContent ? 0 : 20 }}
-          transition={{ delay: 0.25, type: "spring", stiffness: 300 }}
+        <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "clamp(4px, 1vh, 8px) clamp(8px, 2.4vw, 12px)",
-            fontSize: "clamp(0.68rem, 2.2vh, 0.9rem)",
-            background: isDarkTheme
-              ? "rgba(0,0,0,0.15)"
-              : "rgba(13,31,21,0.04)",
-            borderRadius: 12,
-            marginBottom: "clamp(3px, 0.7vh, 6px)",
-            border: isDarkTheme
-              ? `1px solid ${config.borderColor}22`
-              : "1px solid rgba(13,31,21,0.06)",
-            flexWrap: "wrap",
-            gap: "4px",
+            padding: isSmallScreen ? "2px 6px" : "4px 12px",
+            fontSize: isSmallScreen ? "0.55rem" : "0.75rem",
+            background: "rgba(0,0,0,0.06)",
+            borderRadius: 8,
+            marginBottom: isSmallScreen ? "2px" : "4px",
           }}
         >
-          <span
-            style={{
-              fontWeight: "bold",
-              color: isDarkTheme ? "white" : "#0d1f15",
-            }}
-          >
-            💰 Pote:{" "}
-            <span style={{ color: isDarkTheme ? "#ffd700" : "#b8960f" }}>
-              {data.pot}
-            </span>{" "}
-            fichas
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <span style={{ fontWeight: "bold" }}>💰 Pote: {data.pot}</span>
+          <div>
             {isWin && (
-              <span
-                style={{
-                  color: isDarkTheme ? "#4caf50" : "#2e7d32",
-                  fontWeight: 800,
-                  fontSize: "clamp(0.78rem, 2.6vh, 1.1rem)",
-                  textShadow: isDarkTheme
-                    ? "0 0 20px rgba(76,175,80,0.3)"
-                    : "none",
-                }}
-              >
+              <span style={{ color: "#4caf50", fontWeight: 800 }}>
                 + {data.chipsWon}
               </span>
             )}
             {!isWin && !isTie && (
-              <span
-                style={{
-                  color: isDarkTheme ? "#f44336" : "#c62828",
-                  fontWeight: 800,
-                  fontSize: "clamp(0.78rem, 2.6vh, 1.1rem)",
-                  textShadow: isDarkTheme
-                    ? "0 0 20px rgba(244,67,54,0.3)"
-                    : "none",
-                }}
-              >
+              <span style={{ color: "#f44336", fontWeight: 800 }}>
                 - {data.chipsLost}
               </span>
             )}
             {isTie && (
-              <span
-                style={{
-                  color: isDarkTheme ? "#ffc107" : "#b8960f",
-                  fontWeight: 800,
-                  fontSize: "clamp(0.78rem, 2.6vh, 1.1rem)",
-                  textShadow: isDarkTheme
-                    ? "0 0 20px rgba(255,193,7,0.3)"
-                    : "none",
-                }}
-              >
+              <span style={{ color: "#ffc107", fontWeight: 800 }}>
                 + {data.split}
               </span>
             )}
           </div>
-        </motion.div>
+        </div>
 
-        {/* CPU Thought */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: showContent ? 1 : 0, y: showContent ? 0 : 20 }}
-          transition={{ delay: 0.3, type: "spring", stiffness: 300 }}
-          style={{
-            textAlign: "center",
-            fontSize: "clamp(0.56rem, 1.7vh, 0.7rem)",
-            color: isDarkTheme ? "#bbb" : "#4a5a52",
-            fontStyle: "italic",
-            padding: "clamp(3px, 0.7vh, 6px) clamp(8px, 2.4vw, 12px)",
-            marginBottom: "clamp(4px, 0.9vh, 8px)",
-            background: isDarkTheme
-              ? "rgba(0,0,0,0.15)"
-              : "rgba(13,31,21,0.04)",
-            borderRadius: 12,
-            minHeight: "clamp(14px, 3.4vh, 22px)",
-            border: isDarkTheme
-              ? `1px solid ${config.borderColor}22`
-              : "1px solid rgba(13,31,21,0.06)",
-          }}
-        >
-          <span style={{ opacity: 0.5 }}>💭</span> {data.cpuThought}
-        </motion.div>
+        {/* CPU Thought - Compacto */}
+        {data.cpuThought && (
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: isSmallScreen ? "0.45rem" : "0.6rem",
+              color: isDarkTheme ? "#bbb" : "#666",
+              fontStyle: "italic",
+              padding: isSmallScreen ? "2px 4px" : "4px 8px",
+              marginBottom: isSmallScreen ? "2px" : "4px",
+              background: "rgba(0,0,0,0.04)",
+              borderRadius: 8,
+            }}
+          >
+            💭 {data.cpuThought}
+          </div>
+        )}
 
-        {/* Botão Continuar */}
+        {/* Botão Continuar - usando motion.button para animações */}
         <motion.button
           onClick={handleClose}
           disabled={isClosing}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: showContent ? 1 : 0, y: showContent ? 0 : 20 }}
-          transition={{ delay: 0.35, type: "spring", stiffness: 300 }}
           style={{
             background: "linear-gradient(145deg, #f7d97c, #d6a12e)",
             border: "none",
             fontWeight: 700,
-            fontSize: "clamp(0.72rem, 2.4vh, 0.95rem)",
-            padding: "clamp(7px, 1.8vh, 12px) clamp(14px, 5vw, 24px)",
-            borderRadius: 50,
-            boxShadow: "0 4px 0 #7a4c1a, 0 0 30px rgba(255,215,0,0.1)",
+            fontSize: isSmallScreen ? "0.6rem" : "0.85rem",
+            padding: isSmallScreen ? "6px 12px" : "10px 20px",
+            borderRadius: 30,
+            boxShadow: "0 3px 0 #7a4c1a",
             color: "#2e241f",
             width: "100%",
-            transition: "all 0.2s ease",
-            marginTop: "4px",
-            letterSpacing: "0.5px",
-            position: "relative",
-            overflow: "hidden",
             cursor: isClosing ? "not-allowed" : "pointer",
             opacity: isClosing ? 0.5 : 1,
+            marginTop: isSmallScreen ? "2px" : "4px",
           }}
-          whileHover={{
-            scale: isClosing ? 1 : 1.02,
-            boxShadow: isClosing
-              ? "0 4px 0 #7a4c1a"
-              : "0 6px 0 #7a4c1a, 0 0 40px rgba(255,215,0,0.2)",
-          }}
+          whileHover={{ scale: isClosing ? 1 : 1.02 }}
           whileTap={{ scale: isClosing ? 1 : 0.98 }}
         >
-          {isClosing ? (
-            <span
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-              }}
-            >
-              <span style={{ animation: "spin 0.8s linear infinite" }}>⏳</span>
-              FECHANDO...
-            </span>
-          ) : (
-            <span
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-              }}
-            >
-              <span>▶</span>
-              CONTINUAR
-            </span>
-          )}
+          {isClosing ? "⏳" : "▶ CONTINUAR"}
         </motion.button>
       </motion.div>
     </motion.div>

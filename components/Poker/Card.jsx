@@ -1,8 +1,8 @@
-// components/Poker/Card.jsx - COMPLETO CORRIGIDO (TAMANHO RESPONSIVO VIA CSS VARS)
+// components/Poker/Card.jsx - COMPLETO CORRIGIDO (SEM document e SEM conflitos de estilo)
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect, memo } from "react";
+import { memo } from "react";
 
 const Card = memo(function Card({
   card,
@@ -11,148 +11,155 @@ const Card = memo(function Card({
   size = "normal",
   isHighlighted = false,
   isRevealing = false,
+  className = "",
 }) {
-  const [isFlipping, setIsFlipping] = useState(false);
-  const [isDarkTheme, setIsDarkTheme] = useState(true);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const theme = document.documentElement.getAttribute("data-theme");
-      setIsDarkTheme(theme === "dark");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isRevealing && faceDown) {
-      setIsFlipping(true);
-      const timer = setTimeout(() => setIsFlipping(false), 600);
-      return () => clearTimeout(timer);
-    }
-  }, [isRevealing, faceDown]);
-
   if (!card) return null;
 
   const isRed = card.suit === "♥" || card.suit === "♦";
-  const rankDisplay =
-    card.rank === 14
-      ? "A"
-      : card.rank === 13
-        ? "K"
-        : card.rank === 12
-          ? "Q"
-          : card.rank === 11
-            ? "J"
-            : card.rank === 10
-              ? "10"
-              : card.rank;
 
-  // 🔥 CORRIGIDO: Tamanhos agora usam as variáveis CSS responsivas (--card-width,
-  // --card-height, --card-font) já definidas em globals.css por breakpoint.
-  // Antes os tamanhos eram fixos em pixels e NUNCA respondiam ao tamanho da tela,
-  // fazendo a mesa (principalmente as 5 cartas comunitárias) ficar grande demais
-  // no celular e empurrar os botões de ação para baixo. As proporções abaixo
-  // (0.8333 / 1 / 1.1667) preservam a relação de tamanho original entre
-  // small/normal/large (50/60/70 no desktop).
-  const sizeMap = {
-    small: {
-      width: "calc(var(--card-width) * 0.8333)",
-      height: "calc(var(--card-height) * 0.8333)",
-      fontSize: "calc(var(--card-font) * 0.8333)",
-      suitSize: "calc(var(--card-font) * 0.95)",
+  // 🔥 TAMANHOS DAS CARTAS - SEM CONFLITOS DE ESTILO
+  const getSizeStyles = () => {
+    switch (size) {
+      case "tiny":
+        return {
+          width: "32px",
+          height: "45px",
+          fontSize: "0.45rem",
+          borderRadius: "4px",
+          padding: "2px",
+        };
+      case "small":
+        return {
+          width: "45px",
+          height: "63px",
+          fontSize: "0.6rem",
+          borderRadius: "5px",
+          padding: "3px",
+        };
+      case "normal":
+        return {
+          width: "52px",
+          height: "74px",
+          fontSize: "0.7rem",
+          borderRadius: "6px",
+          padding: "4px",
+        };
+      case "large":
+        return {
+          width: "60px",
+          height: "84px",
+          fontSize: "0.8rem",
+          borderRadius: "7px",
+          padding: "5px",
+        };
+      default:
+        return {
+          width: "52px",
+          height: "74px",
+          fontSize: "0.7rem",
+          borderRadius: "6px",
+          padding: "4px",
+        };
+    }
+  };
+
+  const sizeStyles = getSizeStyles();
+
+  // 🔥 RANK DISPLAY
+  const getRankDisplay = () => {
+    const rank = card.rank;
+    if (rank === 14) return "A";
+    if (rank === 13) return "K";
+    if (rank === 12) return "Q";
+    if (rank === 11) return "J";
+    if (rank === 10) return "10";
+    return rank;
+  };
+
+  // 🔥 ESTILO DA CARTA - SEM MISTURAR SHORTHAND COM PROPRIEDADES ESPECÍFICAS
+  const cardStyle = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    width: sizeStyles.width,
+    height: sizeStyles.height,
+    fontSize: sizeStyles.fontSize,
+    borderRadius: sizeStyles.borderRadius,
+    padding: sizeStyles.padding,
+    background: faceDown
+      ? "repeating-linear-gradient(45deg, #2b5797, #2b5797 6px, #1d3f6e 6px, #1d3f6e 12px)"
+      : "linear-gradient(145deg, #ffffff, #f0f0f0)",
+    border: faceDown
+      ? "2px solid #1a3a6e"
+      : `1.5px solid ${isRed ? "#cc0000" : "#333"}`,
+    color: isRed ? "#cc0000" : "#000",
+    boxShadow: isHighlighted
+      ? "0 0 20px rgba(255,215,0,0.6), 0 4px 15px rgba(0,0,0,0.3)"
+      : "0 2px 8px rgba(0,0,0,0.2)",
+    flexShrink: 0,
+    fontWeight: 700,
+    fontFamily: "'Segoe UI', 'Arial', sans-serif",
+    transition: "all 0.3s ease",
+    position: "relative",
+    transform: isHighlighted ? "scale(1.05)" : "scale(1)",
+    ...(isHighlighted && {
+      animation: "glowPulse 1.5s ease-in-out infinite",
+    }),
+  };
+
+  // 🔥 ANIMAÇÃO DE REVELAÇÃO
+  const cardVariants = {
+    hidden: {
+      rotateY: 180,
+      scale: 0.8,
+      opacity: 0,
     },
-    normal: {
-      width: "var(--card-width)",
-      height: "var(--card-height)",
-      fontSize: "var(--card-font)",
-      suitSize: "calc(var(--card-font) * 1.05)",
+    visible: {
+      rotateY: 0,
+      scale: 1,
+      opacity: 1,
+      transition: {
+        type: "spring",
+        stiffness: 350,
+        damping: 25,
+        delay: delay / 1000,
+      },
     },
-    large: {
-      width: "calc(var(--card-width) * 1.1667)",
-      height: "calc(var(--card-height) * 1.1667)",
-      fontSize: "calc(var(--card-font) * 1.15)",
-      suitSize: "calc(var(--card-font) * 1.3)",
+    faceDown: {
+      rotateY: 0,
+      scale: 1,
+      opacity: 1,
     },
   };
 
-  // 🔥 CORRIGIDO: Fallback para "normal" se o size não existir
-  const sizeConfig = sizeMap[size] || sizeMap.normal;
-
-  // 🔥 DESIGN DAS CARTAS POR TEMA
-  const getCardStyles = () => {
+  // 🔥 CONTEÚDO DA CARTA
+  const renderContent = () => {
     if (faceDown) {
-      // 🔥 Costas das cartas - DIFERENTE POR TEMA
-      if (isDarkTheme) {
-        return {
-          background:
-            "repeating-linear-gradient(45deg, #2b5797, #2b5797 10px, #1d3f6e 10px, #1d3f6e 20px)",
-          border: "2px solid #1a3a6e",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-          color: "rgba(255,255,255,0.3)",
-        };
-      } else {
-        return {
-          background: "linear-gradient(145deg, #e8e0d8, #d5ccc4)",
-          border: "2px solid #c4b8ae",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          color: "rgba(0,0,0,0.15)",
-        };
-      }
+      return (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            color: "rgba(255,255,255,0.3)",
+            fontSize: `calc(${sizeStyles.fontSize} * 1.5)`,
+            fontWeight: 900,
+          }}
+        >
+          ♠
+        </div>
+      );
     }
 
-    return {
-      background: isDarkTheme
-        ? "linear-gradient(145deg, #ffffff, #f0ece8)"
-        : "linear-gradient(145deg, #ffffff, #f8f5f0)",
-      border: isDarkTheme ? "1px solid #ddd" : "1px solid #c4b8ae",
-      boxShadow: isDarkTheme
-        ? "0 4px 12px rgba(0,0,0,0.25)"
-        : "0 6px 16px rgba(0,0,0,0.12)",
-      color: isRed ? "#cc0000" : "#1f2a2f",
-    };
-  };
+    const rankDisplay = getRankDisplay();
+    const suitDisplay = card.suit;
 
-  const cardStyles = getCardStyles();
-
-  // 🔥 Tamanhos (strings CSS calc()/var(), responsivos por breakpoint)
-  const fontSize = sizeConfig.fontSize;
-  const suitSize = sizeConfig.suitSize;
-  const suitSizeLarge = `calc(${suitSize} * 1.8)`;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8, y: -20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{
-        delay: delay / 1000,
-        type: "spring",
-        stiffness: 400,
-        damping: 25,
-      }}
-      whileHover={
-        !faceDown ? { scale: 1.05, y: -4, transition: { duration: 0.2 } } : {}
-      }
-      style={{
-        display: "inline-flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        width: sizeConfig.width,
-        height: sizeConfig.height,
-        margin: "2px",
-        borderRadius: 8,
-        boxShadow:
-          isHighlighted && !faceDown
-            ? "0 0 20px rgba(255,215,0,0.5), 0 4px 16px rgba(0,0,0,0.2)"
-            : cardStyles.boxShadow,
-        flexShrink: 0,
-        position: "relative",
-        background: cardStyles.background,
-        border: cardStyles.border,
-        transition: "var(--transition-theme)",
-        transform: isHighlighted && !faceDown ? "translateY(-4px)" : "none",
-      }}
-    >
-      {faceDown ? (
+    // 🔥 PARA CARTAS PEQUENAS (TINY/SMALL) - LAYOUT SIMPLIFICADO
+    if (size === "tiny" || size === "small") {
+      return (
         <div
           style={{
             display: "flex",
@@ -161,145 +168,167 @@ const Card = memo(function Card({
             justifyContent: "center",
             width: "100%",
             height: "100%",
-            borderRadius: 6,
-            background: cardStyles.background,
-            position: "relative",
+            gap: "0px",
           }}
         >
-          {!isDarkTheme && (
-            <>
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 6,
-                  border: "1px solid rgba(0,0,0,0.06)",
-                  borderRadius: 4,
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 10,
-                  border: "1px solid rgba(0,0,0,0.04)",
-                  borderRadius: 3,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: "1.2rem",
-                  color: "rgba(0,0,0,0.08)",
-                  fontWeight: 300,
-                  letterSpacing: "2px",
-                }}
-              >
-                ♠
-              </span>
-            </>
-          )}
-          {isDarkTheme && (
-            <div
-              style={{
-                width: "60%",
-                height: "60%",
-                borderRadius: "50%",
-                border: "2px solid rgba(255,255,255,0.06)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span style={{ fontSize: "1.5rem", opacity: 0.1 }}>♠</span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
           <span
             style={{
-              fontSize: fontSize,
+              fontSize: sizeStyles.fontSize,
               fontWeight: 800,
-              color: cardStyles.color,
               lineHeight: 1,
-              position: "absolute",
-              top: 4,
-              left: 6,
+              color: isRed ? "#cc0000" : "#000",
             }}
           >
             {rankDisplay}
           </span>
           <span
             style={{
-              fontSize: suitSize,
-              color: cardStyles.color,
+              fontSize: `calc(${sizeStyles.fontSize} * 1.2)`,
               lineHeight: 1,
-              position: "absolute",
-              top: 18,
-              left: 6,
+              color: isRed ? "#cc0000" : "#000",
             }}
           >
-            {card.suit}
+            {suitDisplay}
           </span>
-          <span
-            style={{
-              fontSize: suitSize,
-              color: cardStyles.color,
-              lineHeight: 1,
-              position: "absolute",
-              bottom: 4,
-              right: 6,
-              transform: "rotate(180deg)",
-            }}
-          >
-            {rankDisplay}
-          </span>
-          <span
-            style={{
-              fontSize: suitSize,
-              color: cardStyles.color,
-              lineHeight: 1,
-              position: "absolute",
-              bottom: 18,
-              right: 6,
-              transform: "rotate(180deg)",
-            }}
-          >
-            {card.suit}
-          </span>
-          {/* 🔥 CORRIGIDO: Usar string para o fontSize */}
-          <span
-            style={{
-              fontSize: suitSizeLarge,
-              color: cardStyles.color,
-              opacity: 0.15,
-              lineHeight: 1,
-            }}
-          >
-            {card.suit}
-          </span>
-        </>
-      )}
+        </div>
+      );
+    }
 
-      {isHighlighted && !faceDown && (
-        <motion.div
+    // 🔥 PARA CARTAS NORMAIS/GRANDES - LAYOUT COMPLETO
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: "100%",
+          gap: "1px",
+        }}
+      >
+        <div
           style={{
-            position: "absolute",
-            inset: -3,
-            borderRadius: 10,
-            border: "2px solid rgba(255,215,0,0.4)",
-            boxShadow: "0 0 20px rgba(255,215,0,0.2)",
-            pointerEvents: "none",
+            display: "flex",
+            justifyContent: "space-between",
+            width: "100%",
+            padding: "0 2px",
           }}
-          animate={{
-            opacity: [0.6, 1, 0.6],
+        >
+          <span
+            style={{
+              fontSize: sizeStyles.fontSize,
+              fontWeight: 800,
+              lineHeight: 1,
+              color: isRed ? "#cc0000" : "#000",
+            }}
+          >
+            {rankDisplay}
+          </span>
+          <span
+            style={{
+              fontSize: `calc(${sizeStyles.fontSize} * 0.8)`,
+              lineHeight: 1,
+              color: isRed ? "#cc0000" : "#000",
+            }}
+          >
+            {suitDisplay}
+          </span>
+        </div>
+        <span
+          style={{
+            fontSize: `calc(${sizeStyles.fontSize} * 1.8)`,
+            lineHeight: 1,
+            color: isRed ? "#cc0000" : "#000",
+            marginTop: "-2px",
           }}
-          transition={{
-            duration: 1.5,
-            repeat: Infinity,
+        >
+          {suitDisplay}
+        </span>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            width: "100%",
+            padding: "0 2px",
+            transform: "rotate(180deg)",
           }}
-        />
-      )}
+        >
+          <span
+            style={{
+              fontSize: sizeStyles.fontSize,
+              fontWeight: 800,
+              lineHeight: 1,
+              color: isRed ? "#cc0000" : "#000",
+            }}
+          >
+            {rankDisplay}
+          </span>
+          <span
+            style={{
+              fontSize: `calc(${sizeStyles.fontSize} * 0.8)`,
+              lineHeight: 1,
+              color: isRed ? "#cc0000" : "#000",
+            }}
+          >
+            {suitDisplay}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  // 🔥 ANIMAÇÃO DE REVELAÇÃO (SHOWDOWN)
+  if (isRevealing && !faceDown) {
+    return (
+      <motion.div
+        className={`card-container ${className}`}
+        style={cardStyle}
+        initial="hidden"
+        animate="visible"
+        variants={cardVariants}
+        whileHover={!faceDown ? { scale: 1.08, y: -5 } : {}}
+        whileTap={!faceDown ? { scale: 0.95 } : {}}
+      >
+        {renderContent()}
+      </motion.div>
+    );
+  }
+
+  // 🔥 CARTA NORMAL
+  return (
+    <motion.div
+      className={`card-container ${className}`}
+      style={cardStyle}
+      initial={faceDown ? "faceDown" : "hidden"}
+      animate="visible"
+      variants={cardVariants}
+      whileHover={!faceDown ? { scale: 1.08, y: -5 } : {}}
+      whileTap={!faceDown ? { scale: 0.95 } : {}}
+    >
+      {renderContent()}
     </motion.div>
   );
 });
+
+// 🔥 ANIMAÇÃO GLOBAL - USANDO CSS INJECTADO VIA STYLE TAG (APENAS NO CLIENTE)
+if (typeof window !== "undefined") {
+  // Verifica se o estilo já existe para não duplicar
+  if (!document.getElementById("card-glow-style")) {
+    const style = document.createElement("style");
+    style.id = "card-glow-style";
+    style.textContent = `
+      @keyframes glowPulse {
+        0%, 100% {
+          box-shadow: 0 0 20px rgba(255,215,0,0.4), 0 4px 15px rgba(0,0,0,0.3);
+        }
+        50% {
+          box-shadow: 0 0 40px rgba(255,215,0,0.8), 0 4px 25px rgba(0,0,0,0.4);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
 
 export default Card;

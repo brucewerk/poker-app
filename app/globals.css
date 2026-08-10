@@ -2535,3 +2535,430 @@ body {
     display: none !important;
   }
 }
+
+
+
+
+/* ================================================================
+   🔥 CORREÇÃO REAL - PAISAGEM (CELULAR DEITADO)
+   ================================================================ */
+
+/* 🔥 FORÇA O LAYOUT EM LINHA NO MODO PAISAGEM */
+@media (orientation: landscape) and (max-height: 550px) {
+  /* Container principal */
+  .game-main-columns {
+    flex-direction: column !important;
+  }
+
+  .game-table-column {
+    flex: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .game-sidebar-column {
+    display: none !important;
+  }
+
+  /* 🔥 FELT EM LINHA - CORREÇÃO PRINCIPAL */
+  .game-table-felt {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    justify-content: space-between !important;
+    gap: 4px !important;
+    padding: 4px 6px !important;
+    min-height: 140px !important;
+    border-radius: 12px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  /* CPU - Esquerda */
+  .game-table-player-area-cpu {
+    flex: 0 0 22% !important;
+    margin: 0 !important;
+    padding: 4px 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-height: 0 !important;
+  }
+
+  /* Jogador - Direita */
+  .game-table-player-area-player {
+    flex: 0 0 22% !important;
+    margin: 0 !important;
+    padding: 4px 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-height: 0 !important;
+  }
+
+  /* Mesa - Centro */
+  .game-table-community-area {
+    flex: 1 1 auto !important;
+    margin: 0 !important;
+    padding: 4px 6px !important;
+    min-width: 0 !important;
+    border-radius: 10px !important;
+  }
+
+  /* 🔥 CARTAS MENORES */
+  .game-table-cards-row {
+    gap: 2px !important;
+    min-height: 30px !important;
+    margin-top: 2px !important;
+  }
+
+  .game-table-community-cards-row {
+    gap: 2px !important;
+    min-height: 44px !important;
+  }
+
+  /* 🔥 CARTAS INDIVIDUAIS - FORÇA TAMANHO PEQUENO */
+  .game-table-cards-row .card-container,
+  .game-table-community-cards-row .card-container {
+    width: 32px !important;
+    height: 45px !important;
+  }
+
+  .game-table-cards-row .card-container .card-rank,
+  .game-table-community-cards-row .card-container .card-rank {
+    font-size: 0.45rem !important;
+  }
+
+  .game-table-cards-row .card-container .card-suit,
+  .game-table-community-cards-row .card-container .card-suit {
+    font-size: 0.5rem !important;
+  }
+
+  /* 🔥 MULTIPLAYER CONTROLS */
+  .game-table-multiplayer-controls {
+    display: none !important;
+  }
+
+  /* 🔥 LABELS E BADGES */
+  .game-table-player-label {
+    font-size: 0.45rem !important;
+    gap: 2px !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+  }
+
+  .game-table-player-name {
+    font-size: 0.5rem !important;
+  }
+
+  .game-table-chips-label {
+    font-size: 0.45rem !important;
+  }
+
+  .game-table-dealer-inline {
+    font-size: 0.4rem !important;
+    padding: 0px 6px !important;
+  }
+
+  .game-table-turbo-inline {
+    font-size: 0.4rem !important;
+    padding: 0px 6px !important;
+  }
+
+  .game-table-community-label-wrapper {
+    font-size: 0.4rem !important;
+    gap: 4px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .game-table-stage-badge {
+    font-size: 0.4rem !important;
+    padding: 1px 6px !important;
+  }
+
+  .game-table-hand-badge {
+    font-size: 0.4rem !important;
+    padding: 1px 4px !important;
+    margin-top: 1px !important;
+  }
+
+  .game-table-cpu-thought {
+    font-size: 0.4rem !important;
+    padding: 1px 4px !important;
+    margin-top: 1px !important;
+  }
+
+  /* 🔥 POT E BETS */
+  .game-table-pot {
+    font-size: 0.5rem !important;
+    padding: 2px 8px !important;
+    min-width: 40px !important;
+  }
+
+  .game-table-bets-display {
+    gap: 2px !important;
+    font-size: 0.4rem !important;
+    padding: 1px 4px !important;
+    margin-top: 2px !important;
+  }
+
+  .game-table-bet {
+    padding: 1px 4px !important;
+    font-size: 0.4rem !important;
+  }
+
+  .game-table-current-bet {
+    font-size: 0.4rem !important;
+    padding: 1px 4px !important;
+  }
+
+  /* 🔥 EMPTY CARD SLOTS */
+  .game-table-empty-card {
+    width: 32px !important;
+    height: 45px !important;
+  }
+
+  /* 🔥 ACTION BUTTONS */
+  .action-buttons-container {
+    margin-top: 4px !important;
+    gap: 3px !important;
+  }
+
+  .action-buttons-grid {
+    gap: 3px !important;
+  }
+
+  .action-btn {
+    min-height: 30px !important;
+    font-size: 0.5rem !important;
+    padding: 3px 2px !important;
+    border-radius: 4px !important;
+  }
+
+  .action-btn-icon {
+    font-size: 0.55rem !important;
+  }
+
+  .action-btn span:last-child {
+    font-size: 0.35rem !important;
+  }
+
+  .action-btn-reset {
+    font-size: 0.45rem !important;
+    min-height: 28px !important;
+    padding: 4px 8px !important;
+  }
+
+  .action-history {
+    padding: 2px 4px !important;
+    gap: 2px !important;
+  }
+
+  .action-history-item {
+    font-size: 0.4rem !important;
+    padding: 1px 4px !important;
+  }
+
+  .action-history-label {
+    font-size: 0.4rem !important;
+  }
+
+  /* 🔥 TOOLBAR */
+  .toolbar-buttons-container {
+    top: 40px !important;
+    right: 2px !important;
+    gap: 3px !important;
+  }
+
+  .toolbar-btn {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 0.6rem !important;
+  }
+
+  .toolbar-btn-tournament {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 0.6rem !important;
+  }
+
+  .toolbar-dot {
+    width: 5px !important;
+    height: 5px !important;
+  }
+
+  /* 🔥 RESULT MODAL - FORÇA SEM ROLAGEM */
+  .result-modal {
+    max-height: 95vh !important;
+    overflow: hidden !important;
+  }
+
+  .result-card {
+    width: 28px !important;
+    height: 40px !important;
+  }
+
+  .result-card span {
+    font-size: 0.45rem !important;
+  }
+
+  /* 🔥 SIDE STATS */
+  .side-stats-toggles-container {
+    top: 38px !important;
+    padding: 2px 8px !important;
+    gap: 2px !important;
+    border-radius: 10px !important;
+    max-width: calc(100vw - 60px) !important;
+  }
+
+  .side-stats-item {
+    padding: 2px 6px !important;
+    gap: 2px !important;
+    border-radius: 6px !important;
+  }
+
+  .side-stats-icon {
+    font-size: 0.5rem !important;
+  }
+
+  .side-stats-label {
+    font-size: 0.4rem !important;
+    display: none !important;
+  }
+
+  .side-stats-value {
+    font-size: 0.45rem !important;
+    max-width: 25px !important;
+  }
+}
+
+/* 🔥 FORÇA TAMANHO DAS CARTAS VIA CARD COMPONENT */
+.card-container {
+  width: var(--card-width, 52px) !important;
+  height: var(--card-height, 74px) !important;
+  flex-shrink: 0 !important;
+}
+
+.card-container .card-rank {
+  font-size: calc(var(--card-width, 52px) * 0.3) !important;
+}
+
+.card-container .card-suit {
+  font-size: calc(var(--card-width, 52px) * 0.35) !important;
+}
+
+/* 🔥 TAMANHO DAS CARTAS EM PAISAGEM */
+@media (orientation: landscape) and (max-height: 550px) {
+  :root {
+    --card-width: 32px !important;
+    --card-height: 45px !important;
+  }
+}
+
+
+
+/* ================================================================
+   🔥 VARIÁVEIS DE TAMANHO PARA CARTAS
+   ================================================================ */
+
+:root {
+  --card-width: 52px;
+  --card-height: 74px;
+  --card-tiny-width: 32px;
+  --card-tiny-height: 45px;
+  --card-small-width: 45px;
+  --card-small-height: 63px;
+  --card-large-width: 60px;
+  --card-large-height: 84px;
+}
+
+/* 🔥 FORÇA TAMANHO DAS CARTAS EM PAISAGEM */
+@media (orientation: landscape) and (max-height: 550px) {
+  :root {
+    --card-width: 32px !important;
+    --card-height: 45px !important;
+  }
+  
+  /* 🔥 FORÇA TAMANHO DAS CARTAS NO COMPONENTE */
+  .card-container {
+    width: 32px !important;
+    height: 45px !important;
+    min-width: 32px !important;
+    min-height: 45px !important;
+    max-width: 32px !important;
+    max-height: 45px !important;
+  }
+  
+  .card-container .card-rank {
+    font-size: 0.45rem !important;
+  }
+  
+  .card-container .card-suit {
+    font-size: 0.5rem !important;
+  }
+}
+
+/* 🔥 FORÇA TAMANHO DAS CARTAS EM TELAS MUITO PEQUENAS */
+@media (max-width: 360px) and (orientation: portrait) {
+  :root {
+    --card-width: 38px !important;
+    --card-height: 53px !important;
+  }
+  
+  .card-container {
+    width: 38px !important;
+    height: 53px !important;
+    min-width: 38px !important;
+    min-height: 53px !important;
+    max-width: 38px !important;
+    max-height: 53px !important;
+  }
+}
+
+
+
+
+/* ================================================================
+   🔥 FORÇA TAMANHO DAS CARTAS EM PAISAGEM
+   ================================================================ */
+
+@media (orientation: landscape) and (max-height: 550px) {
+  :root {
+    --card-width: 32px !important;
+    --card-height: 45px !important;
+  }
+  
+  /* 🔥 FORÇA TAMANHO DAS CARTAS NO COMPONENTE */
+  .card-container {
+    width: 32px !important;
+    height: 45px !important;
+    min-width: 32px !important;
+    min-height: 45px !important;
+    max-width: 32px !important;
+    max-height: 45px !important;
+  }
+  
+  .card-container .card-rank {
+    font-size: 0.45rem !important;
+  }
+  
+  .card-container .card-suit {
+    font-size: 0.5rem !important;
+  }
+}
+
+/* 🔥 FORÇA TAMANHO DAS CARTAS EM TELAS MUITO PEQUENAS */
+@media (max-width: 360px) and (orientation: portrait) {
+  :root {
+    --card-width: 38px !important;
+    --card-height: 53px !important;
+  }
+  
+  .card-container {
+    width: 38px !important;
+    height: 53px !important;
+    min-width: 38px !important;
+    min-height: 53px !important;
+    max-width: 38px !important;
+    max-height: 53px !important;
+  }
+}

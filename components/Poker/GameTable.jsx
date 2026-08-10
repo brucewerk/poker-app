@@ -1,4 +1,4 @@
-// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO (CARTAS RESPONSIVAS EM PAISAGEM)
+// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO (SEM CONFLITOS DE ESTILO)
 "use client";
 
 import { useState, useEffect, useMemo, memo, useRef } from "react";
@@ -25,6 +25,20 @@ const GameTable = memo(function GameTable({
   onSwitchPlayer,
   currentUser,
 }) {
+  // 🔥 DETECTA MODO PAISAGEM
+  const [isLandscape, setIsLandscape] = useState(false);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      const isLandscapeMode =
+        window.innerHeight < window.innerWidth && window.innerHeight < 550;
+      setIsLandscape(isLandscapeMode);
+    };
+    checkOrientation();
+    window.addEventListener("resize", checkOrientation);
+    return () => window.removeEventListener("resize", checkOrientation);
+  }, []);
+
   // 🔥 Otimização: Evitar re-renders desnecessários
   const memoizedCommunityCards = useMemo(
     () => communityCards,
@@ -130,6 +144,162 @@ const GameTable = memo(function GameTable({
     return currentUser || "Jogador";
   }, [isMultiplayer, multiplayerPlayers, currentPlayerIndex, currentUser]);
 
+  // 🔥 ESTILOS DINÂMICOS PARA PAISAGEM - SEM CONFLITOS (usando apenas propriedades específicas)
+  const getFeltStyles = () => {
+    if (isLandscape) {
+      return {
+        background: "var(--bg-felt)",
+        borderRadius: "12px",
+        paddingTop: "4px",
+        paddingBottom: "4px",
+        paddingLeft: "6px",
+        paddingRight: "6px",
+        position: "relative",
+        minHeight: "140px",
+        border: "3px solid var(--border-felt)",
+        boxShadow: "inset 0 0 60px var(--shadow-felt)",
+        transition: "var(--transition-theme)",
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "stretch",
+        justifyContent: "space-between",
+        gap: "4px",
+        flexWrap: "nowrap",
+      };
+    }
+    return {
+      background: "var(--bg-felt)",
+      borderRadius: "50px",
+      paddingTop: "30px",
+      paddingBottom: "30px",
+      paddingLeft: "20px",
+      paddingRight: "20px",
+      position: "relative",
+      minHeight: "500px",
+      border: "3px solid var(--border-felt)",
+      boxShadow: "inset 0 0 60px var(--shadow-felt)",
+      transition: "var(--transition-theme)",
+    };
+  };
+
+  const getCpuAreaStyles = () => {
+    if (isLandscape) {
+      return {
+        textAlign: "center",
+        flex: "0 0 22%",
+        marginTop: "0px",
+        marginBottom: "0px",
+        marginLeft: "0px",
+        marginRight: "0px",
+        paddingTop: "4px",
+        paddingBottom: "4px",
+        paddingLeft: "4px",
+        paddingRight: "4px",
+        background: "var(--bg-status-item)",
+        borderRadius: "8px",
+        border: "1px solid var(--border-element)",
+        boxShadow: "0 2px 8px var(--shadow-element)",
+        transition: "var(--transition-theme)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        minHeight: "0px",
+      };
+    }
+    return {
+      textAlign: "center",
+      marginBottom: "20px",
+      paddingTop: "10px",
+      paddingBottom: "10px",
+      paddingLeft: "10px",
+      paddingRight: "10px",
+      background: "var(--bg-status-item)",
+      borderRadius: "20px",
+      border: "1px solid var(--border-element)",
+      boxShadow: "0 2px 8px var(--shadow-element)",
+      transition: "var(--transition-theme)",
+    };
+  };
+
+  const getPlayerAreaStyles = () => {
+    if (isLandscape) {
+      return {
+        textAlign: "center",
+        flex: "0 0 22%",
+        marginTop: "0px",
+        marginBottom: "0px",
+        marginLeft: "0px",
+        marginRight: "0px",
+        paddingTop: "4px",
+        paddingBottom: "4px",
+        paddingLeft: "4px",
+        paddingRight: "4px",
+        background: "var(--bg-status-item)",
+        borderRadius: "8px",
+        border: "1px solid var(--border-element)",
+        boxShadow: "0 2px 8px var(--shadow-element)",
+        transition: "var(--transition-theme)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        minHeight: "0px",
+      };
+    }
+    return {
+      textAlign: "center",
+      marginTop: "20px",
+      paddingTop: "10px",
+      paddingBottom: "10px",
+      paddingLeft: "10px",
+      paddingRight: "10px",
+      background: "var(--bg-status-item)",
+      borderRadius: "20px",
+      border: "1px solid var(--border-element)",
+      boxShadow: "0 2px 8px var(--shadow-element)",
+      transition: "var(--transition-theme)",
+    };
+  };
+
+  const getCommunityAreaStyles = () => {
+    if (isLandscape) {
+      return {
+        textAlign: "center",
+        flex: "1 1 auto",
+        marginTop: "0px",
+        marginBottom: "0px",
+        marginLeft: "0px",
+        marginRight: "0px",
+        paddingTop: "4px",
+        paddingBottom: "4px",
+        paddingLeft: "6px",
+        paddingRight: "6px",
+        background: "rgba(0, 0, 0, 0.10)",
+        borderRadius: "8px",
+        border: "1px solid var(--border-gold)",
+        position: "relative",
+        transition: "var(--transition-theme)",
+        minWidth: "0px",
+        minHeight: "0px",
+      };
+    }
+    return {
+      textAlign: "center",
+      paddingTop: "15px",
+      paddingBottom: "15px",
+      paddingLeft: "15px",
+      paddingRight: "15px",
+      background: "rgba(0, 0, 0, 0.10)",
+      borderRadius: "25px",
+      marginTop: "10px",
+      marginBottom: "10px",
+      marginLeft: "0px",
+      marginRight: "0px",
+      border: "1px solid var(--border-gold)",
+      position: "relative",
+      transition: "var(--transition-theme)",
+    };
+  };
+
   return (
     <motion.div
       className="game-table-container"
@@ -138,13 +308,26 @@ const GameTable = memo(function GameTable({
       animate={tableState}
       initial="idle"
     >
-      <div className="game-table-felt" style={tableFeltStyle()}>
+      <div className="game-table-felt" style={getFeltStyles()}>
         {/* Cartas da CPU */}
         <div
           className="game-table-player-area game-table-player-area-cpu"
-          style={cpuAreaStyle()}
+          style={getCpuAreaStyles()}
         >
-          <div className="game-table-player-label">
+          <div
+            className="game-table-player-label"
+            style={
+              isLandscape
+                ? {
+                    fontSize: "0.45rem",
+                    gap: "2px",
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                  }
+                : {}
+            }
+          >
             <span className="game-table-player-label-text">🤖 CPU</span>
             <motion.span
               className="game-table-chips-label"
@@ -152,10 +335,26 @@ const GameTable = memo(function GameTable({
               initial={{ scale: 1 }}
               animate={{ scale: cpuBet > 0 ? [1, 1.2, 1] : 1 }}
               transition={{ duration: 0.3 }}
+              style={isLandscape ? { fontSize: "0.4rem" } : {}}
             >
               💰 {cpuBet}
             </motion.span>
-            <span className="game-table-dealer-inline">🎯 DEALER</span>
+            <span
+              className="game-table-dealer-inline"
+              style={
+                isLandscape
+                  ? {
+                      fontSize: "0.4rem",
+                      paddingTop: "0px",
+                      paddingBottom: "0px",
+                      paddingLeft: "6px",
+                      paddingRight: "6px",
+                    }
+                  : {}
+              }
+            >
+              🎯 DEALER
+            </span>
             {isTurbo && (
               <motion.span
                 className="game-table-turbo-inline"
@@ -164,12 +363,34 @@ const GameTable = memo(function GameTable({
                   opacity: [0.7, 1, 0.7],
                 }}
                 transition={{ duration: 1.2, repeat: Infinity }}
+                style={
+                  isLandscape
+                    ? {
+                        fontSize: "0.4rem",
+                        paddingTop: "0px",
+                        paddingBottom: "0px",
+                        paddingLeft: "6px",
+                        paddingRight: "6px",
+                      }
+                    : {}
+                }
               >
                 🚀 TURBO
               </motion.span>
             )}
           </div>
-          <div className="game-table-cards-row">
+          <div
+            className="game-table-cards-row"
+            style={
+              isLandscape
+                ? {
+                    gap: "2px",
+                    minHeight: "30px",
+                    marginTop: "2px",
+                  }
+                : {}
+            }
+          >
             {cpuCards && cpuCards.length > 0 ? (
               cpuCards.map((card, i) => (
                 <Card
@@ -178,11 +399,26 @@ const GameTable = memo(function GameTable({
                   faceDown={!showCpuCards}
                   delay={i * 120}
                   isRevealing={stage === "showdown"}
-                  size="small"
+                  size={isLandscape ? "tiny" : "small"}
                 />
               ))
             ) : (
-              <span className="game-table-empty-cards-text">🔒 ???</span>
+              <span
+                className="game-table-empty-cards-text"
+                style={
+                  isLandscape
+                    ? {
+                        fontSize: "0.45rem",
+                        paddingTop: "4px",
+                        paddingBottom: "4px",
+                        paddingLeft: "8px",
+                        paddingRight: "8px",
+                      }
+                    : {}
+                }
+              >
+                🔒 ???
+              </span>
             )}
           </div>
           {cpuHandName && (
@@ -191,6 +427,18 @@ const GameTable = memo(function GameTable({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 300 }}
+              style={
+                isLandscape
+                  ? {
+                      fontSize: "0.4rem",
+                      paddingTop: "1px",
+                      paddingBottom: "1px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      marginTop: "1px",
+                    }
+                  : {}
+              }
             >
               {cpuHandName}
             </motion.div>
@@ -201,6 +449,19 @@ const GameTable = memo(function GameTable({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
+              style={
+                isLandscape
+                  ? {
+                      fontSize: "0.4rem",
+                      paddingTop: "1px",
+                      paddingBottom: "1px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      marginTop: "1px",
+                      maxWidth: "100%",
+                    }
+                  : {}
+              }
             >
               <span className="game-table-thought-icon">💭</span> {cpuThought}
             </motion.div>
@@ -208,8 +469,22 @@ const GameTable = memo(function GameTable({
         </div>
 
         {/* Cartas comunitárias */}
-        <div className="game-table-community-area" style={communityAreaStyle()}>
-          <div className="game-table-community-label-wrapper">
+        <div
+          className="game-table-community-area"
+          style={getCommunityAreaStyles()}
+        >
+          <div
+            className="game-table-community-label-wrapper"
+            style={
+              isLandscape
+                ? {
+                    fontSize: "0.4rem",
+                    gap: "4px",
+                    marginBottom: "2px",
+                  }
+                : {}
+            }
+          >
             <span className="game-table-community-label">🔥 MESA</span>
             <motion.span
               className="game-table-stage-badge"
@@ -217,6 +492,17 @@ const GameTable = memo(function GameTable({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 300 }}
+              style={
+                isLandscape
+                  ? {
+                      fontSize: "0.4rem",
+                      paddingTop: "1px",
+                      paddingBottom: "1px",
+                      paddingLeft: "6px",
+                      paddingRight: "6px",
+                    }
+                  : {}
+              }
             >
               {stage === "preflop"
                 ? "Pré-flop"
@@ -231,7 +517,17 @@ const GameTable = memo(function GameTable({
                         : stage}
             </motion.span>
           </div>
-          <div className="game-table-community-cards-row">
+          <div
+            className="game-table-community-cards-row"
+            style={
+              isLandscape
+                ? {
+                    gap: "2px",
+                    minHeight: "44px",
+                  }
+                : {}
+            }
+          >
             {communityCards && communityCards.length > 0
               ? communityCards.map((card, i) => (
                   <motion.div
@@ -247,7 +543,7 @@ const GameTable = memo(function GameTable({
                     <Card
                       card={card}
                       delay={i * 100}
-                      size="large"
+                      size={isLandscape ? "tiny" : "large"}
                       isHighlighted={stage === "showdown"}
                     />
                   </motion.div>
@@ -258,13 +554,24 @@ const GameTable = memo(function GameTable({
                     <div
                       key={`empty-${i}`}
                       className="game-table-empty-card"
-                      style={emptyCardSlotStyle()}
+                      style={{
+                        ...emptyCardSlotStyle(),
+                        ...(isLandscape
+                          ? {
+                              width: "32px",
+                              height: "45px",
+                            }
+                          : {}),
+                      }}
                     />
                   ))}
           </div>
 
           {/* Área do pote */}
-          <div className="game-table-pot-area">
+          <div
+            className="game-table-pot-area"
+            style={isLandscape ? { marginTop: "2px" } : {}}
+          >
             <motion.div
               key={`pot-${potAnimationKey}`}
               className="game-table-pot"
@@ -278,7 +585,19 @@ const GameTable = memo(function GameTable({
                 stiffness: 300,
                 duration: 0.4,
               }}
-              style={potDisplayStyle()}
+              style={{
+                ...potDisplayStyle(),
+                ...(isLandscape
+                  ? {
+                      fontSize: "0.5rem",
+                      paddingTop: "2px",
+                      paddingBottom: "2px",
+                      paddingLeft: "8px",
+                      paddingRight: "8px",
+                      minWidth: "40px",
+                    }
+                  : {}),
+              }}
             >
               <motion.span
                 className="game-table-pot-text"
@@ -286,6 +605,7 @@ const GameTable = memo(function GameTable({
                   scale: showPotEffect ? [1, 1.15, 1] : 1,
                 }}
                 transition={{ duration: 0.5 }}
+                style={isLandscape ? { fontSize: "0.5rem" } : {}}
               >
                 💰 Pote: ${pot}
               </motion.span>
@@ -296,13 +616,40 @@ const GameTable = memo(function GameTable({
           </div>
 
           {/* Apostas atuais */}
-          <div className="game-table-bets-display">
+          <div
+            className="game-table-bets-display"
+            style={
+              isLandscape
+                ? {
+                    gap: "2px",
+                    fontSize: "0.4rem",
+                    paddingTop: "1px",
+                    paddingBottom: "1px",
+                    paddingLeft: "4px",
+                    paddingRight: "4px",
+                    marginTop: "2px",
+                    flexWrap: "nowrap",
+                  }
+                : {}
+            }
+          >
             <motion.span
               className="game-table-bet game-table-bet-player"
               key={`player-bet-${playerBet}`}
               initial={{ scale: 1 }}
               animate={{ scale: playerBet > 0 ? [1, 1.1, 1] : 1 }}
               transition={{ duration: 0.3 }}
+              style={
+                isLandscape
+                  ? {
+                      paddingTop: "1px",
+                      paddingBottom: "1px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      fontSize: "0.4rem",
+                    }
+                  : {}
+              }
             >
               👤 ${playerBet}
             </motion.span>
@@ -312,11 +659,35 @@ const GameTable = memo(function GameTable({
               initial={{ scale: 1 }}
               animate={{ scale: cpuBet > 0 ? [1, 1.1, 1] : 1 }}
               transition={{ duration: 0.3 }}
+              style={
+                isLandscape
+                  ? {
+                      paddingTop: "1px",
+                      paddingBottom: "1px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      fontSize: "0.4rem",
+                    }
+                  : {}
+              }
             >
               🤖 ${cpuBet}
             </motion.span>
             {currentBet > 0 && (
-              <span className="game-table-current-bet">
+              <span
+                className="game-table-current-bet"
+                style={
+                  isLandscape
+                    ? {
+                        fontSize: "0.4rem",
+                        paddingTop: "1px",
+                        paddingBottom: "1px",
+                        paddingLeft: "4px",
+                        paddingRight: "4px",
+                      }
+                    : {}
+                }
+              >
                 📊 Aposta: ${currentBet}
               </span>
             )}
@@ -326,39 +697,97 @@ const GameTable = memo(function GameTable({
         {/* Cartas do jogador */}
         <div
           className="game-table-player-area game-table-player-area-player"
-          style={playerAreaStyle()}
+          style={getPlayerAreaStyles()}
         >
-          <div className="game-table-player-label">
+          <div
+            className="game-table-player-label"
+            style={
+              isLandscape
+                ? {
+                    fontSize: "0.45rem",
+                    gap: "2px",
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                  }
+                : {}
+            }
+          >
             🃏{" "}
-            <span className="game-table-player-name">{playerDisplayName}</span>
+            <span
+              className="game-table-player-name"
+              style={isLandscape ? { fontSize: "0.5rem" } : {}}
+            >
+              {playerDisplayName}
+            </span>
             <motion.span
               className="game-table-chips-label"
               key={`player-bet-label-${playerBet}`}
               initial={{ scale: 1 }}
               animate={{ scale: playerBet > 0 ? [1, 1.2, 1] : 1 }}
               transition={{ duration: 0.3 }}
+              style={isLandscape ? { fontSize: "0.4rem" } : {}}
             >
               💰 {playerBet}
             </motion.span>
             {isMultiplayer && (
-              <span className="game-table-player-counter">
+              <span
+                className="game-table-player-counter"
+                style={
+                  isLandscape
+                    ? {
+                        fontSize: "0.4rem",
+                        paddingTop: "1px",
+                        paddingBottom: "1px",
+                        paddingLeft: "6px",
+                        paddingRight: "6px",
+                      }
+                    : {}
+                }
+              >
                 {currentPlayerIndex + 1}/{multiplayerPlayers?.length || 1}
               </span>
             )}
           </div>
-          <div className="game-table-cards-row">
+          <div
+            className="game-table-cards-row"
+            style={
+              isLandscape
+                ? {
+                    gap: "2px",
+                    minHeight: "30px",
+                    marginTop: "2px",
+                  }
+                : {}
+            }
+          >
             {playerCards && playerCards.length > 0 ? (
               playerCards.map((card, i) => (
                 <Card
                   key={`player-${i}-${card.rank}${card.suit}`}
                   card={card}
                   delay={i * 120 + 80}
-                  size="normal"
+                  size={isLandscape ? "tiny" : "normal"}
                   isHighlighted={stage === "showdown" || stage === "flop"}
                 />
               ))
             ) : (
-              <span className="game-table-empty-cards-text">🔒 ???</span>
+              <span
+                className="game-table-empty-cards-text"
+                style={
+                  isLandscape
+                    ? {
+                        fontSize: "0.45rem",
+                        paddingTop: "4px",
+                        paddingBottom: "4px",
+                        paddingLeft: "8px",
+                        paddingRight: "8px",
+                      }
+                    : {}
+                }
+              >
+                🔒 ???
+              </span>
             )}
           </div>
           {playerHandName && (
@@ -367,6 +796,18 @@ const GameTable = memo(function GameTable({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 300 }}
+              style={
+                isLandscape
+                  ? {
+                      fontSize: "0.4rem",
+                      paddingTop: "1px",
+                      paddingBottom: "1px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      marginTop: "1px",
+                    }
+                  : {}
+              }
             >
               {playerHandName}
             </motion.div>
@@ -377,7 +818,16 @@ const GameTable = memo(function GameTable({
         {isMultiplayer &&
           multiplayerPlayers &&
           multiplayerPlayers.length > 1 && (
-            <div className="game-table-multiplayer-controls">
+            <div
+              className="game-table-multiplayer-controls"
+              style={
+                isLandscape
+                  ? {
+                      display: "none",
+                    }
+                  : {}
+              }
+            >
               {multiplayerPlayers.map((player, index) => (
                 <motion.button
                   key={`mp-${index}-${player.name}`}
@@ -407,7 +857,10 @@ function tableContainerStyle() {
     width: "100%",
     maxWidth: 1000,
     margin: "0 auto",
-    padding: "10px",
+    paddingTop: "10px",
+    paddingBottom: "10px",
+    paddingLeft: "10px",
+    paddingRight: "10px",
     borderRadius: 60,
     background: "var(--bg-table)",
     boxShadow: "var(--table-shadow)",
@@ -415,61 +868,6 @@ function tableContainerStyle() {
   };
 }
 
-function tableFeltStyle() {
-  return {
-    background: "var(--bg-felt)",
-    borderRadius: 50,
-    padding: "30px 20px",
-    position: "relative",
-    minHeight: 500,
-    border: "3px solid var(--border-felt)",
-    boxShadow: "inset 0 0 60px var(--shadow-felt)",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function cpuAreaStyle() {
-  return {
-    textAlign: "center",
-    marginBottom: "20px",
-    padding: "10px",
-    background: "var(--bg-status-item)",
-    borderRadius: 20,
-    border: "1px solid var(--border-element)",
-    boxShadow: "0 2px 8px var(--shadow-element)",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function playerAreaStyle() {
-  return {
-    textAlign: "center",
-    marginTop: "20px",
-    padding: "10px",
-    background: "var(--bg-status-item)",
-    borderRadius: 20,
-    border: "1px solid var(--border-element)",
-    boxShadow: "0 2px 8px var(--shadow-element)",
-    transition: "var(--transition-theme)",
-  };
-}
-
-function communityAreaStyle() {
-  return {
-    textAlign: "center",
-    padding: "15px",
-    background: "rgba(0, 0, 0, 0.10)",
-    borderRadius: 25,
-    margin: "10px 0",
-    border: "1px solid var(--border-gold)",
-    position: "relative",
-    transition: "var(--transition-theme)",
-  };
-}
-
-// 🔥 CORRIGIDO: placeholder agora usa exatamente o mesmo cálculo responsivo
-// do size="large" do componente Card, garantindo que a mesa NUNCA mude de
-// tamanho entre "sem cartas" e "com cartas".
 function emptyCardSlotStyle() {
   return {
     width: "calc(var(--card-width) * 1.1667)",
@@ -477,7 +875,10 @@ function emptyCardSlotStyle() {
     borderRadius: 8,
     background: "var(--bg-empty-card)",
     border: "2px dashed var(--border-empty-card)",
-    margin: "0 3px",
+    marginTop: "0px",
+    marginBottom: "0px",
+    marginLeft: "3px",
+    marginRight: "3px",
     transition: "var(--transition-theme)",
   };
 }
@@ -488,7 +889,10 @@ function potDisplayStyle() {
     fontSize: "1rem",
     fontWeight: "bold",
     background: "var(--bg-pot)",
-    padding: "8px 20px",
+    paddingTop: "8px",
+    paddingBottom: "8px",
+    paddingLeft: "20px",
+    paddingRight: "20px",
     borderRadius: 20,
     display: "inline-block",
     position: "relative",
