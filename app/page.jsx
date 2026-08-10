@@ -2422,8 +2422,11 @@ export default function PokerGame() {
                 </>
               )}
 
-            <div style={{ display: "flex", gap: 15, flexWrap: "wrap" }}>
-              <div style={{ flex: 3, minWidth: 280 }}>
+            <div
+              className="game-main-columns"
+              style={{ display: "flex", gap: 15, flexWrap: "wrap" }}
+            >
+              <div className="game-table-column" style={{ flex: 3, minWidth: 280 }}>
                 {g && (
                   <GameTable
                     communityCards={g?.community || []}
@@ -2519,6 +2522,7 @@ export default function PokerGame() {
               </div>
 
               <div
+                className="game-sidebar-column"
                 style={{
                   flex: 1,
                   minWidth: 220,

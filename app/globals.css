@@ -355,6 +355,30 @@ body {
     border-radius: 16px !important;
   }
 
+  /* 🔥 NOVO (a correção principal pedida): no celular deitado, a mesa e a
+     barra lateral (Estatísticas/Nível/Amigos/Missões/Histórico) ficavam
+     lado a lado, espremendo a mesa numa coluna estreita demais para caber
+     bem - resultado: cartas desproporcionais e mesa malposicionada, como
+     no print reportado. Agora elas empilham verticalmente: a mesa de jogo
+     e os botões de ação ocupam a largura TOTAL da tela (sempre visíveis,
+     sem precisar rolar), e a barra lateral vem logo abaixo, acessível
+     rolando a página para baixo (body já tem overflow-y:auto acima). */
+  .game-main-columns {
+    flex-direction: column !important;
+  }
+
+  .game-table-column {
+    flex: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .game-sidebar-column {
+    flex: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
   /* 🔥 A MUDANÇA PRINCIPAL: o felt passa a organizar CPU, mesa e jogador
      em uma LINHA horizontal (não mais empilhados verticalmente). Isso é o
      que resolve definitivamente o problema relatado: as cartas cobrindo a
