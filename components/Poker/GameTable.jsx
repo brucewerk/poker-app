@@ -1,4 +1,4 @@
-// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO (DEALER/TURBO NA LINHA DA CPU)
+// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO (CARTAS RESPONSIVAS EM PAISAGEM)
 "use client";
 
 import { useState, useEffect, useMemo, memo, useRef } from "react";
@@ -155,7 +155,6 @@ const GameTable = memo(function GameTable({
             >
               💰 {cpuBet}
             </motion.span>
-            {/* 🔥 DEALER e TURBO agora ficam na mesma linha da CPU, como últimos itens */}
             <span className="game-table-dealer-inline">🎯 DEALER</span>
             {isTurbo && (
               <motion.span

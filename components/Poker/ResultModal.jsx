@@ -228,11 +228,7 @@ export default function ResultModal({ data, onClose }) {
           boxShadow: isDarkTheme
             ? `0 20px 60px rgba(0,0,0,0.6), 0 0 60px ${config.glowColor}`
             : `0 20px 60px rgba(0,0,0,0.08)`,
-          // 🔥 CORRIGIDO: maxHeight continua como rede de segurança, mas com
-          // todo o conteúdo redimensionado via clamp() (abaixo), a soma real
-          // das alturas passa a caber folgada mesmo em celulares deitados
-          // (~320-360px de altura), então a rolagem nunca chega a ser
-          // necessária na prática.
+          // 🔥 CORRIGIDO: maxHeight como rede de segurança
           maxHeight: "94vh",
           overflowY: "auto",
           position: "relative",
@@ -848,12 +844,26 @@ export default function ResultModal({ data, onClose }) {
           whileTap={{ scale: isClosing ? 1 : 0.98 }}
         >
           {isClosing ? (
-            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}
+            >
               <span style={{ animation: "spin 0.8s linear infinite" }}>⏳</span>
               FECHANDO...
             </span>
           ) : (
-            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}
+            >
               <span>▶</span>
               CONTINUAR
             </span>
