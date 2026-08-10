@@ -4,8 +4,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import TournamentGame from "./TournamentGame.jsx";
+import { useToast } from "@/components/Toast/ToastManager";
 
 export default function TournamentLobby({ onClose, username }) {
+  const { toast } = useToast();
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -25,6 +27,11 @@ export default function TournamentLobby({ onClose, username }) {
   const isMounted = useRef(true);
   const isFetching = useRef(false);
   const intervalRef = useRef(null);
+  // 🔥 NOVO: guarda os IDs de torneio para os quais já avisamos o jogador
+  // que a partida começou, para não repetir o aviso a cada nova consulta
+  // de 30 em 30 segundos (e não forçar a entrada de novo se o jogador
+  // decidiu fechar a tela do jogo manualmente).
+  const notifiedStartRef = useRef(new Set());
 
   const [newTournament, setNewTournament] = useState({
     name: "",
@@ -48,7 +55,46 @@ export default function TournamentLobby({ onClose, username }) {
       const data = await res.json();
 
       if (data.success && isMounted.current) {
-        setTournaments(data.tournaments || []);
+        const newTournaments = data.tournaments || [];
+        setTournaments(newTournaments);
+
+        // 🔥 NOVO: avisa e direciona o jogador automaticamente para a mesa
+        // quando um torneio em que ele está inscrito passa a "active".
+        // Antes disso, o jogador só descobria que o torneio começou se
+        // percebesse sozinho a mudança de status na lista e clicasse
+        // manualmente em "Entrar" - agora ele é avisado com um toast e
+        // levado direto para a mesa de jogo.
+        if (username) {
+          const readyTournament = newTournaments.find((t) => {
+            const isPlayerHere = (t.players || []).some(
+              (p) => p.username === username,
+            );
+            const alreadyNotified = notifiedStartRef.current.has(
+              String(t._id),
+            );
+            const alreadyInThisGame =
+              showTournamentGame &&
+              activeTournament &&
+              String(activeTournament._id) === String(t._id);
+            return (
+              isPlayerHere &&
+              t.status === "active" &&
+              !alreadyNotified &&
+              !alreadyInThisGame
+            );
+          });
+
+          if (readyTournament) {
+            notifiedStartRef.current.add(String(readyTournament._id));
+            toast.success(
+              `🎮 O torneio "${readyTournament.name}" começou! Entrando na mesa...`,
+            );
+            setTimeout(() => {
+              if (isMounted.current) handleEnterGame(readyTournament);
+            }, 900);
+          }
+        }
+
         if (!silent) {
           setSuccess("✅ Lista atualizada");
           setTimeout(() => setSuccess(""), 2000);
@@ -67,7 +113,7 @@ export default function TournamentLobby({ onClose, username }) {
         }
       }
     }
-  }, []);
+  }, [username, toast, showTournamentGame, activeTournament]);
 
   // 🔥 CARREGAMENTO INICIAL
   useEffect(() => {
@@ -187,6 +233,21 @@ export default function TournamentLobby({ onClose, username }) {
         setSuccess("✅ Torneio iniciado!");
         setTimeout(() => setSuccess(""), 3000);
         await fetchTournaments(false);
+
+        // 🔥 NOVO: se quem iniciou o torneio também está inscrito como
+        // jogador, entra direto na mesa - não faz sentido esperar até 30
+        // segundos pelo próximo polling automático perceber a mudança.
+        const startedTournament = data.tournament;
+        const isPlayerHere = (startedTournament?.players || []).some(
+          (p) => p.username === username,
+        );
+        if (isPlayerHere && startedTournament) {
+          notifiedStartRef.current.add(String(startedTournament._id));
+          toast.success(`🎮 Torneio iniciado! Entrando na mesa...`);
+          setTimeout(() => {
+            if (isMounted.current) handleEnterGame(startedTournament);
+          }, 700);
+        }
       } else {
         setError(`❌ ${data.error}`);
         setTimeout(() => setError(""), 3000);

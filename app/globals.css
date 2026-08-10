@@ -314,8 +314,21 @@ body {
   }
 }
 
-/* SMARTPHONE PAISAGEM (Deitado) - OTIMIZADO */
-@media (max-width: 900px) and (orientation: landscape) {
+/* SMARTPHONE PAISAGEM (Deitado) - OTIMIZADO
+   🔥 CORRIGIDO (bug real, confirmado por print de um Android): esta regra
+   antes usava "max-width: 900px", mas celulares grandes/modernos (Galaxy
+   S, Pixel, etc.) frequentemente relatam MAIS de 900px de largura CSS
+   quando deitados (ex: um aparelho com 412px de largura em pé pode
+   reportar ~915px deitado). Esses celulares "escapavam" desta regra e
+   caíam no bucket de tablet-paisagem (mais abaixo), que NÃO colapsa a
+   barra lateral - o resultado era o painel de Estatísticas/Amigos/etc
+   ocupando metade da tela e espremendo a mesa de jogo, como relatado.
+   Detectar por ALTURA é muito mais confiável: um celular deitado sempre
+   tem altura baixa (~350-430px CSS), não importa quão largo seja,
+   enquanto tablets deitados mantêm altura alta (600-900px+) mesmo em
+   paisagem. Essa condição agora captura corretamente QUALQUER celular
+   deitado, de qualquer largura. */
+@media (orientation: landscape) and (max-height: 500px) {
   :root {
     /* 🔥 CORRIGIDO: como o layout do felt passa a ser em LINHA (CPU | mesa |
        jogador lado a lado, em vez de empilhado), cada coluna tem mais altura
@@ -1969,7 +1982,7 @@ body {
   }
 }
 
-@media (max-width: 900px) and (orientation: landscape) {
+@media (orientation: landscape) and (max-height: 500px) {
   /* 🔥 NOVO: em pé deitado a altura é curta - encolher e subir os toasts
      para não brigar com a mesa/botões de ação logo abaixo. */
   .toast-container {
@@ -2530,7 +2543,7 @@ body {
 }
 
 /* 🔥 MOBILE PAISAGEM */
-@media (max-width: 900px) and (orientation: landscape) {
+@media (orientation: landscape) and (max-height: 500px) {
   .side-stats-toggles-container {
     top: 45px !important;
     padding: 4px 12px !important;
