@@ -1,1 +1,8 @@
-projectId: "b86g4h"
+module.exports = {
+  projectId: 'm1tyf1',
+  e2e: {
+    setupNodeEvents(on, config) {
+      // implement node event listeners here
+    },
+  },
+};
