@@ -2962,3 +2962,75 @@ body {
     max-height: 53px !important;
   }
 }
+/* ====================== POLIMENTO PREMIUM (v2) ====================== */
+/* Ambiente da mesa: brilho suave pulsante ao redor do feltro */
+.game-table-container {
+  position: relative;
+}
+.game-table-container::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(255, 215, 0, 0.08),
+    transparent 60%
+  );
+  animation: ambientGlow 6s ease-in-out infinite;
+}
+
+@keyframes ambientGlow {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Botões de ação: brilho dourado sutil ao passar o mouse */
+.action-btn:hover:not(:disabled)::after,
+.action-btn-reset:hover::after {
+  content: "";
+}
+
+/* Cartas: sombra de profundidade extra quando empilhadas na mesa */
+.game-table-cards-row,
+.game-table-community-cards-row {
+  perspective: 900px;
+}
+
+/* Confetti sempre acima de tudo, sem capturar cliques */
+canvas {
+  pointer-events: none;
+}
+
+/* Scrollbar fina e dourada nos painéis (Webkit) */
+.friends-card ::-webkit-scrollbar,
+.missions-card ::-webkit-scrollbar,
+[style*="overflow-y: auto"]::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 215, 0, 0.25);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Loading spinner mais suave */
+@keyframes softPulseScale {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.85;
+  }
+}
