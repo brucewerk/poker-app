@@ -1,6 +1,4 @@
-// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO v3
-// 🔥 Layout de 3 zonas em portrait mobile (CPU / MESA / JOGADOR) com
-// 5 cartas da mesa SEMPRE em linha única (grid de 5 colunas)
+// components/Poker/GameTable.jsx - COMPLETO CORRIGIDO (SEM CONFLITOS DE ESTILO)
 "use client";
 
 import { useState, useEffect, useMemo, memo, useRef } from "react";
@@ -27,26 +25,18 @@ const GameTable = memo(function GameTable({
   onSwitchPlayer,
   currentUser,
 }) {
-  // 🔥 DETECTA MODO PAISAGEM E PORTRAIT MOBILE
+  // 🔥 DETECTA MODO PAISAGEM
   const [isLandscape, setIsLandscape] = useState(false);
-  const [isPortraitMobile, setIsPortraitMobile] = useState(false);
 
   useEffect(() => {
     const checkOrientation = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const landscape = h < w && h < 550;
-      const portraitMobile = w <= 768 && h > w;
-      setIsLandscape(landscape);
-      setIsPortraitMobile(portraitMobile);
+      const isLandscapeMode =
+        window.innerHeight < window.innerWidth && window.innerHeight < 550;
+      setIsLandscape(isLandscapeMode);
     };
     checkOrientation();
     window.addEventListener("resize", checkOrientation);
-    window.addEventListener("orientationchange", checkOrientation);
-    return () => {
-      window.removeEventListener("resize", checkOrientation);
-      window.removeEventListener("orientationchange", checkOrientation);
-    };
+    return () => window.removeEventListener("resize", checkOrientation);
   }, []);
 
   // 🔥 Otimização: Evitar re-renders desnecessários
@@ -154,14 +144,7 @@ const GameTable = memo(function GameTable({
     return currentUser || "Jogador";
   }, [isMultiplayer, multiplayerPlayers, currentPlayerIndex, currentUser]);
 
-  // ================================================================
-  // 🔥 ESTILOS ADAPTATIVOS
-  // Em portrait mobile: coluna com 3 zonas (CPU topo / MESA centro / JOGADOR
-  // base), ocupando 100% da altura disponível, sem rolagem.
-  // Em paisagem: linha com CPU esquerda / MESA centro / JOGADOR direita.
-  // Em desktop: layout empilhado original.
-  // ================================================================
-
+  // 🔥 ESTILOS DINÂMICOS PARA PAISAGEM - SEM CONFLITOS (usando apenas propriedades específicas)
   const getFeltStyles = () => {
     if (isLandscape) {
       return {
@@ -182,29 +165,6 @@ const GameTable = memo(function GameTable({
         justifyContent: "space-between",
         gap: "4px",
         flexWrap: "nowrap",
-      };
-    }
-    if (isPortraitMobile) {
-      return {
-        background: "var(--bg-felt)",
-        borderRadius: "16px",
-        paddingTop: "6px",
-        paddingBottom: "6px",
-        paddingLeft: "6px",
-        paddingRight: "6px",
-        position: "relative",
-        border: "3px solid var(--border-felt)",
-        boxShadow: "inset 0 0 60px var(--shadow-felt)",
-        transition: "var(--transition-theme)",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        alignItems: "stretch",
-        gap: "4px",
-        flex: "1 1 auto",
-        minHeight: "0",
-        height: "100%",
-        overflow: "hidden",
       };
     }
     return {
@@ -246,21 +206,6 @@ const GameTable = memo(function GameTable({
         minHeight: "0px",
       };
     }
-    if (isPortraitMobile) {
-      return {
-        textAlign: "center",
-        flex: "0 0 auto",
-        paddingTop: "4px",
-        paddingBottom: "4px",
-        paddingLeft: "6px",
-        paddingRight: "6px",
-        background: "var(--bg-status-item)",
-        borderRadius: "10px",
-        border: "1px solid var(--border-element)",
-        boxShadow: "0 2px 8px var(--shadow-element)",
-        transition: "var(--transition-theme)",
-      };
-    }
     return {
       textAlign: "center",
       marginBottom: "20px",
@@ -300,21 +245,6 @@ const GameTable = memo(function GameTable({
         minHeight: "0px",
       };
     }
-    if (isPortraitMobile) {
-      return {
-        textAlign: "center",
-        flex: "0 0 auto",
-        paddingTop: "4px",
-        paddingBottom: "4px",
-        paddingLeft: "6px",
-        paddingRight: "6px",
-        background: "var(--bg-status-item)",
-        borderRadius: "10px",
-        border: "1px solid var(--border-element)",
-        boxShadow: "0 2px 8px var(--shadow-element)",
-        transition: "var(--transition-theme)",
-      };
-    }
     return {
       textAlign: "center",
       marginTop: "20px",
@@ -352,26 +282,6 @@ const GameTable = memo(function GameTable({
         minHeight: "0px",
       };
     }
-    if (isPortraitMobile) {
-      return {
-        textAlign: "center",
-        flex: "1 1 auto",
-        paddingTop: "6px",
-        paddingBottom: "6px",
-        paddingLeft: "4px",
-        paddingRight: "4px",
-        background: "rgba(0, 0, 0, 0.10)",
-        borderRadius: "12px",
-        border: "1px solid var(--border-gold)",
-        position: "relative",
-        transition: "var(--transition-theme)",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        minHeight: "0",
-        overflow: "hidden",
-      };
-    }
     return {
       textAlign: "center",
       paddingTop: "15px",
@@ -390,110 +300,16 @@ const GameTable = memo(function GameTable({
     };
   };
 
-  // ================================================================
-  // 🔥 ESTILO DO GRID DE CARTAS DA MESA
-  // A correção principal: em portrait mobile e paisagem, usamos GRID de
-  // 5 colunas iguais com flex-wrap: nowrap — as 5 cartas SEMPRE cabem em
-  // uma linha única, cada uma ocupando 1/5 do espaço disponível.
-  // ================================================================
-  const getCommunityCardsRowStyle = () => {
-    if (isLandscape) {
-      return {
-        display: "grid",
-        gridTemplateColumns: "repeat(5, 1fr)",
-        gap: "2px",
-        minHeight: "44px",
-        width: "100%",
-        alignItems: "center",
-        justifyItems: "center",
-      };
-    }
-    if (isPortraitMobile) {
-      return {
-        display: "grid",
-        gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-        gap: "clamp(2px, 1vw, 6px)",
-        width: "100%",
-        alignItems: "center",
-        justifyItems: "center",
-        minHeight: "0",
-      };
-    }
-    return {
-      display: "flex",
-      flexWrap: "nowrap",
-      justifyContent: "center",
-      alignItems: "center",
-      gap: "6px",
-      width: "100%",
-    };
-  };
-
-  // ================================================================
-  // 🔥 ESTILO DOS EMPTY SLOTS
-  // Em portrait mobile seguem o grid de 5 colunas e esticam para
-  // preencher a célula. Nos outros modos, mantém o tamanho original.
-  // ================================================================
-  const getEmptyCardStyle = () => {
-    if (isPortraitMobile) {
-      return {
-        width: "100%",
-        aspectRatio: "62 / 87",
-        height: "auto",
-        maxWidth: "100%",
-        borderRadius: 8,
-        background: "var(--bg-empty-card)",
-        border: "2px dashed var(--border-empty-card)",
-        transition: "var(--transition-theme)",
-      };
-    }
-    if (isLandscape) {
-      return {
-        width: "32px",
-        height: "45px",
-        borderRadius: 6,
-        background: "var(--bg-empty-card)",
-        border: "2px dashed var(--border-empty-card)",
-        margin: "0 1px",
-        transition: "var(--transition-theme)",
-      };
-    }
-    return emptyCardSlotStyle();
-  };
-
-  // ================================================================
-  // 🔥 SIZE DAS CARTAS DA MESA
-  // Paisagem: tiny | Portrait mobile: fluid (100% do slot) | Desktop: large
-  // ================================================================
-  const getCommunityCardSize = () => {
-    if (isLandscape) return "tiny";
-    if (isPortraitMobile) return "fluid";
-    return "large";
-  };
-
   return (
     <motion.div
       className="game-table-container"
-      style={{
-        ...tableContainerStyle(),
-        // Em portrait mobile, o container da mesa preenche a faixa do meio
-        ...(isPortraitMobile
-          ? {
-              flex: "1 1 auto",
-              minHeight: 0,
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }
-          : {}),
-      }}
+      style={tableContainerStyle()}
       variants={tableGlowVariants}
       animate={tableState}
       initial="idle"
     >
       <div className="game-table-felt" style={getFeltStyles()}>
-        {/* ==================== ZONA CPU ==================== */}
+        {/* Cartas da CPU */}
         <div
           className="game-table-player-area game-table-player-area-cpu"
           style={getCpuAreaStyles()}
@@ -501,14 +317,13 @@ const GameTable = memo(function GameTable({
           <div
             className="game-table-player-label"
             style={
-              isLandscape || isPortraitMobile
+              isLandscape
                 ? {
-                    fontSize: "0.6rem",
-                    gap: "4px",
+                    fontSize: "0.45rem",
+                    gap: "2px",
                     flexDirection: "row",
                     flexWrap: "wrap",
                     justifyContent: "center",
-                    marginBottom: "2px",
                   }
                 : {}
             }
@@ -520,22 +335,18 @@ const GameTable = memo(function GameTable({
               initial={{ scale: 1 }}
               animate={{ scale: cpuBet > 0 ? [1, 1.2, 1] : 1 }}
               transition={{ duration: 0.3 }}
-              style={
-                isLandscape || isPortraitMobile
-                  ? { fontSize: "0.55rem" }
-                  : {}
-              }
+              style={isLandscape ? { fontSize: "0.4rem" } : {}}
             >
               💰 {cpuBet}
             </motion.span>
             <span
               className="game-table-dealer-inline"
               style={
-                isLandscape || isPortraitMobile
+                isLandscape
                   ? {
-                      fontSize: "0.5rem",
-                      paddingTop: "1px",
-                      paddingBottom: "1px",
+                      fontSize: "0.4rem",
+                      paddingTop: "0px",
+                      paddingBottom: "0px",
                       paddingLeft: "6px",
                       paddingRight: "6px",
                     }
@@ -553,11 +364,11 @@ const GameTable = memo(function GameTable({
                 }}
                 transition={{ duration: 1.2, repeat: Infinity }}
                 style={
-                  isLandscape || isPortraitMobile
+                  isLandscape
                     ? {
-                        fontSize: "0.5rem",
-                        paddingTop: "1px",
-                        paddingBottom: "1px",
+                        fontSize: "0.4rem",
+                        paddingTop: "0px",
+                        paddingBottom: "0px",
                         paddingLeft: "6px",
                         paddingRight: "6px",
                       }
@@ -571,12 +382,11 @@ const GameTable = memo(function GameTable({
           <div
             className="game-table-cards-row"
             style={
-              isLandscape || isPortraitMobile
+              isLandscape
                 ? {
-                    gap: "3px",
-                    minHeight: "0",
+                    gap: "2px",
+                    minHeight: "30px",
                     marginTop: "2px",
-                    justifyContent: "center",
                   }
                 : {}
             }
@@ -589,18 +399,18 @@ const GameTable = memo(function GameTable({
                   faceDown={!showCpuCards}
                   delay={i * 120}
                   isRevealing={stage === "showdown"}
-                  size={isLandscape ? "tiny" : isPortraitMobile ? "small" : "small"}
+                  size={isLandscape ? "tiny" : "small"}
                 />
               ))
             ) : (
               <span
                 className="game-table-empty-cards-text"
                 style={
-                  isLandscape || isPortraitMobile
+                  isLandscape
                     ? {
-                        fontSize: "0.55rem",
-                        paddingTop: "3px",
-                        paddingBottom: "3px",
+                        fontSize: "0.45rem",
+                        paddingTop: "4px",
+                        paddingBottom: "4px",
                         paddingLeft: "8px",
                         paddingRight: "8px",
                       }
@@ -618,14 +428,14 @@ const GameTable = memo(function GameTable({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 300 }}
               style={
-                isLandscape || isPortraitMobile
+                isLandscape
                   ? {
-                      fontSize: "0.55rem",
+                      fontSize: "0.4rem",
                       paddingTop: "1px",
                       paddingBottom: "1px",
-                      paddingLeft: "6px",
-                      paddingRight: "6px",
-                      marginTop: "3px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      marginTop: "1px",
                     }
                   : {}
               }
@@ -640,14 +450,14 @@ const GameTable = memo(function GameTable({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               style={
-                isLandscape || isPortraitMobile
+                isLandscape
                   ? {
-                      fontSize: "0.55rem",
+                      fontSize: "0.4rem",
                       paddingTop: "1px",
                       paddingBottom: "1px",
-                      paddingLeft: "6px",
-                      paddingRight: "6px",
-                      marginTop: "2px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      marginTop: "1px",
                       maxWidth: "100%",
                     }
                   : {}
@@ -658,7 +468,7 @@ const GameTable = memo(function GameTable({
           )}
         </div>
 
-        {/* ==================== ZONA MESA (centro) ==================== */}
+        {/* Cartas comunitárias */}
         <div
           className="game-table-community-area"
           style={getCommunityAreaStyles()}
@@ -666,11 +476,11 @@ const GameTable = memo(function GameTable({
           <div
             className="game-table-community-label-wrapper"
             style={
-              isLandscape || isPortraitMobile
+              isLandscape
                 ? {
-                    fontSize: "0.55rem",
-                    gap: "6px",
-                    marginBottom: "4px",
+                    fontSize: "0.4rem",
+                    gap: "4px",
+                    marginBottom: "2px",
                   }
                 : {}
             }
@@ -683,13 +493,13 @@ const GameTable = memo(function GameTable({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 300 }}
               style={
-                isLandscape || isPortraitMobile
+                isLandscape
                   ? {
-                      fontSize: "0.55rem",
-                      paddingTop: "2px",
-                      paddingBottom: "2px",
-                      paddingLeft: "8px",
-                      paddingRight: "8px",
+                      fontSize: "0.4rem",
+                      paddingTop: "1px",
+                      paddingBottom: "1px",
+                      paddingLeft: "6px",
+                      paddingRight: "6px",
                     }
                   : {}
               }
@@ -707,11 +517,16 @@ const GameTable = memo(function GameTable({
                         : stage}
             </motion.span>
           </div>
-
-          {/* 🔥🔥🔥 GRID DE 5 CARTAS — SEMPRE EM LINHA ÚNICA */}
           <div
             className="game-table-community-cards-row"
-            style={getCommunityCardsRowStyle()}
+            style={
+              isLandscape
+                ? {
+                    gap: "2px",
+                    minHeight: "44px",
+                  }
+                : {}
+            }
           >
             {communityCards && communityCards.length > 0
               ? communityCards.map((card, i) => (
@@ -724,18 +539,11 @@ const GameTable = memo(function GameTable({
                       type: "spring",
                       stiffness: 300,
                     }}
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      width: "100%",
-                      minWidth: 0,
-                    }}
                   >
                     <Card
                       card={card}
                       delay={i * 100}
-                      size={getCommunityCardSize()}
+                      size={isLandscape ? "tiny" : "large"}
                       isHighlighted={stage === "showdown"}
                     />
                   </motion.div>
@@ -746,7 +554,15 @@ const GameTable = memo(function GameTable({
                     <div
                       key={`empty-${i}`}
                       className="game-table-empty-card"
-                      style={getEmptyCardStyle()}
+                      style={{
+                        ...emptyCardSlotStyle(),
+                        ...(isLandscape
+                          ? {
+                              width: "32px",
+                              height: "45px",
+                            }
+                          : {}),
+                      }}
                     />
                   ))}
           </div>
@@ -754,13 +570,7 @@ const GameTable = memo(function GameTable({
           {/* Área do pote */}
           <div
             className="game-table-pot-area"
-            style={
-              isLandscape
-                ? { marginTop: "2px" }
-                : isPortraitMobile
-                  ? { marginTop: "6px" }
-                  : {}
-            }
+            style={isLandscape ? { marginTop: "2px" } : {}}
           >
             <motion.div
               key={`pot-${potAnimationKey}`}
@@ -786,16 +596,7 @@ const GameTable = memo(function GameTable({
                       paddingRight: "8px",
                       minWidth: "40px",
                     }
-                  : isPortraitMobile
-                    ? {
-                        fontSize: "0.72rem",
-                        paddingTop: "4px",
-                        paddingBottom: "4px",
-                        paddingLeft: "12px",
-                        paddingRight: "12px",
-                        minWidth: "70px",
-                      }
-                    : {}),
+                  : {}),
               }}
             >
               <motion.span
@@ -829,13 +630,7 @@ const GameTable = memo(function GameTable({
                     marginTop: "2px",
                     flexWrap: "nowrap",
                   }
-                : isPortraitMobile
-                  ? {
-                      gap: "4px",
-                      marginTop: "4px",
-                      flexWrap: "nowrap",
-                    }
-                  : {}
+                : {}
             }
           >
             <motion.span
@@ -845,13 +640,13 @@ const GameTable = memo(function GameTable({
               animate={{ scale: playerBet > 0 ? [1, 1.1, 1] : 1 }}
               transition={{ duration: 0.3 }}
               style={
-                isLandscape || isPortraitMobile
+                isLandscape
                   ? {
-                      paddingTop: "2px",
-                      paddingBottom: "2px",
-                      paddingLeft: "8px",
-                      paddingRight: "8px",
-                      fontSize: isPortraitMobile ? "0.6rem" : "0.4rem",
+                      paddingTop: "1px",
+                      paddingBottom: "1px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      fontSize: "0.4rem",
                     }
                   : {}
               }
@@ -865,13 +660,13 @@ const GameTable = memo(function GameTable({
               animate={{ scale: cpuBet > 0 ? [1, 1.1, 1] : 1 }}
               transition={{ duration: 0.3 }}
               style={
-                isLandscape || isPortraitMobile
+                isLandscape
                   ? {
-                      paddingTop: "2px",
-                      paddingBottom: "2px",
-                      paddingLeft: "8px",
-                      paddingRight: "8px",
-                      fontSize: isPortraitMobile ? "0.6rem" : "0.4rem",
+                      paddingTop: "1px",
+                      paddingBottom: "1px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      fontSize: "0.4rem",
                     }
                   : {}
               }
@@ -882,13 +677,13 @@ const GameTable = memo(function GameTable({
               <span
                 className="game-table-current-bet"
                 style={
-                  isLandscape || isPortraitMobile
+                  isLandscape
                     ? {
-                        fontSize: isPortraitMobile ? "0.6rem" : "0.4rem",
-                        paddingTop: "2px",
-                        paddingBottom: "2px",
-                        paddingLeft: "8px",
-                        paddingRight: "8px",
+                        fontSize: "0.4rem",
+                        paddingTop: "1px",
+                        paddingBottom: "1px",
+                        paddingLeft: "4px",
+                        paddingRight: "4px",
                       }
                     : {}
                 }
@@ -899,7 +694,7 @@ const GameTable = memo(function GameTable({
           </div>
         </div>
 
-        {/* ==================== ZONA JOGADOR ==================== */}
+        {/* Cartas do jogador */}
         <div
           className="game-table-player-area game-table-player-area-player"
           style={getPlayerAreaStyles()}
@@ -907,14 +702,13 @@ const GameTable = memo(function GameTable({
           <div
             className="game-table-player-label"
             style={
-              isLandscape || isPortraitMobile
+              isLandscape
                 ? {
-                    fontSize: "0.6rem",
-                    gap: "4px",
+                    fontSize: "0.45rem",
+                    gap: "2px",
                     flexDirection: "row",
                     flexWrap: "wrap",
                     justifyContent: "center",
-                    marginBottom: "2px",
                   }
                 : {}
             }
@@ -922,11 +716,7 @@ const GameTable = memo(function GameTable({
             🃏{" "}
             <span
               className="game-table-player-name"
-              style={
-                isLandscape || isPortraitMobile
-                  ? { fontSize: "0.65rem" }
-                  : {}
-              }
+              style={isLandscape ? { fontSize: "0.5rem" } : {}}
             >
               {playerDisplayName}
             </span>
@@ -936,11 +726,7 @@ const GameTable = memo(function GameTable({
               initial={{ scale: 1 }}
               animate={{ scale: playerBet > 0 ? [1, 1.2, 1] : 1 }}
               transition={{ duration: 0.3 }}
-              style={
-                isLandscape || isPortraitMobile
-                  ? { fontSize: "0.55rem" }
-                  : {}
-              }
+              style={isLandscape ? { fontSize: "0.4rem" } : {}}
             >
               💰 {playerBet}
             </motion.span>
@@ -948,9 +734,9 @@ const GameTable = memo(function GameTable({
               <span
                 className="game-table-player-counter"
                 style={
-                  isLandscape || isPortraitMobile
+                  isLandscape
                     ? {
-                        fontSize: "0.5rem",
+                        fontSize: "0.4rem",
                         paddingTop: "1px",
                         paddingBottom: "1px",
                         paddingLeft: "6px",
@@ -966,12 +752,11 @@ const GameTable = memo(function GameTable({
           <div
             className="game-table-cards-row"
             style={
-              isLandscape || isPortraitMobile
+              isLandscape
                 ? {
-                    gap: "3px",
-                    minHeight: "0",
+                    gap: "2px",
+                    minHeight: "30px",
                     marginTop: "2px",
-                    justifyContent: "center",
                   }
                 : {}
             }
@@ -982,13 +767,7 @@ const GameTable = memo(function GameTable({
                   key={`player-${i}-${card.rank}${card.suit}`}
                   card={card}
                   delay={i * 120 + 80}
-                  size={
-                    isLandscape
-                      ? "tiny"
-                      : isPortraitMobile
-                        ? "small"
-                        : "normal"
-                  }
+                  size={isLandscape ? "tiny" : "normal"}
                   isHighlighted={stage === "showdown" || stage === "flop"}
                 />
               ))
@@ -996,11 +775,11 @@ const GameTable = memo(function GameTable({
               <span
                 className="game-table-empty-cards-text"
                 style={
-                  isLandscape || isPortraitMobile
+                  isLandscape
                     ? {
-                        fontSize: "0.55rem",
-                        paddingTop: "3px",
-                        paddingBottom: "3px",
+                        fontSize: "0.45rem",
+                        paddingTop: "4px",
+                        paddingBottom: "4px",
                         paddingLeft: "8px",
                         paddingRight: "8px",
                       }
@@ -1018,14 +797,14 @@ const GameTable = memo(function GameTable({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 300 }}
               style={
-                isLandscape || isPortraitMobile
+                isLandscape
                   ? {
-                      fontSize: "0.55rem",
+                      fontSize: "0.4rem",
                       paddingTop: "1px",
                       paddingBottom: "1px",
-                      paddingLeft: "6px",
-                      paddingRight: "6px",
-                      marginTop: "3px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                      marginTop: "1px",
                     }
                   : {}
               }
@@ -1042,7 +821,7 @@ const GameTable = memo(function GameTable({
             <div
               className="game-table-multiplayer-controls"
               style={
-                isLandscape || isPortraitMobile
+                isLandscape
                   ? {
                       display: "none",
                     }

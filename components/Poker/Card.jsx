@@ -1,5 +1,4 @@
 // components/Poker/Card.jsx - REDESENHADA (cartas realistas com pips, SVG e flip 3D)
-// + SIZE "FLUID" para cartas da mesa caberem em linha única em portrait mobile
 "use client";
 
 import { motion } from "framer-motion";
@@ -168,17 +167,7 @@ const Card = memo(function Card({
   const isAce = rankRaw === 14;
   const pipPositions = PIP_LAYOUTS[rankRaw];
 
-  // 🔥 TAMANHOS: inclui "fluid" para cartas da mesa em portrait mobile
-  // (largura 100% do slot do grid de 5 colunas, altura por aspect-ratio)
   const sizeMap = {
-    tiny: {
-      width: 32,
-      height: 45,
-      indexFont: "0.42rem",
-      indexSuit: 6,
-      pipSize: 6,
-      centerSuit: 14,
-    },
     small: {
       width: 50,
       height: 70,
@@ -203,17 +192,6 @@ const Card = memo(function Card({
       pipSize: 12,
       centerSuit: 30,
     },
-    // 🔥 NOVO: variante "fluid" — para as cartas da mesa em portrait mobile.
-    // Largura = 100% do slot pai (grid 5 colunas), altura via aspect-ratio.
-    fluid: {
-      width: "100%",
-      height: "auto",
-      aspectRatio: "62 / 87",
-      indexFont: "clamp(0.5rem, 2.2vw, 0.78rem)",
-      indexSuit: 9,
-      pipSize: 10,
-      centerSuit: 26,
-    },
   };
   const cfg = sizeMap[size] || sizeMap.normal;
 
@@ -229,12 +207,7 @@ const Card = memo(function Card({
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.8, y: -20 }}
-        animate={{
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          rotateY: isFlipping ? [0, 90, 0] : 0,
-        }}
+        animate={{ opacity: 1, scale: 1, y: 0, rotateY: isFlipping ? [0, 90, 0] : 0 }}
         transition={{
           delay: delay / 1000,
           type: "spring",
@@ -246,10 +219,6 @@ const Card = memo(function Card({
           display: "inline-flex",
           width: cfg.width,
           height: cfg.height,
-          // 🔥 Só aplica aspect-ratio quando o size é "fluid"
-          ...(cfg.aspectRatio
-            ? { aspectRatio: cfg.aspectRatio, height: "auto" }
-            : {}),
           margin: "2px",
           borderRadius: 8,
           flexShrink: 0,
@@ -277,7 +246,7 @@ const Card = memo(function Card({
         >
           <span
             style={{
-              fontSize: typeof cfg.width === "number" ? cfg.width * 0.38 : "1.4rem",
+              fontSize: cfg.width * 0.38,
               opacity: isDarkTheme ? 0.55 : 0.4,
               filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
             }}
@@ -296,12 +265,7 @@ const Card = memo(function Card({
 
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-        scale: 0.8,
-        y: -20,
-        rotateY: isRevealing ? -90 : 0,
-      }}
+      initial={{ opacity: 0, scale: 0.8, y: -20, rotateY: isRevealing ? -90 : 0 }}
       animate={{
         opacity: 1,
         scale: 1,
@@ -320,10 +284,6 @@ const Card = memo(function Card({
         flexDirection: "column",
         width: cfg.width,
         height: cfg.height,
-        // 🔥 Só aplica aspect-ratio quando o size é "fluid"
-        ...(cfg.aspectRatio
-          ? { aspectRatio: cfg.aspectRatio, height: "auto" }
-          : {}),
         margin: "2px",
         borderRadius: 8,
         flexShrink: 0,
@@ -401,17 +361,10 @@ const Card = memo(function Card({
             }}
             title={FACE_NAME[rankRaw]}
           >
-            <SuitIcon
-              suit={card.suit}
-              size={cfg.centerSuit * 0.8}
-              color={suitColor}
-            />
+            <SuitIcon suit={card.suit} size={cfg.centerSuit * 0.8} color={suitColor} />
             <span
               style={{
-                fontSize:
-                  typeof cfg.width === "number"
-                    ? cfg.width * 0.34
-                    : "clamp(0.7rem, 3vw, 1.1rem)",
+                fontSize: cfg.width * 0.34,
                 fontWeight: 900,
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 letterSpacing: "-0.5px",
@@ -435,11 +388,7 @@ const Card = memo(function Card({
                   transform: `translate(-50%, -50%) ${y > 55 ? "rotate(180deg)" : ""}`,
                 }}
               >
-                <SuitIcon
-                  suit={card.suit}
-                  size={cfg.pipSize}
-                  color={suitColor}
-                />
+                <SuitIcon suit={card.suit} size={cfg.pipSize} color={suitColor} />
               </div>
             ))}
           </div>
