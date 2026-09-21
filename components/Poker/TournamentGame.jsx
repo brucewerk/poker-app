@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Card from "./Card.jsx";
 
 export default function TournamentGame({ tournament, onLeave, username }) {
   const [gameState, setGameState] = useState(null);
@@ -180,20 +181,21 @@ export default function TournamentGame({ tournament, onLeave, username }) {
     }
   };
 
-  // 🔥 RENDERIZAR CARTAS
+  // 🔥 RENDERIZAR CARTAS (componente real: naipes SVG, pips, flip 3D)
   const renderCards = (cards, isCurrentPlayer) => {
     if (!cards || cards.length === 0) {
       return <span style={cardPlaceholderStyle()}>🔒</span>;
     }
 
-    return cards.map((card, i) => {
-      const isRed = card.suit === "♥" || card.suit === "♦";
-      return (
-        <span key={i} style={cardStyle(isRed, !isCurrentPlayer)}>
-          {isCurrentPlayer ? `${card.rank}${card.suit}` : "🔒"}
-        </span>
-      );
-    });
+    return cards.map((card, i) => (
+      <Card
+        key={i}
+        card={card}
+        faceDown={!isCurrentPlayer}
+        size="small"
+        delay={i * 80}
+      />
+    ));
   };
 
   // 🔥 RESULTADO DO TORNEIO
@@ -333,15 +335,9 @@ export default function TournamentGame({ tournament, onLeave, username }) {
         <span style={communityLabelStyle()}>🔥 MESA</span>
         <div style={communityCardsStyle()}>
           {gameState.communityCards && gameState.communityCards.length > 0 ? (
-            gameState.communityCards.map((card, i) => {
-              const isRed = card.suit === "♥" || card.suit === "♦";
-              return (
-                <span key={i} style={cardStyle(isRed, false)}>
-                  {card.rank}
-                  {card.suit}
-                </span>
-              );
-            })
+            gameState.communityCards.map((card, i) => (
+              <Card key={i} card={card} size="normal" delay={i * 90} />
+            ))
           ) : (
             <span style={emptyCommunityStyle()}>Aguardando cartas...</span>
           )}

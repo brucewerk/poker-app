@@ -66,15 +66,44 @@ Como o `react-confetti` já está em `package.json`, um `npm install`
 normal (o mesmo que você já roda) é suficiente — não é preciso instalar
 nada novo manualmente.
 
-## Próximos passos sugeridos (não incluídos nesta passagem, para não
-arriscar regressão num pacote só)
+## v2.1 — segunda passagem de melhorias (continuação)
 
-- Aplicar o mesmo componente `Card` real dentro de `OnlineGame.jsx` e
-  `TournamentGame.jsx` (hoje eles ainda desenham cartas com um
-  `<span>` simples via `CardDisplay`/`cardStyle`), unificando o visual
-  também no multiplayer online e nos torneios.
-- Adicionar sons já existentes (`lib/sound.js`) ao evento de confetti
-  (ex.: `soundManager.playWinSequence()` já é chamado em `page.jsx`,
-  então o áudio e o confetti agora tocam juntos automaticamente).
-- Avatar/moldura de assento com o dealer button (⚪ "D") girando entre
-  jogadores no multiplayer, usando o mesmo esquema de cores do tema.
+4. **`components/Poker/TournamentGame.jsx` — cartas reais no torneio**
+   - As cartas dos jogadores e as cartas comunitárias do modo Torneio
+     agora usam o mesmo componente `Card` real (SVG, pips, flip),
+     em vez do antigo `<span>{card.rank}{card.suit}</span>` genérico.
+   - Assinatura das funções internas (`renderCards`) mantida — só o
+     conteúdo visual mudou, nenhuma prop pública do componente foi
+     alterada.
+   - As funções de estilo antigas (`cardStyle`/`cardPlaceholderStyle`)
+     foram deixadas no arquivo (a de placeholder ainda é usada quando
+     não há cartas); nada foi removido, só deixou de ser chamado onde
+     não fazia mais sentido — zero risco de regressão.
+
+5. **`components/Poker/OnlineGame.jsx` — confirmado usando cartas reais**
+   - Esse arquivo já usa um wrapper `CardDisplay` sobre o componente
+     `Card` real (naipes SVG/pips/flip) para as cartas do multiplayer
+     online — validado e mantido como está, sem necessidade de mudança.
+
+6. **`components/Poker/ActionButtons.jsx` — indicador visual de "sua vez"**
+   - A grade de botões de ação (Fold/Call/Raise/All-in/Nova Mão) agora
+     ganha um **brilho dourado pulsante** ao redor enquanto é a vez do
+     jogador agir (`isGameActive === true`), usando `framer-motion`.
+   - O brilho desliga automaticamente assim que o jogador age, a mão
+     termina, ou é a vez da CPU — reaproveitando a mesma variável
+     `isGameActive` que já controlava o `disabled` dos botões, então
+     não há nenhuma lógica nova de estado, só uma animação condicional.
+   - Ajuda bastante a comunicar visualmente "é sua vez de jogar" sem
+     precisar ler o texto do `StatusPanel`.
+
+## Próximos passos sugeridos (não incluídos ainda, para não arriscar
+regressão num pacote só)
+
+- Dealer button (⚪ "D") girando entre assentos no modo 2 Jogadores /
+  Torneio, usando o `currentPlayerIndex`/`dealerIndex` que o backend
+  já calcula.
+- Reaproveitar o mesmo brilho pulsante de "sua vez" também nos botões
+  de ação do `OnlineGame.jsx` e do `TournamentGame.jsx` (hoje eles têm
+  seus próprios botões de ação simples, sem esse destaque).
+- Avatares/iniciais coloridas para os jogadores no `PlayerSelector` e
+  nas listas de sala (`RoomList`, `OnlineLobby`), no lugar do nome puro.

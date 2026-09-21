@@ -118,14 +118,32 @@ export default function ActionButtons({
       )}
 
       {/* 🔥 5 BOTÕES EM UMA LINHA - FONTES MAIORES */}
-      <div
+      <motion.div
         className="action-buttons-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(5, 1fr)",
           gap: "6px",
           width: "100%",
+          borderRadius: 16,
+          padding: 4,
         }}
+        animate={
+          isGameActive
+            ? {
+                boxShadow: [
+                  "0 0 0px rgba(255,215,0,0)",
+                  "0 0 18px rgba(255,215,0,0.35)",
+                  "0 0 0px rgba(255,215,0,0)",
+                ],
+              }
+            : { boxShadow: "0 0 0px rgba(255,215,0,0)" }
+        }
+        transition={
+          isGameActive
+            ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
+            : { duration: 0.3 }
+        }
       >
         {/* FOLD */}
         <button
@@ -371,7 +389,7 @@ export default function ActionButtons({
             NOVA
           </span>
         </button>
-      </div>
+      </motion.div>
 
       <ActionHistory />
     </div>

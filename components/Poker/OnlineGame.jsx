@@ -3,25 +3,18 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import Card from "./Card.jsx";
 
-function getRankDisplay(rank) {
-  if (rank === 11) return "J";
-  if (rank === 12) return "Q";
-  if (rank === 13) return "K";
-  if (rank === 14) return "A";
-  return rank;
-}
-
-function CardDisplay({ card, faceDown = false }) {
-  if (faceDown || !card) {
-    return <span style={cardStyle(null, true)}>🔒</span>;
-  }
-  const isRed = card.suit === "♥" || card.suit === "♦";
+// 🔥 Wrapper fino sobre o componente real de carta (naipes SVG, pips, flip),
+// preservando a antiga API local (card, faceDown) usada abaixo.
+function CardDisplay({ card, faceDown = false, size = "small" }) {
+  const showBack = faceDown || !card;
   return (
-    <span style={cardStyle(isRed, false)}>
-      {getRankDisplay(card.rank)}
-      {card.suit}
-    </span>
+    <Card
+      card={card || { rank: 14, suit: "♠" }}
+      faceDown={showBack}
+      size={size}
+    />
   );
 }
 
