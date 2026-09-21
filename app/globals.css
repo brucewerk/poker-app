@@ -3035,22 +3035,21 @@ canvas {
   }
 }
 
-
 /* ================================================================
-   🔥 CORREÇÃO DEFINITIVA v3 — LAYOUT FIXO EM PORTRAIT
+   🔥 CORREÇÃO v3 — PORTRAIT MOBILE: MESA FIXA + SIDEBAR ROLÁVEL ABAIXO
    ================================================================
    Problema 1: cartas da mesa quebravam para 2 linhas
    Problema 2: usuário precisava rolar para ver botões de ação
    
-   Solução: container do jogo vira "3 faixas" com altura fixa em
-   100dvh — header (auto), mesa (flex:1), botões (auto). A mesa NUNCA
-   rola porque está contida em min-height:0 + overflow:hidden, e as
-   cartas da mesa NUNCA quebram porque usam flex-wrap:nowrap + largura
-   calculada por porcentagem do container.
+   Solução: container do jogo vira coluna 100dvh. A faixa "mesa+botões"
+   tem altura mínima garantida (mesa+botoes sempre visíveis). A sidebar
+   (Stats/Level/Amigos/Missões/Histórico) volta a aparecer ABAIXO da
+   mesa, dentro do mesmo container rolável (.game-main-columns), com
+   scroll próprio — assim é acessível sem empurrar a mesa.
    ================================================================ */
 
-/* -------- HTML/BODY: não rolam em portrait mobile -------- */
 @media (max-width: 768px) and (orientation: portrait) {
+  /* -------- HTML/BODY: não rolam em portrait mobile -------- */
   html, body {
     overflow: hidden !important;
     height: 100dvh !important;
@@ -3059,7 +3058,7 @@ canvas {
     width: 100% !important;
   }
 
-  /* O wrapper principal do jogo vira o único elemento rolável */
+  /* O wrapper principal do jogo vira o único elemento gerenciador */
   .app-full-height {
     height: 100dvh !important;
     min-height: 0 !important;
@@ -3069,10 +3068,7 @@ canvas {
     padding: 4px 6px !important;
     overflow: hidden !important;
   }
-}
 
-/* -------- GRID PRINCIPAL: 3 faixas (header / mesa / botões) -------- */
-@media (max-width: 768px) and (orientation: portrait) {
   /* O motion.div que envolve tudo vira coluna de altura cheia */
   .app-full-height > div[style*="max-width"] {
     height: 100% !important;
@@ -3083,6 +3079,7 @@ canvas {
     border-radius: 20px !important;
     margin-top: 0 !important;
     overflow: hidden !important;
+    min-height: 0 !important;
   }
 
   /* Container interno (fundo escuro) também vira coluna cheia */
@@ -3097,35 +3094,69 @@ canvas {
     min-height: 0 !important;
   }
 
-  /* Colunas (game-table-column + game-sidebar-column) */
+  /* 🔥 Container principal: ROLA verticalmente.
+     A mesa tem altura mínima garantida acima (mesa + botões sempre visíveis),
+     e a sidebar aparece ABAIXO, acessível rolando este container. */
   .game-main-columns {
     display: flex !important;
     flex-direction: column !important;
     flex: 1 1 auto !important;
     min-height: 0 !important;
-    overflow: hidden !important;
-    gap: 6px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 8px !important;
+    padding-right: 2px !important;
   }
 
-  /* Coluna principal (mesa + botões) = coluna cheia sem overflow */
+  /* Scrollbar dourada discreta no container principal em mobile */
+  .game-main-columns::-webkit-scrollbar {
+    width: 4px !important;
+  }
+  .game-main-columns::-webkit-scrollbar-thumb {
+    background: rgba(255, 215, 0, 0.25) !important;
+    border-radius: 10px !important;
+  }
+  .game-main-columns::-webkit-scrollbar-track {
+    background: transparent !important;
+  }
+  .game-main-columns {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(255, 215, 0, 0.25) transparent !important;
+  }
+
+  /* 🔥 Coluna principal (mesa + botões) com altura MÍNIMA garantida.
+     Isso assegura que a mesa + os botões de ação SEMPRE cabem na tela,
+     independentemente do tamanho dos painéis da sidebar que virão abaixo. */
   .game-table-column {
     display: flex !important;
     flex-direction: column !important;
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
+    flex: 0 0 auto !important;
+    min-height: calc(100dvh - 180px) !important;
     width: 100% !important;
     overflow: hidden !important;
     gap: 6px !important;
   }
 
-  /* Sidebar: escondida em portrait mobile (evita empurrar botões pra fora) */
+  /* 🔥 CORRIGIDO: a sidebar volta a aparecer em portrait mobile, mas
+     agora fica ABAIXO da mesa (não ao lado), dentro do mesmo container
+     rolável. Os painéis (Stats/Level/Amigos/Missões/Histórico) ficam
+     acessíveis rolando APENAS este container, sem empurrar os botões
+     de ação para fora da tela. */
   .game-sidebar-column {
-    display: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 8px !important;
+    overflow: visible !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-right: 2px !important;
+    padding-bottom: 16px !important;
   }
-}
 
-/* -------- FELTRO: nunca estoura, cartas em linha única -------- */
-@media (max-width: 768px) and (orientation: portrait) {
+  /* -------- FELTRO: nunca estoura, cartas em linha única -------- */
   .game-table-container {
     flex: 1 1 auto !important;
     min-height: 0 !important;
@@ -3208,19 +3239,13 @@ canvas {
   /* 🔥🔥🔥 A CORREÇÃO PRINCIPAL: cartas da mesa em LINHA ÚNICA */
   .game-table-community-cards-row {
     display: flex !important;
-    flex-wrap: nowrap !important;          /* NUNCA quebra linha */
+    flex-wrap: nowrap !important;
     justify-content: center !important;
     align-items: center !important;
     gap: clamp(2px, 1vw, 6px) !important;
     min-height: 0 !important;
     width: 100% !important;
     overflow: visible !important;
-  }
-
-  /* Força cada carta da mesa a caber proporcionalmente na largura */
-  .game-table-community-cards-row > * {
-    flex: 0 1 auto !important;
-    max-width: calc((100% - 8 * 4px) / 5) !important;  /* 5 cartas + gaps */
   }
 
   /* Botões de ação: sempre na faixa inferior, nunca empurrados */
@@ -3255,7 +3280,7 @@ canvas {
   .action-history-item { font-size: 0.48rem !important; padding: 1px 5px !important; }
   .action-history-label { font-size: 0.48rem !important; }
 
-  /* Side stats: escondido em portrait para não roubar altura */
+  /* Side stats: compacto em portrait para não roubar altura */
   .side-stats-toggles-container {
     top: 4px !important;
     padding: 3px 8px !important;
@@ -3295,7 +3320,7 @@ canvas {
 
 /* -------- Cartas da mesa em portrait: tamanho fluido -------- */
 @media (max-width: 768px) and (orientation: portrait) {
-  /* "large" da mesa: encolhe proporcionalmente à tela */
+  /* "large"/"fluid" da mesa: encolhe proporcionalmente à tela */
   .game-table-community-cards-row .card-container,
   .game-table-community-cards-row > div > div {
     width: clamp(34px, calc((100vw - 60px) / 5 - 6px), 62px) !important;
