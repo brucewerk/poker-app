@@ -3034,3 +3034,353 @@ canvas {
     opacity: 0.85;
   }
 }
+
+
+/* ================================================================
+   🔥 CORREÇÃO DEFINITIVA v3 — LAYOUT FIXO EM PORTRAIT
+   ================================================================
+   Problema 1: cartas da mesa quebravam para 2 linhas
+   Problema 2: usuário precisava rolar para ver botões de ação
+   
+   Solução: container do jogo vira "3 faixas" com altura fixa em
+   100dvh — header (auto), mesa (flex:1), botões (auto). A mesa NUNCA
+   rola porque está contida em min-height:0 + overflow:hidden, e as
+   cartas da mesa NUNCA quebram porque usam flex-wrap:nowrap + largura
+   calculada por porcentagem do container.
+   ================================================================ */
+
+/* -------- HTML/BODY: não rolam em portrait mobile -------- */
+@media (max-width: 768px) and (orientation: portrait) {
+  html, body {
+    overflow: hidden !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    position: fixed !important;
+    width: 100% !important;
+  }
+
+  /* O wrapper principal do jogo vira o único elemento rolável */
+  .app-full-height {
+    height: 100dvh !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 4px 6px !important;
+    overflow: hidden !important;
+  }
+}
+
+/* -------- GRID PRINCIPAL: 3 faixas (header / mesa / botões) -------- */
+@media (max-width: 768px) and (orientation: portrait) {
+  /* O motion.div que envolve tudo vira coluna de altura cheia */
+  .app-full-height > div[style*="max-width"] {
+    height: 100% !important;
+    max-height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 6px 8px !important;
+    border-radius: 20px !important;
+    margin-top: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Container interno (fundo escuro) também vira coluna cheia */
+  .app-full-height > div[style*="max-width"] > div {
+    height: 100% !important;
+    max-height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 6px 8px !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
+  }
+
+  /* Colunas (game-table-column + game-sidebar-column) */
+  .game-main-columns {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    gap: 6px !important;
+  }
+
+  /* Coluna principal (mesa + botões) = coluna cheia sem overflow */
+  .game-table-column {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    gap: 6px !important;
+  }
+
+  /* Sidebar: escondida em portrait mobile (evita empurrar botões pra fora) */
+  .game-sidebar-column {
+    display: none !important;
+  }
+}
+
+/* -------- FELTRO: nunca estoura, cartas em linha única -------- */
+@media (max-width: 768px) and (orientation: portrait) {
+  .game-table-container {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 4px !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+  }
+
+  .game-table-felt {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    padding: 6px 6px !important;
+    border-radius: 16px !important;
+    overflow: hidden !important;
+    gap: 4px !important;
+  }
+
+  /* Área da CPU e do jogador: compactas, altura natural */
+  .game-table-player-area {
+    flex: 0 0 auto !important;
+    padding: 4px 6px !important;
+    border-radius: 10px !important;
+    min-height: 0 !important;
+  }
+
+  .game-table-player-area-cpu {
+    margin-bottom: 4px !important;
+  }
+
+  .game-table-player-area-player {
+    margin-top: 4px !important;
+  }
+
+  .game-table-player-label {
+    font-size: 0.6rem !important;
+    gap: 4px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .game-table-player-name { font-size: 0.65rem !important; }
+  .game-table-chips-label { font-size: 0.6rem !important; }
+
+  .game-table-cards-row {
+    gap: 3px !important;
+    min-height: 0 !important;
+    margin-top: 2px !important;
+  }
+
+  /* 🔥 ÁREA DA MESA — centro, ocupa espaço restante */
+  .game-table-community-area {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    padding: 6px 4px !important;
+    margin: 4px 0 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+
+  .game-table-community-label-wrapper {
+    font-size: 0.55rem !important;
+    gap: 6px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .game-table-stage-badge {
+    font-size: 0.55rem !important;
+    padding: 2px 8px !important;
+  }
+
+  /* 🔥🔥🔥 A CORREÇÃO PRINCIPAL: cartas da mesa em LINHA ÚNICA */
+  .game-table-community-cards-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;          /* NUNCA quebra linha */
+    justify-content: center !important;
+    align-items: center !important;
+    gap: clamp(2px, 1vw, 6px) !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Força cada carta da mesa a caber proporcionalmente na largura */
+  .game-table-community-cards-row > * {
+    flex: 0 1 auto !important;
+    max-width: calc((100% - 8 * 4px) / 5) !important;  /* 5 cartas + gaps */
+  }
+
+  /* Botões de ação: sempre na faixa inferior, nunca empurrados */
+  .action-buttons-container {
+    flex: 0 0 auto !important;
+    margin-top: 4px !important;
+    gap: 4px !important;
+    width: 100% !important;
+  }
+
+  .action-buttons-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 4px !important;
+  }
+
+  .action-btn {
+    padding: 6px 2px !important;
+    min-height: 46px !important;
+    font-size: 0.58rem !important;
+    border-radius: 8px !important;
+  }
+
+  .action-btn-icon { font-size: 0.85rem !important; }
+  .action-btn span:last-child { font-size: 0.5rem !important; }
+
+  .action-history {
+    padding: 2px 6px !important;
+    gap: 3px !important;
+    margin-top: 2px !important;
+  }
+
+  .action-history-item { font-size: 0.48rem !important; padding: 1px 5px !important; }
+  .action-history-label { font-size: 0.48rem !important; }
+
+  /* Side stats: escondido em portrait para não roubar altura */
+  .side-stats-toggles-container {
+    top: 4px !important;
+    padding: 3px 8px !important;
+    gap: 3px !important;
+    border-radius: 10px !important;
+    max-width: calc(100vw - 90px) !important;
+  }
+  .side-stats-item { padding: 2px 6px !important; gap: 2px !important; }
+  .side-stats-icon { font-size: 0.6rem !important; }
+  .side-stats-label { display: none !important; }
+  .side-stats-value { font-size: 0.5rem !important; max-width: 34px !important; }
+
+  /* Header / "Sair" não deve empurrar o felt */
+  .app-full-height > div[style*="position: fixed"] {
+    top: 4px !important;
+    right: 4px !important;
+  }
+
+  .app-full-height > div[style*="position: fixed"] button {
+    padding: 4px 8px !important;
+    font-size: 0.65rem !important;
+  }
+
+  /* Toolbar: encolhe para não roubar altura lateral */
+  .toolbar-buttons-container {
+    top: 36px !important;
+    right: 3px !important;
+    gap: 3px !important;
+  }
+  .toolbar-btn,
+  .toolbar-btn-tournament {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 0.75rem !important;
+  }
+}
+
+/* -------- Cartas da mesa em portrait: tamanho fluido -------- */
+@media (max-width: 768px) and (orientation: portrait) {
+  /* "large" da mesa: encolhe proporcionalmente à tela */
+  .game-table-community-cards-row .card-container,
+  .game-table-community-cards-row > div > div {
+    width: clamp(34px, calc((100vw - 60px) / 5 - 6px), 62px) !important;
+    height: clamp(48px, calc(((100vw - 60px) / 5 - 6px) * 1.4), 86px) !important;
+    margin: 1px !important;
+    border-radius: 6px !important;
+  }
+
+  /* Cartas do jogador/CPU (small/normal): proporcional, sem quebrar */
+  .game-table-cards-row .card-container,
+  .game-table-cards-row > div {
+    width: clamp(38px, 14vw, 62px) !important;
+    height: auto !important;
+    aspect-ratio: 62 / 87 !important;
+    margin: 1px !important;
+  }
+
+  /* Empty slots: mesmo tamanho das cartas reais da mesa */
+  .game-table-empty-card {
+    width: clamp(34px, calc((100vw - 60px) / 5 - 6px), 62px) !important;
+    height: clamp(48px, calc(((100vw - 60px) / 5 - 6px) * 1.4), 86px) !important;
+    margin: 1px !important;
+  }
+}
+
+/* -------- Pote e apostas mais compactos em portrait -------- */
+@media (max-width: 768px) and (orientation: portrait) {
+  .game-table-pot {
+    font-size: 0.72rem !important;
+    padding: 4px 12px !important;
+    min-width: 70px !important;
+    border-radius: 14px !important;
+  }
+
+  .game-table-pot-area { margin-top: 6px !important; }
+
+  .game-table-bets-display {
+    gap: 4px !important;
+    margin-top: 4px !important;
+    flex-wrap: nowrap !important;
+  }
+  .game-table-bet,
+  .game-table-current-bet {
+    font-size: 0.6rem !important;
+    padding: 2px 8px !important;
+  }
+
+  .game-table-hand-badge {
+    font-size: 0.58rem !important;
+    padding: 2px 8px !important;
+    margin-top: 3px !important;
+  }
+
+  .game-table-cpu-thought {
+    font-size: 0.55rem !important;
+    padding: 2px 8px !important;
+    margin-top: 2px !important;
+  }
+
+  .game-table-player-counter {
+    font-size: 0.55rem !important;
+    padding: 2px 6px !important;
+  }
+
+  .game-table-dealer-inline,
+  .game-table-turbo-inline {
+    font-size: 0.5rem !important;
+    padding: 1px 6px !important;
+  }
+
+  /* Mensagem de vitória/derrota compacta */
+  .winner-message {
+    font-size: 0.7rem !important;
+    padding: 4px 10px !important;
+    margin-top: 6px !important;
+  }
+
+  .footer-credit {
+    font-size: 0.6rem !important;
+    margin-top: 6px !important;
+  }
+}
+
+/* ================================================================
+   🔥 CORREÇÃO COMPLEMENTAR — evita scroll fantasma em qualquer tela
+   ================================================================ */
+.app-full-height::-webkit-scrollbar { display: none; }
+.app-full-height { scrollbar-width: none; -ms-overflow-style: none; }
