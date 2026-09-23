@@ -9,6 +9,7 @@
     "lint": "eslint",
     "socket": "node socket-server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run socket\"",
+    "start:all": "concurrently \"npm start\" \"npm run socket\"",
     "cypress:install": "npx cypress install",
     "cypress:open": "npx cypress open",
     "cypress:run": "npx cypress run",

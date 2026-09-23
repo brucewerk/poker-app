@@ -1,4 +1,4 @@
-// app/page.jsx - VERSÃO COMPLETA (SEM StatusPanel)
+// app/page.jsx - VERSÃO COMPLETA (LAYOUT VIEWPORT MOBILE-FIRST)
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -2092,13 +2092,6 @@ export default function PokerGame() {
     return "";
   }
 
-  // ====================== FUNÇÃO PARA CALCULAR CARTAS VAZIAS ======================
-  const getEmptyCardCount = useCallback(() => {
-    const communityCount = game.community?.length || 0;
-    const maxCards = 5;
-    return Math.max(0, maxCards - communityCount);
-  }, [game.community]);
-
   // ====================== EVENTO DE ATUALIZAÇÃO DE FICHAS ======================
   useEffect(() => {
     const handleChipsUpdate = (event) => {
@@ -2237,49 +2230,35 @@ export default function PokerGame() {
         currentUser={currentUser}
       />
 
-      <div
-        className="app-full-height"
-        style={{
-          margin: 0,
-          minHeight: "100vh",
-          background: "var(--bg-primary)",
-          display: "flex",
-          justifyContent: "center",
-          fontFamily: "'Segoe UI','Poppins',system-ui,sans-serif",
-          padding: "8px 15px",
-          userSelect: "none",
-          position: "relative",
-          transition: "var(--transition-theme)",
-          width: "100%",
-          boxSizing: "border-box",
-        }}
-      >
+      {/* 🔥 NOVO LAYOUT VIEWPORT: mesa+botões fixos, cards roláveis */}
+      <div className="app-viewport">
+        {/* Botão Sair - fixo */}
         {currentUser && (
           <div
             style={{
               position: "fixed",
-              top: 8,
-              right: 8,
-              zIndex: 100,
+              top: 6,
+              right: 6,
+              zIndex: 300,
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              gap: "6px",
             }}
           >
             <motion.button
               onClick={() => signOut()}
               style={{
-                background: "rgba(200,50,50,0.8)",
+                background: "rgba(200,50,50,0.85)",
                 color: "white",
                 border: "none",
-                padding: "6px 12px",
-                borderRadius: 20,
+                padding: "5px 10px",
+                borderRadius: 16,
                 cursor: "pointer",
                 fontWeight: "bold",
                 backdropFilter: "blur(4px)",
-                fontSize: "0.8rem",
+                fontSize: "0.72rem",
               }}
-              whileHover={{ scale: 1.05, background: "rgba(200,50,50,0.95)" }}
+              whileHover={{ scale: 1.05, background: "rgba(200,50,50,1)" }}
               whileTap={{ scale: 0.95 }}
             >
               🚪 Sair
@@ -2358,218 +2337,182 @@ export default function PokerGame() {
           />
         )}
 
-        <motion.div
-          style={{
-            background:
-              "radial-gradient(circle at 30% 20%, var(--bg-felt), var(--bg-primary))",
-            borderRadius: 50,
-            boxShadow:
-              "var(--table-shadow), inset 0 2px 5px rgba(255,255,255,0.2)",
-            padding: "15px 20px",
-            maxWidth: 1600,
-            width: "100%",
-            marginTop: "5px",
-            transition: "var(--transition-theme)",
-          }}
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4 }}
-        >
+        {/* ============================================================
+            🔥 ÁREA DE JOGO (MESA + BOTÕES) — SEMPRE VISÍVEL
+            ============================================================ */}
+        <div className="game-stage">
+          {isMultiplayer &&
+            multiplayerModeActive &&
+            multiplayerPlayers.length > 0 && (
+              <>
+                <PlayerSelector
+                  players={multiplayerPlayers}
+                  currentPlayer={currentPlayerIndex}
+                  onSelectPlayer={handleSwitchPlayer}
+                />
+                {(multiplayerPlayers[currentPlayerIndex]?.chips ?? 0) <= 0 && (
+                  <motion.button
+                    onClick={resetSession}
+                    style={{
+                      background: "radial-gradient(#f7d97c, #d6a12e)",
+                      border: "none",
+                      borderRadius: "16px",
+                      padding: "6px 12px",
+                      fontWeight: "700",
+                      fontSize: "0.7rem",
+                      color: "#2e241f",
+                      boxShadow: "0 3px 0 #7a4c1a",
+                      cursor: "pointer",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      margin: "0 auto",
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <span style={{ fontSize: "0.9rem" }}>🔄</span>
+                    RENOVAR FICHAS (1000)
+                  </motion.button>
+                )}
+              </>
+            )}
+
+          {g && (
+            <GameTable
+              communityCards={g?.community || []}
+              playerCards={g?.playerCards || []}
+              cpuCards={g?.cpuCards || []}
+              playerHandName={g?.playerHandName || ""}
+              cpuHandName={g?.cpuHandName || ""}
+              cpuThought={g?.cpuThought || ""}
+              stage={g?.stage || "preflop"}
+              pot={g?.pot || 0}
+              currentBet={g?.currentBet || 0}
+              playerBet={g?.playerBet || 0}
+              cpuBet={g?.cpuBet || 0}
+              isTurbo={isTurbo}
+              showCpuCards={showCpuCards}
+              isMultiplayer={isMultiplayer && multiplayerModeActive}
+              multiplayerPlayers={multiplayerPlayers}
+              currentPlayerIndex={currentPlayerIndex}
+              onSwitchPlayer={handleSwitchPlayer}
+              currentUser={currentUser}
+            />
+          )}
+
+          {g && (
+            <ActionButtons
+              disabled={actionButtonsDisabled}
+              canRaise={canRaise}
+              toCall={toCall}
+              nextRaise={nextRaise}
+              onFold={playerFold}
+              onCall={playerCall}
+              onRaise={playerRaise}
+              onAllIn={playerAllIn}
+              onReset={resetSession}
+              onNewHand={() => {
+                startNewHand(currentUser, undefined);
+              }}
+              playerMoney={g?.playerMoney || 0}
+              isWaitingForNewHand={waitingForNewHand}
+              cpuAction={null}
+            />
+          )}
+
+          {g?.winnerMsg && (
+            <motion.div
+              className="winner-message"
+              style={{
+                background: "rgba(0,0,0,0.7)",
+                backdropFilter: "blur(12px)",
+                borderRadius: 20,
+                padding: "4px 12px",
+                textAlign: "center",
+                fontWeight: "bold",
+                fontSize: "0.75rem",
+                color: "#ffd966",
+                border: "1px solid rgba(255,215,0,0.3)",
+                textShadow: "0 1px 2px rgba(0,0,0,0.3)",
+                margin: "4px auto 0",
+                maxWidth: "95%",
+              }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              {g?.winnerMsg}
+            </motion.div>
+          )}
+        </div>
+
+        {/* ============================================================
+            🔥 ÁREA ROLÁVEL — CARDS DO APP (abaixo dos botões)
+            ============================================================ */}
+        <div className="app-cards-scroll">
+          {g && (
+            <StatsPanel
+              username={currentUser}
+              onShowAchievements={() => setShowAchievementsModal(true)}
+              isResultModalOpen={isResultModalOpen}
+            />
+          )}
+
+          {g && (
+            <LevelDisplay
+              username={currentUser}
+              isResultModalOpen={isResultModalOpen}
+              onShowAchievements={() => setShowAchievementsModal(true)}
+              onShowFindings={() => setShowFindingsModal(true)}
+            />
+          )}
+
+          <FriendsList
+            username={currentUser}
+            onJoinGame={handleJoinOnlineGame}
+            onNewChatMessage={handleGlobalChatMessage}
+          />
+
+          <MissionsPanel
+            username={currentUser}
+            onChipsUpdated={(newChips) => {
+              setCurrentChips(newChips);
+              setGame((prev) => ({ ...prev, playerMoney: newChips }));
+            }}
+            isResultModalOpen={isResultModalOpen}
+          />
+
+          <HandHistory
+            username={currentUser}
+            isResultModalOpen={isResultModalOpen}
+          />
+
           <div
+            className="footer-credit"
             style={{
-              background: "rgba(0,20,0,0.3)",
-              borderRadius: 40,
-              padding: "12px 15px",
+              textAlign: "center",
+              padding: "10px 0 20px",
+              fontSize: "0.7rem",
+              color: "var(--text-muted)",
+              textShadow: "1px 1px 0 #2a1f0e",
+              transition: "var(--transition-theme)",
             }}
           >
-            {isMultiplayer &&
-              multiplayerModeActive &&
-              multiplayerPlayers.length > 0 && (
-                <>
-                  <PlayerSelector
-                    players={multiplayerPlayers}
-                    currentPlayer={currentPlayerIndex}
-                    onSelectPlayer={handleSwitchPlayer}
-                  />
-                  {(multiplayerPlayers[currentPlayerIndex]?.chips ?? 0) <=
-                    0 && (
-                    <motion.button
-                      onClick={resetSession}
-                      style={{
-                        background: "radial-gradient(#f7d97c, #d6a12e)",
-                        border: "none",
-                        borderRadius: "20px",
-                        padding: "8px 16px",
-                        fontWeight: "700",
-                        fontSize: "0.8rem",
-                        color: "#2e241f",
-                        boxShadow: "0 4px 0 #7a4c1a",
-                        cursor: "pointer",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        transition: "all 0.2s ease",
-                      }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <span style={{ fontSize: "1rem" }}>🔄</span>
-                      RENOVAR FICHAS (1000)
-                    </motion.button>
-                  )}
-                </>
-              )}
-
-            <div
-              className="game-main-columns"
-              style={{ display: "flex", gap: 15, flexWrap: "wrap" }}
+            Desenvolvido por{" "}
+            <a
+              href="https://klingklang.free.nf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-credit-link"
             >
-              <div className="game-table-column" style={{ flex: 3, minWidth: 280 }}>
-                {g && (
-                  <GameTable
-                    communityCards={g?.community || []}
-                    playerCards={g?.playerCards || []}
-                    cpuCards={g?.cpuCards || []}
-                    playerHandName={g?.playerHandName || ""}
-                    cpuHandName={g?.cpuHandName || ""}
-                    cpuThought={g?.cpuThought || ""}
-                    stage={g?.stage || "preflop"}
-                    pot={g?.pot || 0}
-                    currentBet={g?.currentBet || 0}
-                    playerBet={g?.playerBet || 0}
-                    cpuBet={g?.cpuBet || 0}
-                    isTurbo={isTurbo}
-                    showCpuCards={showCpuCards}
-                    isMultiplayer={isMultiplayer && multiplayerModeActive}
-                    multiplayerPlayers={multiplayerPlayers}
-                    currentPlayerIndex={currentPlayerIndex}
-                    onSwitchPlayer={handleSwitchPlayer}
-                    currentUser={currentUser}
-                  />
-                )}
-
-                {g && (
-                  <ActionButtons
-                    disabled={actionButtonsDisabled}
-                    canRaise={canRaise}
-                    toCall={toCall}
-                    nextRaise={nextRaise}
-                    onFold={playerFold}
-                    onCall={playerCall}
-                    onRaise={playerRaise}
-                    onAllIn={playerAllIn}
-                    onReset={resetSession}
-                    onNewHand={() => {
-                      console.log(
-                        "🔍 [Page] onNewHand chamado! Iniciando nova mão...",
-                      );
-                      startNewHand(currentUser, undefined);
-                    }}
-                    playerMoney={g?.playerMoney || 0}
-                    isWaitingForNewHand={waitingForNewHand}
-                    cpuAction={null}
-                  />
-                )}
-
-                {g?.winnerMsg && (
-                  <motion.div
-                    className="winner-message"
-                    style={{
-                      background: "rgba(0,0,0,0.7)",
-                      backdropFilter: "blur(12px)",
-                      borderRadius: 40,
-                      padding: "6px 15px",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                      fontSize: "0.85rem",
-                      color: "#ffd966",
-                      marginTop: 12,
-                      border: "1px solid rgba(255,215,0,0.3)",
-                      textShadow: "0 1px 2px rgba(0,0,0,0.3)",
-                    }}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
-                    {g?.winnerMsg}
-                  </motion.div>
-                )}
-
-                <div
-                  className="footer-credit"
-                  style={{
-                    textAlign: "center",
-                    marginTop: 12,
-                    fontSize: "0.7rem",
-                    color: "var(--text-muted)",
-                    textShadow: "1px 1px 0 #2a1f0e",
-                    transition: "var(--transition-theme)",
-                  }}
-                >
-                  Desenvolvido por{" "}
-                  <a
-                    href="https://klingklang.free.nf"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="footer-credit-link"
-                  >
-                    BruCe
-                  </a>{" "}
-                  - 2026
-                </div>
-              </div>
-
-              <div
-                className="game-sidebar-column"
-                style={{
-                  flex: 1,
-                  minWidth: 220,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                {g && (
-                  <StatsPanel
-                    username={currentUser}
-                    onShowAchievements={() => setShowAchievementsModal(true)}
-                    isResultModalOpen={isResultModalOpen}
-                  />
-                )}
-
-                {g && (
-                  <LevelDisplay
-                    username={currentUser}
-                    isResultModalOpen={isResultModalOpen}
-                    onShowAchievements={() => setShowAchievementsModal(true)}
-                    onShowFindings={() => setShowFindingsModal(true)}
-                  />
-                )}
-
-                <FriendsList
-                  username={currentUser}
-                  onJoinGame={handleJoinOnlineGame}
-                  onNewChatMessage={handleGlobalChatMessage}
-                />
-
-                <MissionsPanel
-                  username={currentUser}
-                  onChipsUpdated={(newChips) => {
-                    setCurrentChips(newChips);
-                    setGame((prev) => ({ ...prev, playerMoney: newChips }));
-                  }}
-                  isResultModalOpen={isResultModalOpen}
-                />
-                <HandHistory
-                  username={currentUser}
-                  isResultModalOpen={isResultModalOpen}
-                />
-              </div>
-            </div>
+              BruCe
+            </a>{" "}
+            - 2026
           </div>
-        </motion.div>
+        </div>
       </div>
     </>
   );
