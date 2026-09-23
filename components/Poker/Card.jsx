@@ -1,20 +1,14 @@
-// components/Poker/Card.jsx - RESPONSIVO COM CLAMP() (corrigido)
+// components/Poker/Card.jsx - REDESENHADA (cartas realistas com pips, SVG e flip 3D)
 "use client";
 
 import { motion } from "framer-motion";
 import { useState, useEffect, memo } from "react";
 
 // ====================== ÍCONES DE NAIPE (SVG) ======================
-// 🔥 NOTA: o SVG aceita APENAS número em width/height, não clamp().
-// Por isso os tamanhos aqui são números fixos — quem escala é o CSS
-// do container (via --card-width com clamp()).
 function SuitIcon({ suit, size = 14, color }) {
-  // Garante que size seja sempre número (fallback seguro)
-  const safeSize = Number.isFinite(size) ? size : 14;
-
   const common = {
-    width: safeSize,
-    height: safeSize,
+    width: size,
+    height: size,
     viewBox: "0 0 32 32",
     style: { display: "block" },
   };
@@ -57,6 +51,7 @@ function SuitIcon({ suit, size = 14, color }) {
   }
 }
 
+// Layout dos pips para cartas numéricas (posições em % dentro do miolo da carta)
 const PIP_LAYOUTS = {
   2: [
     [50, 22],
@@ -136,51 +131,6 @@ const PIP_LAYOUTS = {
 const FACE_LABEL = { 11: "J", 12: "Q", 13: "K", 14: "A" };
 const FACE_NAME = { 11: "Valete", 12: "Rainha", 13: "Rei", 14: "Ás" };
 
-// 🔥 TAMANHOS COM CLAMP — usados APENAS no CSS (width/height/fontSize)
-// Os valores de SVG (indexSuit, pipSize, centerSuit) voltaram a ser NÚMEROS fixos.
-const SIZE_MAP = {
-  tiny: {
-    width: "clamp(28px, 8vw, 40px)",
-    height: "clamp(39px, 11.2vw, 56px)",
-    indexFont: "clamp(0.42rem, 1.6vw, 0.55rem)",
-    indexSuit: 7,
-    pipSize: 7,
-    centerSuit: 16,
-  },
-  small: {
-    width: "clamp(34px, 9vw, 50px)",
-    height: "clamp(48px, 12.6vw, 70px)",
-    indexFont: "clamp(0.5rem, 1.8vw, 0.62rem)",
-    indexSuit: 8,
-    pipSize: 8,
-    centerSuit: 18,
-  },
-  normal: {
-    width: "clamp(38px, 10vw, 62px)",
-    height: "clamp(53px, 14vw, 87px)",
-    indexFont: "clamp(0.55rem, 2vw, 0.72rem)",
-    indexSuit: 9,
-    pipSize: 9,
-    centerSuit: 22,
-  },
-  large: {
-    width: "clamp(42px, 11vw, 74px)",
-    height: "clamp(59px, 15.4vw, 103px)",
-    indexFont: "clamp(0.6rem, 2.2vw, 0.82rem)",
-    indexSuit: 10,
-    pipSize: 10,
-    centerSuit: 28,
-  },
-  board: {
-    width: "clamp(36px, 9.5vw, 58px)",
-    height: "clamp(50px, 13.3vw, 81px)",
-    indexFont: "clamp(0.55rem, 2vw, 0.7rem)",
-    indexSuit: 9,
-    pipSize: 9,
-    centerSuit: 24,
-  },
-};
-
 const Card = memo(function Card({
   card,
   faceDown = false,
@@ -217,7 +167,33 @@ const Card = memo(function Card({
   const isAce = rankRaw === 14;
   const pipPositions = PIP_LAYOUTS[rankRaw];
 
-  const cfg = SIZE_MAP[size] || SIZE_MAP.normal;
+  const sizeMap = {
+    small: {
+      width: 50,
+      height: 70,
+      indexFont: "0.62rem",
+      indexSuit: 8,
+      pipSize: 9,
+      centerSuit: 20,
+    },
+    normal: {
+      width: 62,
+      height: 87,
+      indexFont: "0.72rem",
+      indexSuit: 9,
+      pipSize: 10,
+      centerSuit: 24,
+    },
+    large: {
+      width: 74,
+      height: 103,
+      indexFont: "0.82rem",
+      indexSuit: 10,
+      pipSize: 12,
+      centerSuit: 30,
+    },
+  };
+  const cfg = sizeMap[size] || sizeMap.normal;
 
   // ====================== VERSO DA CARTA ======================
   if (faceDown) {
@@ -231,12 +207,7 @@ const Card = memo(function Card({
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.8, y: -20 }}
-        animate={{
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          rotateY: isFlipping ? [0, 90, 0] : 0,
-        }}
+        animate={{ opacity: 1, scale: 1, y: 0, rotateY: isFlipping ? [0, 90, 0] : 0 }}
         transition={{
           delay: delay / 1000,
           type: "spring",
@@ -248,8 +219,8 @@ const Card = memo(function Card({
           display: "inline-flex",
           width: cfg.width,
           height: cfg.height,
-          margin: "1px",
-          borderRadius: "clamp(4px, 1vw, 8px)",
+          margin: "2px",
+          borderRadius: 8,
           flexShrink: 0,
           position: "relative",
           background: backGrad,
@@ -257,17 +228,17 @@ const Card = memo(function Card({
             ? "1.5px solid rgba(255,215,0,0.35)"
             : "1.5px solid rgba(120,90,40,0.35)",
           boxShadow:
-            "0 2px 8px rgba(0,0,0,0.35), inset 0 0 0 2px rgba(255,255,255,0.08)",
+            "0 4px 14px rgba(0,0,0,0.35), inset 0 0 0 3px rgba(255,255,255,0.08)",
           overflow: "hidden",
         }}
       >
         <div
           style={{
             position: "absolute",
-            inset: 2,
-            borderRadius: "clamp(3px, 0.8vw, 5px)",
+            inset: 4,
+            borderRadius: 5,
             border: `1px solid ${latticeColor}`,
-            backgroundImage: `repeating-linear-gradient(45deg, ${latticeColor} 0, ${latticeColor} 1px, transparent 1px, transparent 6px), repeating-linear-gradient(-45deg, ${latticeColor} 0, ${latticeColor} 1px, transparent 1px, transparent 6px)`,
+            backgroundImage: `repeating-linear-gradient(45deg, ${latticeColor} 0, ${latticeColor} 1px, transparent 1px, transparent 7px), repeating-linear-gradient(-45deg, ${latticeColor} 0, ${latticeColor} 1px, transparent 1px, transparent 7px)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -275,7 +246,7 @@ const Card = memo(function Card({
         >
           <span
             style={{
-              fontSize: "clamp(0.8rem, 3vw, 1.4rem)",
+              fontSize: cfg.width * 0.38,
               opacity: isDarkTheme ? 0.55 : 0.4,
               filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
             }}
@@ -294,12 +265,7 @@ const Card = memo(function Card({
 
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-        scale: 0.8,
-        y: -20,
-        rotateY: isRevealing ? -90 : 0,
-      }}
+      initial={{ opacity: 0, scale: 0.8, y: -20, rotateY: isRevealing ? -90 : 0 }}
       animate={{
         opacity: 1,
         scale: 1,
@@ -312,21 +278,21 @@ const Card = memo(function Card({
         stiffness: 380,
         damping: 24,
       }}
-      whileHover={{ scale: 1.04, y: -3, transition: { duration: 0.15 } }}
+      whileHover={{ scale: 1.06, y: -5, transition: { duration: 0.15 } }}
       style={{
         display: "inline-flex",
         flexDirection: "column",
         width: cfg.width,
         height: cfg.height,
-        margin: "1px",
-        borderRadius: "clamp(4px, 1vw, 8px)",
+        margin: "2px",
+        borderRadius: 8,
         flexShrink: 0,
         position: "relative",
         background: faceBg,
         border: isRed ? "1px solid #e3b8b8" : "1px solid #cfd4d0",
         boxShadow: isHighlighted
-          ? "0 0 0 2px rgba(255,215,0,0.75), 0 0 18px rgba(255,215,0,0.55), 0 4px 12px rgba(0,0,0,0.3)"
-          : "0 2px 8px rgba(0,0,0,0.28), 0 1px 2px rgba(0,0,0,0.15)",
+          ? "0 0 0 2px rgba(255,215,0,0.75), 0 0 24px rgba(255,215,0,0.55), 0 6px 16px rgba(0,0,0,0.3)"
+          : "0 4px 12px rgba(0,0,0,0.28), 0 1px 3px rgba(0,0,0,0.15)",
         transformStyle: "preserve-3d",
         transition: "box-shadow 0.25s ease",
       }}
@@ -335,8 +301,8 @@ const Card = memo(function Card({
       <div
         style={{
           position: "absolute",
-          top: "clamp(1px, 0.5vw, 3px)",
-          left: "clamp(2px, 0.7vw, 4px)",
+          top: 3,
+          left: 4,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -354,8 +320,8 @@ const Card = memo(function Card({
       <div
         style={{
           position: "absolute",
-          bottom: "clamp(1px, 0.5vw, 3px)",
-          right: "clamp(2px, 0.7vw, 4px)",
+          bottom: 3,
+          right: 4,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -390,19 +356,15 @@ const Card = memo(function Card({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 1,
+              gap: 2,
               color: suitColor,
             }}
             title={FACE_NAME[rankRaw]}
           >
-            <SuitIcon
-              suit={card.suit}
-              size={cfg.centerSuit * 0.8}
-              color={suitColor}
-            />
+            <SuitIcon suit={card.suit} size={cfg.centerSuit * 0.8} color={suitColor} />
             <span
               style={{
-                fontSize: "clamp(0.7rem, 2.5vw, 1.1rem)",
+                fontSize: cfg.width * 0.34,
                 fontWeight: 900,
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 letterSpacing: "-0.5px",
@@ -426,11 +388,7 @@ const Card = memo(function Card({
                   transform: `translate(-50%, -50%) ${y > 55 ? "rotate(180deg)" : ""}`,
                 }}
               >
-                <SuitIcon
-                  suit={card.suit}
-                  size={cfg.pipSize}
-                  color={suitColor}
-                />
+                <SuitIcon suit={card.suit} size={cfg.pipSize} color={suitColor} />
               </div>
             ))}
           </div>
@@ -442,7 +400,7 @@ const Card = memo(function Card({
         style={{
           position: "absolute",
           inset: 0,
-          borderRadius: "clamp(4px, 1vw, 8px)",
+          borderRadius: 8,
           background:
             "linear-gradient(135deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 35%)",
           pointerEvents: "none",
@@ -454,9 +412,9 @@ const Card = memo(function Card({
           style={{
             position: "absolute",
             inset: -3,
-            borderRadius: "clamp(6px, 1.3vw, 10px)",
+            borderRadius: 10,
             border: "2px solid rgba(255,215,0,0.5)",
-            boxShadow: "0 0 18px rgba(255,215,0,0.35)",
+            boxShadow: "0 0 22px rgba(255,215,0,0.35)",
             pointerEvents: "none",
           }}
           animate={{ opacity: [0.55, 1, 0.55] }}
