@@ -1119,3 +1119,74 @@ body {
   overflow-x: hidden;
   width: 100%;
 }
+
+
+/* ================================================================
+   🔥 LANDSCAPE — MESA COMPRIMIDA + BOTÕES VISÍVEIS
+   ================================================================ */
+@media (orientation: landscape) and (max-height: 550px) {
+  /* O viewport vira um grid: mesa à esquerda, botões à direita */
+  .game-stage {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    grid-template-rows: auto auto !important;
+    gap: 4px !important;
+    padding: 2px 4px !important;
+    align-items: start !important;
+  }
+
+  /* A mesa ocupa a coluna esquerda */
+  .game-stage > .game-table-container {
+    grid-column: 1 / 2 !important;
+    grid-row: 1 / 2 !important;
+  }
+
+  /* Os botões ficam na coluna direita, abaixo da mesa OU ao lado */
+  .game-stage > .action-buttons-container {
+    grid-column: 2 / 3 !important;
+    grid-row: 1 / 2 !important;
+    align-self: end !important;
+    max-width: 240px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Reduz drasticamente a mesa em landscape */
+  .game-table-felt {
+    min-height: 120px !important;
+    padding: 3px 5px !important;
+    gap: 2px !important;
+  }
+
+  .game-table-player-area-cpu,
+  .game-table-player-area-player,
+  .game-table-community-area {
+    padding: 2px 4px !important;
+  }
+
+  .game-table-community-cards-row {
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  .game-table-empty-card,
+  .game-table-community-cards-row > * {
+    --card-width: 26px;
+    --card-height: 36px;
+  }
+
+  /* Botões em landscape ficam menores */
+  .action-btn {
+    min-height: 26px !important;
+    font-size: 0.4rem !important;
+    padding: 2px 1px !important;
+  }
+
+  .action-btn-icon {
+    font-size: 0.55rem !important;
+  }
+
+  .action-btn span:last-child {
+    font-size: 0.32rem !important;
+  }
+}

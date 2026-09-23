@@ -1,4 +1,4 @@
-// app/page.jsx - VERSÃO COMPLETA (LAYOUT VIEWPORT MOBILE-FIRST)
+// app/page.jsx - VERSÃO COMPLETA (LAYOUT VIEWPORT MOBILE-FIRST + ALIASES)
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -105,11 +105,8 @@ export default function PokerGame() {
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [pendingInviteJoin, setPendingInviteJoin] = useState(null);
 
-  // 🔥 ESTADO PARA NOTIFICAÇÕES DE CHAT GLOBAIS
   const [globalChatNotifications, setGlobalChatNotifications] = useState([]);
   const [globalChatUnread, setGlobalChatUnread] = useState(0);
-
-  // 🔥 ESTADO PARA CONTROLAR SE O JOGO ESTÁ ESPERANDO "NOVA MÃO"
   const [waitingForNewHand, setWaitingForNewHand] = useState(true);
 
   const cpuTimerRef = useRef(null);
@@ -2217,7 +2214,6 @@ export default function PokerGame() {
     <>
       <DesktopZoom />
 
-      {/* 🔥 STATS NO TOPO - ÚNICA FONTE DE INFORMAÇÃO */}
       <SideStatsToggles
         pot={g?.pot || 0}
         stage={g?.stage || "preflop"}
@@ -2230,7 +2226,6 @@ export default function PokerGame() {
         currentUser={currentUser}
       />
 
-      {/* 🔥 NOVO LAYOUT VIEWPORT: mesa+botões fixos, cards roláveis */}
       <div className="app-viewport">
         {/* Botão Sair - fixo */}
         {currentUser && (
@@ -2339,8 +2334,9 @@ export default function PokerGame() {
 
         {/* ============================================================
             🔥 ÁREA DE JOGO (MESA + BOTÕES) — SEMPRE VISÍVEL
+            Alias .game-table-column mantido para compatibilidade
             ============================================================ */}
-        <div className="game-stage">
+        <div className="game-stage game-table-column">
           {isMultiplayer &&
             multiplayerModeActive &&
             multiplayerPlayers.length > 0 && (
@@ -2451,8 +2447,9 @@ export default function PokerGame() {
 
         {/* ============================================================
             🔥 ÁREA ROLÁVEL — CARDS DO APP (abaixo dos botões)
+            Alias .game-sidebar-column mantido para compatibilidade
             ============================================================ */}
-        <div className="app-cards-scroll">
+        <div className="app-cards-scroll game-sidebar-column">
           {g && (
             <StatsPanel
               username={currentUser}
