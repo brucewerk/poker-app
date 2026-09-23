@@ -26,17 +26,35 @@ const GameTable = memo(function GameTable({
   currentUser,
 }) {
   // 🔥 DETECTA MODO PAISAGEM
+  // Usa matchMedia (não "resize") para não recalcular a cada oscilação da
+  // barra de endereço do navegador mobile — essa era a causa da mesa
+  // "mudando de tamanho" durante a partida ao rolar a tela.
   const [isLandscape, setIsLandscape] = useState(false);
 
   useEffect(() => {
-    const checkOrientation = () => {
-      const isLandscapeMode =
-        window.innerHeight < window.innerWidth && window.innerHeight < 550;
-      setIsLandscape(isLandscapeMode);
+    if (typeof window === "undefined" || !window.matchMedia) return;
+
+    const mql = window.matchMedia(
+      "(orientation: landscape) and (max-height: 550px)",
+    );
+    const updateOrientation = () => setIsLandscape(mql.matches);
+
+    updateOrientation();
+
+    if (mql.addEventListener) {
+      mql.addEventListener("change", updateOrientation);
+    } else {
+      // Fallback para navegadores mais antigos
+      mql.addListener(updateOrientation);
+    }
+
+    return () => {
+      if (mql.removeEventListener) {
+        mql.removeEventListener("change", updateOrientation);
+      } else {
+        mql.removeListener(updateOrientation);
+      }
     };
-    checkOrientation();
-    window.addEventListener("resize", checkOrientation);
-    return () => window.removeEventListener("resize", checkOrientation);
   }, []);
 
   // 🔥 Otimização: Evitar re-renders desnecessários

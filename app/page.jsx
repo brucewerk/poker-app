@@ -80,6 +80,7 @@ export default function PokerGame() {
     isError: false,
     visible: false,
   });
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [showFindingsModal, setShowFindingsModal] = useState(false);
   const [showTournamentLobby, setShowTournamentLobby] = useState(false);
@@ -2238,7 +2239,7 @@ export default function PokerGame() {
       />
 
       <div
-        className="app-full-height"
+        className={`app-full-height game-shell${showMobileSidebar ? " game-shell--sidebar-open" : ""}`}
         style={{
           margin: 0,
           minHeight: "100vh",
@@ -2254,6 +2255,17 @@ export default function PokerGame() {
           boxSizing: "border-box",
         }}
       >
+        {/* 🔥 Atalho mobile para abrir o painel lateral (stats/amigos/missões/histórico)
+            sem empurrar a mesa e os botões de ação para fora da tela */}
+        <button
+          type="button"
+          className="mobile-sidebar-toggle"
+          onClick={() => setShowMobileSidebar(true)}
+          aria-label="Abrir painel"
+        >
+          📊
+        </button>
+
         {currentUser && (
           <div
             style={{
@@ -2359,6 +2371,7 @@ export default function PokerGame() {
         )}
 
         <motion.div
+          className="game-board-shell"
           style={{
             background:
               "radial-gradient(circle at 30% 20%, var(--bg-felt), var(--bg-primary))",
@@ -2376,6 +2389,7 @@ export default function PokerGame() {
           transition={{ duration: 0.4 }}
         >
           <div
+            className="game-board-shell-inner"
             style={{
               background: "rgba(0,20,0,0.3)",
               borderRadius: 40,
@@ -2531,6 +2545,15 @@ export default function PokerGame() {
                   gap: 8,
                 }}
               >
+                <button
+                  type="button"
+                  className="mobile-sidebar-close"
+                  onClick={() => setShowMobileSidebar(false)}
+                  aria-label="Fechar painel"
+                >
+                  ✕ Fechar
+                </button>
+
                 {g && (
                   <StatsPanel
                     username={currentUser}
