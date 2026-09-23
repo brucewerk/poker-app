@@ -1,33 +1,55 @@
 name: Cypress Tests
-on: [push]
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
 jobs:
   cypress-run:
     runs-on: ubuntu-latest
-    # Runs tests in parallel with matrix strategy https://on.cypress.io/parallelization
-    # https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/run-job-variations
-    # Also see warning here https://github.com/cypress-io/github-action#parallel
     strategy:
-      fail-fast: false # https://github.com/cypress-io/github-action/issues/48
+      fail-fast: false
       matrix:
-        containers: [1, 2] # Uses 2 parallel instances
+        containers: [1]
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-      - name: Cypress run
-        # Uses the official Cypress GitHub action https://github.com/cypress-io/github-action
-        uses: cypress-io/github-action@v7
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          # Starts web server for E2E tests - replace with your own server invocation
-          # https://docs.cypress.io/app/continuous-integration/overview#Boot-your-server
-          start: npm start
-          wait-on: "http://localhost:3000" # Waits for above
-          # Records to Cypress Cloud
-          # https://docs.cypress.io/cloud/get-started/setup
-          record: true
-          parallel: true # Runs test in parallel using settings above
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build Next.js
+        run: npm run build
         env:
-          # For recording and parallelization you must set your CYPRESS_RECORD_KEY
-          # in GitHub repo → Settings → Secrets → Actions
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_SOCKET_URL: ${{ secrets.NEXT_PUBLIC_SOCKET_URL }}
+
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
+          start: npm start
+          wait-on: "http://localhost:3000"
+          wait-on-timeout: 120
+          record: true
+          parallel: true
+          browser: chrome
+        env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          # Create a token https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
+          CYPRESS_TEST_USER: ${{ secrets.CYPRESS_TEST_USER }}
+          CYPRESS_TEST_PASSWORD: ${{ secrets.CYPRESS_TEST_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_SOCKET_URL: ${{ secrets.NEXT_PUBLIC_SOCKET_URL }}
