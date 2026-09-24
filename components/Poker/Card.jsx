@@ -326,26 +326,6 @@ const Card = memo(function Card({
         <SuitIcon suit={card.suit} size={cfg.indexSuit} color={suitColor} />
       </div>
 
-      {/* Índice inferior-direito (invertido) */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 3,
-          right: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          lineHeight: 1,
-          color: suitColor,
-          transform: "rotate(180deg)",
-        }}
-      >
-        <span style={{ fontSize: cfg.indexFont, fontWeight: 800 }}>
-          {rankDisplay}
-        </span>
-        <SuitIcon suit={card.suit} size={cfg.indexSuit} color={suitColor} />
-      </div>
-
       {/* Miolo da carta */}
       <div
         style={{
