@@ -2853,18 +2853,26 @@ body {
 }
 
 .card-container.card-size-tiny {
-  width: calc(var(--card-width, 52px) * 0.62) !important;
-  height: calc(var(--card-height, 74px) * 0.62) !important;
+  width: calc(var(--card-width, 52px) * 0.72) !important;
+  height: calc(var(--card-height, 74px) * 0.72) !important;
 }
 
 .card-container.card-size-small {
-  width: calc(var(--card-width, 52px) * 0.82) !important;
-  height: calc(var(--card-height, 74px) * 0.82) !important;
+  width: calc(var(--card-width, 52px) * 0.98) !important;
+  height: calc(var(--card-height, 74px) * 0.98) !important;
+}
+
+.card-container.card-size-normal {
+  width: calc(var(--card-width, 52px) * 1.15) !important;
+  height: calc(var(--card-height, 74px) * 1.15) !important;
 }
 
 .card-container.card-size-large {
-  width: calc(var(--card-width, 52px) * 1.18) !important;
-  height: calc(var(--card-height, 74px) * 1.18) !important;
+  /* 🔥 Cartas comunitárias: fator maior porque agora a linha de cartas
+     só precisa caber 4 cartas (o river ganhou linha própria), sobrando
+     bem mais largura por carta do que quando eram 5 numa fileira só. */
+  width: calc(var(--card-width, 52px) * 1.6) !important;
+  height: calc(var(--card-height, 74px) * 1.6) !important;
 }
 
 .card-container .card-rank {
@@ -3265,4 +3273,19 @@ canvas {
   .game-shell .game-table-felt {
     padding: 4px 6px !important;
   }
+}
+
+/* ================================================================
+   🔥 LINHA DO RIVER (5ª carta comunitária) EM LINHA PRÓPRIA
+   ------------------------------------------------------------------
+   O river ganhou uma linha só para ele (pedido do BruCe) para que as
+   4 primeiras cartas (flop + turn) não precisem dividir espaço com
+   uma 5ª carta na mesma fileira — sobra mais largura por carta.
+   A altura mínima aqui acompanha --card-height (responsivo) para não
+   duplicar o "chão" alto das fileiras normais, que foi pensado para
+   caber várias cartas lado a lado.
+   ================================================================ */
+.game-table-river-row {
+  min-height: calc(var(--card-height, 74px) * 1.6 + 10px) !important;
+  margin-top: 6px !important;
 }

@@ -547,26 +547,28 @@ const GameTable = memo(function GameTable({
             }
           >
             {communityCards && communityCards.length > 0
-              ? communityCards.map((card, i) => (
-                  <motion.div
-                    key={`community-${i}-${card.rank}${card.suit}`}
-                    initial={{ opacity: 0, scale: 0.8, y: -20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{
-                      delay: i * 0.15,
-                      type: "spring",
-                      stiffness: 300,
-                    }}
-                  >
-                    <Card
-                      card={card}
-                      delay={i * 100}
-                      size={isLandscape ? "tiny" : "large"}
-                      isHighlighted={stage === "showdown"}
-                    />
-                  </motion.div>
-                ))
-              : Array(5)
+              ? communityCards
+                  .slice(0, isLandscape ? 5 : 4)
+                  .map((card, i) => (
+                    <motion.div
+                      key={`community-${i}-${card.rank}${card.suit}`}
+                      initial={{ opacity: 0, scale: 0.8, y: -20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{
+                        delay: i * 0.15,
+                        type: "spring",
+                        stiffness: 300,
+                      }}
+                    >
+                      <Card
+                        card={card}
+                        delay={i * 100}
+                        size={isLandscape ? "tiny" : "large"}
+                        isHighlighted={stage === "showdown"}
+                      />
+                    </motion.div>
+                  ))
+              : Array(isLandscape ? 5 : 4)
                   .fill(0)
                   .map((_, i) => (
                     <div
@@ -584,6 +586,43 @@ const GameTable = memo(function GameTable({
                     />
                   ))}
           </div>
+
+          {/* River — linha própria só no retrato (no retrato sobra largura,
+              na paisagem o que falta é altura, então lá o river continua
+              junto dos outros, como antes) */}
+          {!isLandscape && (
+            <div className="game-table-community-cards-row game-table-river-row">
+              {communityCards && communityCards.length > 4 ? (
+                (() => {
+                  const card = communityCards[4];
+                  return (
+                    <motion.div
+                      key={`community-4-${card.rank}${card.suit}`}
+                      initial={{ opacity: 0, scale: 0.8, y: -20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{
+                        delay: 4 * 0.15,
+                        type: "spring",
+                        stiffness: 300,
+                      }}
+                    >
+                      <Card
+                        card={card}
+                        delay={4 * 100}
+                        size="large"
+                        isHighlighted={stage === "showdown"}
+                      />
+                    </motion.div>
+                  );
+                })()
+              ) : (
+                <div
+                  className="game-table-empty-card"
+                  style={emptyCardSlotStyle()}
+                />
+              )}
+            </div>
+          )}
 
           {/* Área do pote */}
           <div
@@ -631,84 +670,6 @@ const GameTable = memo(function GameTable({
                 <div className="game-table-chip-container">{renderChips}</div>
               )}
             </motion.div>
-          </div>
-
-          {/* Apostas atuais */}
-          <div
-            className="game-table-bets-display"
-            style={
-              isLandscape
-                ? {
-                    gap: "2px",
-                    fontSize: "0.4rem",
-                    paddingTop: "1px",
-                    paddingBottom: "1px",
-                    paddingLeft: "4px",
-                    paddingRight: "4px",
-                    marginTop: "2px",
-                    flexWrap: "nowrap",
-                  }
-                : {}
-            }
-          >
-            <motion.span
-              className="game-table-bet game-table-bet-player"
-              key={`player-bet-${playerBet}`}
-              initial={{ scale: 1 }}
-              animate={{ scale: playerBet > 0 ? [1, 1.1, 1] : 1 }}
-              transition={{ duration: 0.3 }}
-              style={
-                isLandscape
-                  ? {
-                      paddingTop: "1px",
-                      paddingBottom: "1px",
-                      paddingLeft: "4px",
-                      paddingRight: "4px",
-                      fontSize: "0.4rem",
-                    }
-                  : {}
-              }
-            >
-              👤 ${playerBet}
-            </motion.span>
-            <motion.span
-              className="game-table-bet game-table-bet-cpu"
-              key={`cpu-bet-${cpuBet}`}
-              initial={{ scale: 1 }}
-              animate={{ scale: cpuBet > 0 ? [1, 1.1, 1] : 1 }}
-              transition={{ duration: 0.3 }}
-              style={
-                isLandscape
-                  ? {
-                      paddingTop: "1px",
-                      paddingBottom: "1px",
-                      paddingLeft: "4px",
-                      paddingRight: "4px",
-                      fontSize: "0.4rem",
-                    }
-                  : {}
-              }
-            >
-              🤖 ${cpuBet}
-            </motion.span>
-            {currentBet > 0 && (
-              <span
-                className="game-table-current-bet"
-                style={
-                  isLandscape
-                    ? {
-                        fontSize: "0.4rem",
-                        paddingTop: "1px",
-                        paddingBottom: "1px",
-                        paddingLeft: "4px",
-                        paddingRight: "4px",
-                      }
-                    : {}
-                }
-              >
-                📊 Aposta: ${currentBet}
-              </span>
-            )}
           </div>
         </div>
 
