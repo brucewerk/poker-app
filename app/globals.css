@@ -2831,11 +2831,33 @@ body {
   }
 }
 
-/* 🔥 FORÇA TAMANHO DAS CARTAS VIA CARD COMPONENT */
+/* 🔥 FORÇA TAMANHO DAS CARTAS VIA CARD COMPONENT
+   Antes esta classe existia mas o componente Card.jsx nunca a aplicava —
+   por isso as cartas (principalmente as "large" da mesa) renderizavam no
+   tamanho fixo de desktop (74px) em qualquer tela. Agora o Card.jsx usa
+   `card-container card-size-<tiny|small|normal|large>` e cada variante
+   escala proporcionalmente à variável --card-width já responsiva acima,
+   então TODOS os breakpoints (retrato, paisagem, telas pequenas) passam
+   a valer automaticamente para as cartas também. */
 .card-container {
   width: var(--card-width, 52px) !important;
   height: var(--card-height, 74px) !important;
   flex-shrink: 0 !important;
+}
+
+.card-container.card-size-tiny {
+  width: calc(var(--card-width, 52px) * 0.62) !important;
+  height: calc(var(--card-height, 74px) * 0.62) !important;
+}
+
+.card-container.card-size-small {
+  width: calc(var(--card-width, 52px) * 0.82) !important;
+  height: calc(var(--card-height, 74px) * 0.82) !important;
+}
+
+.card-container.card-size-large {
+  width: calc(var(--card-width, 52px) * 1.18) !important;
+  height: calc(var(--card-height, 74px) * 1.18) !important;
 }
 
 .card-container .card-rank {

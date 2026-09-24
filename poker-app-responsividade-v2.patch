@@ -1,8 +1,45 @@
 diff --git a/app/globals.css b/app/globals.css
-index f99cf29..87e5153 100644
+index f99cf29..6f4a109 100644
 --- a/app/globals.css
 +++ b/app/globals.css
-@@ -3034,3 +3034,206 @@ canvas {
+@@ -2831,13 +2831,35 @@ body {
+   }
+ }
+ 
+-/* 🔥 FORÇA TAMANHO DAS CARTAS VIA CARD COMPONENT */
++/* 🔥 FORÇA TAMANHO DAS CARTAS VIA CARD COMPONENT
++   Antes esta classe existia mas o componente Card.jsx nunca a aplicava —
++   por isso as cartas (principalmente as "large" da mesa) renderizavam no
++   tamanho fixo de desktop (74px) em qualquer tela. Agora o Card.jsx usa
++   `card-container card-size-<tiny|small|normal|large>` e cada variante
++   escala proporcionalmente à variável --card-width já responsiva acima,
++   então TODOS os breakpoints (retrato, paisagem, telas pequenas) passam
++   a valer automaticamente para as cartas também. */
+ .card-container {
+   width: var(--card-width, 52px) !important;
+   height: var(--card-height, 74px) !important;
+   flex-shrink: 0 !important;
+ }
+ 
++.card-container.card-size-tiny {
++  width: calc(var(--card-width, 52px) * 0.62) !important;
++  height: calc(var(--card-height, 74px) * 0.62) !important;
++}
++
++.card-container.card-size-small {
++  width: calc(var(--card-width, 52px) * 0.82) !important;
++  height: calc(var(--card-height, 74px) * 0.82) !important;
++}
++
++.card-container.card-size-large {
++  width: calc(var(--card-width, 52px) * 1.18) !important;
++  height: calc(var(--card-height, 74px) * 1.18) !important;
++}
++
+ .card-container .card-rank {
+   font-size: calc(var(--card-width, 52px) * 0.3) !important;
+ }
+@@ -3034,3 +3056,206 @@ canvas {
      opacity: 0.85;
    }
  }
@@ -292,6 +329,73 @@ index 7a68a8c..03f0e8f 100644
                  {g && (
                    <StatsPanel
                      username={currentUser}
+diff --git a/components/Poker/Card.jsx b/components/Poker/Card.jsx
+index 910b746..f99a414 100644
+--- a/components/Poker/Card.jsx
++++ b/components/Poker/Card.jsx
+@@ -168,6 +168,14 @@ const Card = memo(function Card({
+   const pipPositions = PIP_LAYOUTS[rankRaw];
+ 
+   const sizeMap = {
++    tiny: {
++      width: 34,
++      height: 48,
++      indexFont: "0.48rem",
++      indexSuit: 6,
++      pipSize: 6,
++      centerSuit: 14,
++    },
+     small: {
+       width: 50,
+       height: 70,
+@@ -206,6 +214,7 @@ const Card = memo(function Card({
+ 
+     return (
+       <motion.div
++        className={`card-container card-size-${size}`}
+         initial={{ opacity: 0, scale: 0.8, y: -20 }}
+         animate={{ opacity: 1, scale: 1, y: 0, rotateY: isFlipping ? [0, 90, 0] : 0 }}
+         transition={{
+@@ -265,6 +274,7 @@ const Card = memo(function Card({
+ 
+   return (
+     <motion.div
++      className={`card-container card-size-${size}`}
+       initial={{ opacity: 0, scale: 0.8, y: -20, rotateY: isRevealing ? -90 : 0 }}
+       animate={{
+         opacity: 1,
+diff --git a/components/Poker/FriendsList.jsx b/components/Poker/FriendsList.jsx
+index a6bfc50..224f6ba 100644
+--- a/components/Poker/FriendsList.jsx
++++ b/components/Poker/FriendsList.jsx
+@@ -2412,6 +2412,13 @@ export default function FriendsList({
+           border: "1px solid var(--border-gold)",
+           transition: "var(--transition-theme)",
+           overflow: "hidden",
++          // 🔥 Sem isso, dentro de uma coluna flex (a barra lateral) este
++          // card era o único painel sem "flexShrink: 0" + overflow:hidden
++          // juntos — o que zera a altura mínima automática do item flex e
++          // deixa o navegador espremê-lo quando falta espaço, diferente
++          // dos outros painéis (StatsPanel, LevelDisplay, etc).
++          flexShrink: 0,
++          width: "100%",
+         }}
+       >
+         <h3
+@@ -2463,6 +2470,13 @@ export default function FriendsList({
+           border: "1px solid var(--border-gold)",
+           transition: "var(--transition-theme)",
+           overflow: "hidden",
++          // 🔥 Sem isso, dentro de uma coluna flex (a barra lateral) este
++          // card era o único painel sem "flexShrink: 0" + overflow:hidden
++          // juntos — o que zera a altura mínima automática do item flex e
++          // deixa o navegador espremê-lo quando falta espaço, diferente
++          // dos outros painéis (StatsPanel, LevelDisplay, etc).
++          flexShrink: 0,
++          width: "100%",
+         }}
+       >
+         <div
 diff --git a/components/Poker/GameTable.jsx b/components/Poker/GameTable.jsx
 index b491712..88ec201 100644
 --- a/components/Poker/GameTable.jsx

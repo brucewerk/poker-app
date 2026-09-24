@@ -168,6 +168,14 @@ const Card = memo(function Card({
   const pipPositions = PIP_LAYOUTS[rankRaw];
 
   const sizeMap = {
+    tiny: {
+      width: 34,
+      height: 48,
+      indexFont: "0.48rem",
+      indexSuit: 6,
+      pipSize: 6,
+      centerSuit: 14,
+    },
     small: {
       width: 50,
       height: 70,
@@ -206,6 +214,7 @@ const Card = memo(function Card({
 
     return (
       <motion.div
+        className={`card-container card-size-${size}`}
         initial={{ opacity: 0, scale: 0.8, y: -20 }}
         animate={{ opacity: 1, scale: 1, y: 0, rotateY: isFlipping ? [0, 90, 0] : 0 }}
         transition={{
@@ -265,6 +274,7 @@ const Card = memo(function Card({
 
   return (
     <motion.div
+      className={`card-container card-size-${size}`}
       initial={{ opacity: 0, scale: 0.8, y: -20, rotateY: isRevealing ? -90 : 0 }}
       animate={{
         opacity: 1,

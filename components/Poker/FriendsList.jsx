@@ -2412,6 +2412,13 @@ export default function FriendsList({
           border: "1px solid var(--border-gold)",
           transition: "var(--transition-theme)",
           overflow: "hidden",
+          // 🔥 Sem isso, dentro de uma coluna flex (a barra lateral) este
+          // card era o único painel sem "flexShrink: 0" + overflow:hidden
+          // juntos — o que zera a altura mínima automática do item flex e
+          // deixa o navegador espremê-lo quando falta espaço, diferente
+          // dos outros painéis (StatsPanel, LevelDisplay, etc).
+          flexShrink: 0,
+          width: "100%",
         }}
       >
         <h3
@@ -2463,6 +2470,13 @@ export default function FriendsList({
           border: "1px solid var(--border-gold)",
           transition: "var(--transition-theme)",
           overflow: "hidden",
+          // 🔥 Sem isso, dentro de uma coluna flex (a barra lateral) este
+          // card era o único painel sem "flexShrink: 0" + overflow:hidden
+          // juntos — o que zera a altura mínima automática do item flex e
+          // deixa o navegador espremê-lo quando falta espaço, diferente
+          // dos outros painéis (StatsPanel, LevelDisplay, etc).
+          flexShrink: 0,
+          width: "100%",
         }}
       >
         <div
