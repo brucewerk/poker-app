@@ -2440,7 +2440,10 @@ export default function PokerGame() {
               className="game-main-columns"
               style={{ display: "flex", gap: 15, flexWrap: "wrap" }}
             >
-              <div className="game-table-column" style={{ flex: 3, minWidth: 280 }}>
+              <div
+  className="game-table-column game-stage"
+  style={{ flex: 3, minWidth: 280 }}
+>
                 {g && (
                   <GameTable
                     communityCards={g?.community || []}

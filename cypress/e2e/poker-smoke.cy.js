@@ -9,13 +9,9 @@
  *  3. Verificar que os 5 botões de ação aparecem em uma única linha
  *  4. Verificar que a tela de jogo cabe em um celular em pé (sem rolagem
  *     na área da mesa + botões) — o requisito principal do BruCe
- *
- * NOTA IMPORTANTE:
- *  Os testes 4 (enquadra a mesa na viewport) e o de landscape
- *  (flexDirection === "row") estão marcados como `it.skip` porque
- *  dependem do refactor do page.jsx (classe .game-stage) e do
- *  GameTable.jsx (cartas em linha). Serão reativados quando o
- *  layout novo for implementado.
+ *  5. Verificar que em paisagem a mesa organiza CPU/comunitárias/jogador
+ *     em uma linha (classe .game-stage no page.jsx + flexDirection: row
+ *     no GameTable.jsx)
  */
 
 describe("Poker App - Smoke Test", () => {
@@ -59,8 +55,7 @@ describe("Poker App - Smoke Test", () => {
       });
     });
 
-    // ⏭️ SKIP TEMPORÁRIO: depende da classe .game-stage (refactor do page.jsx)
-    it.skip("enquadra a mesa + botões na viewport sem rolagem vertical", () => {
+    it("enquadra a mesa + botões na viewport sem rolagem vertical", () => {
       cy.login();
       cy.waitForTable();
       cy.assertGameStageFitsViewport();
@@ -84,8 +79,7 @@ describe("Poker App - Smoke Test", () => {
       cy.viewport(844, 390);
     });
 
-    // ⏭️ SKIP TEMPORÁRIO: depende do GameTable.jsx com flexDirection row
-    it.skip("renderiza a mesa em paisagem com cartas em uma linha", () => {
+    it("renderiza a mesa em paisagem com cartas em uma linha", () => {
       cy.login();
       cy.waitForTable();
       cy.get(".game-table-felt").should("be.visible");
