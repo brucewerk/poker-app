@@ -5,12 +5,13 @@ import { motion } from "framer-motion";
 import { useState, useEffect, memo } from "react";
 
 // ====================== ÍCONES DE NAIPE (SVG) ======================
+// `size` aceita número (px) OU string CSS (ex: "16cqw") — por isso width/height
+// vão dentro de `style`, não como atributo cru do SVG, garantindo que unidades
+// modernas (container query units) sejam interpretadas corretamente.
 function SuitIcon({ suit, size = 14, color }) {
   const common = {
-    width: size,
-    height: size,
     viewBox: "0 0 32 32",
-    style: { display: "block" },
+    style: { display: "block", width: size, height: size, flexShrink: 0 },
   };
 
   switch (suit) {
@@ -131,6 +132,31 @@ const PIP_LAYOUTS = {
 const FACE_LABEL = { 11: "J", 12: "Q", 13: "K", 14: "A" };
 const FACE_NAME = { 11: "Valete", 12: "Rainha", 13: "Rei", 14: "Ás" };
 
+// ======================================================================
+// 🔥 PROPORÇÕES DO CONTEÚDO INTERNO — em "cqw" (% da LARGURA REAL da
+// própria carta no momento, via CSS Container Query), e não em pixels
+// fixos calculados a partir de um "tamanho de referência" do JS.
+//
+// Antes, a caixa da carta encolhia via CSS (--card-width responsivo),
+// mas a fonte do índice, os ícones de naipe e a letra grande continuavam
+// no tamanho fixo do desktop — daí o naipe/letra vazando pra fora da
+// carta em telas pequenas. Com cqw, o conteúdo SEMPRE acompanha o
+// tamanho real da caixa, não importa o breakpoint.
+//
+// `.card-container` tem `container-type: inline-size` (definido em
+// globals.css) para que "cqw" resolva contra a largura da própria carta.
+// ======================================================================
+const CQW_RATIOS = {
+  tiny: { indexFont: 21, indexSuit: 16, pipSize: 16, centerSuit: 40 },
+  small: { indexFont: 19, indexSuit: 15, pipSize: 17, centerSuit: 40 },
+  normal: { indexFont: 18, indexSuit: 14, pipSize: 15, centerSuit: 38 },
+  large: { indexFont: 17, indexSuit: 13, pipSize: 15, centerSuit: 39 },
+};
+// Letra grande central (Q/K/J) e símbolo do verso — sempre a mesma
+// proporção da largura da carta, em qualquer tamanho.
+const CENTER_RANK_CQW = 34;
+const BACK_SYMBOL_CQW = 38;
+
 const Card = memo(function Card({
   card,
   faceDown = false,
@@ -167,41 +193,16 @@ const Card = memo(function Card({
   const isAce = rankRaw === 14;
   const pipPositions = PIP_LAYOUTS[rankRaw];
 
-  const sizeMap = {
-    tiny: {
-      width: 34,
-      height: 48,
-      indexFont: "0.48rem",
-      indexSuit: 6,
-      pipSize: 6,
-      centerSuit: 14,
-    },
-    small: {
-      width: 50,
-      height: 70,
-      indexFont: "0.62rem",
-      indexSuit: 8,
-      pipSize: 9,
-      centerSuit: 20,
-    },
-    normal: {
-      width: 62,
-      height: 87,
-      indexFont: "0.72rem",
-      indexSuit: 9,
-      pipSize: 10,
-      centerSuit: 24,
-    },
-    large: {
-      width: 74,
-      height: 103,
-      indexFont: "0.82rem",
-      indexSuit: 10,
-      pipSize: 12,
-      centerSuit: 30,
-    },
-  };
-  const cfg = sizeMap[size] || sizeMap.normal;
+  const ratios = CQW_RATIOS[size] || CQW_RATIOS.normal;
+  // Tamanho "de projeto" da caixa (o tamanho REAL final vem do CSS via
+  // .card-container.card-size-<size>, que pode ser bem menor — isso aqui
+  // só serve de fallback caso o CSS não carregue por algum motivo).
+  const fallbackBox = {
+    tiny: { width: 34, height: 48 },
+    small: { width: 50, height: 70 },
+    normal: { width: 62, height: 87 },
+    large: { width: 74, height: 103 },
+  }[size] || { width: 62, height: 87 };
 
   // ====================== VERSO DA CARTA ======================
   if (faceDown) {
@@ -226,8 +227,8 @@ const Card = memo(function Card({
         }}
         style={{
           display: "inline-flex",
-          width: cfg.width,
-          height: cfg.height,
+          width: fallbackBox.width,
+          height: fallbackBox.height,
           margin: "2px",
           borderRadius: 8,
           flexShrink: 0,
@@ -239,6 +240,7 @@ const Card = memo(function Card({
           boxShadow:
             "0 4px 14px rgba(0,0,0,0.35), inset 0 0 0 3px rgba(255,255,255,0.08)",
           overflow: "hidden",
+          containerType: "inline-size",
         }}
       >
         <div
@@ -255,7 +257,7 @@ const Card = memo(function Card({
         >
           <span
             style={{
-              fontSize: cfg.width * 0.38,
+              fontSize: `${BACK_SYMBOL_CQW}cqw`,
               opacity: isDarkTheme ? 0.55 : 0.4,
               filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
             }}
@@ -292,8 +294,8 @@ const Card = memo(function Card({
       style={{
         display: "inline-flex",
         flexDirection: "column",
-        width: cfg.width,
-        height: cfg.height,
+        width: fallbackBox.width,
+        height: fallbackBox.height,
         margin: "2px",
         borderRadius: 8,
         flexShrink: 0,
@@ -305,6 +307,8 @@ const Card = memo(function Card({
           : "0 4px 12px rgba(0,0,0,0.28), 0 1px 3px rgba(0,0,0,0.15)",
         transformStyle: "preserve-3d",
         transition: "box-shadow 0.25s ease",
+        overflow: "hidden",
+        containerType: "inline-size",
       }}
     >
       {/* Índice superior-esquerdo */}
@@ -320,10 +324,10 @@ const Card = memo(function Card({
           color: suitColor,
         }}
       >
-        <span style={{ fontSize: cfg.indexFont, fontWeight: 800 }}>
+        <span style={{ fontSize: `${ratios.indexFont}cqw`, fontWeight: 800 }}>
           {rankDisplay}
         </span>
-        <SuitIcon suit={card.suit} size={cfg.indexSuit} color={suitColor} />
+        <SuitIcon suit={card.suit} size={`${ratios.indexSuit}cqw`} color={suitColor} />
       </div>
 
       {/* Miolo da carta */}
@@ -337,7 +341,7 @@ const Card = memo(function Card({
         }}
       >
         {isAce && (
-          <SuitIcon suit={card.suit} size={cfg.centerSuit} color={suitColor} />
+          <SuitIcon suit={card.suit} size={`${ratios.centerSuit}cqw`} color={suitColor} />
         )}
 
         {isFaceCard && (
@@ -351,10 +355,14 @@ const Card = memo(function Card({
             }}
             title={FACE_NAME[rankRaw]}
           >
-            <SuitIcon suit={card.suit} size={cfg.centerSuit * 0.8} color={suitColor} />
+            <SuitIcon
+              suit={card.suit}
+              size={`${ratios.centerSuit * 0.8}cqw`}
+              color={suitColor}
+            />
             <span
               style={{
-                fontSize: cfg.width * 0.34,
+                fontSize: `${CENTER_RANK_CQW}cqw`,
                 fontWeight: 900,
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 letterSpacing: "-0.5px",
@@ -378,7 +386,7 @@ const Card = memo(function Card({
                   transform: `translate(-50%, -50%) ${y > 55 ? "rotate(180deg)" : ""}`,
                 }}
               >
-                <SuitIcon suit={card.suit} size={cfg.pipSize} color={suitColor} />
+                <SuitIcon suit={card.suit} size={`${ratios.pipSize}cqw`} color={suitColor} />
               </div>
             ))}
           </div>

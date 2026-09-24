@@ -2843,6 +2843,13 @@ body {
   width: var(--card-width, 52px) !important;
   height: var(--card-height, 74px) !important;
   flex-shrink: 0 !important;
+  /* 🔥 Container Query: permite que o conteúdo interno da carta (fonte do
+     índice, ícones de naipe, letra grande) seja dimensionado em "cqw"
+     (Card.jsx) relativo à largura REAL desta caixa, e não a um número
+     fixo do JS — é isso que corrige o naipe/letra vazando para fora da
+     carta quando ela encolhe em telas pequenas. */
+  container-type: inline-size !important;
+  overflow: hidden !important;
 }
 
 .card-container.card-size-tiny {
