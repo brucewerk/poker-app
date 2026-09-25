@@ -2863,19 +2863,17 @@ body {
 }
 
 .card-container.card-size-normal {
-  /* 🔥 Cartas do jogador: aumentadas — só 2 cartas nessa linha, então
-     sobra bastante largura para deixá-las bem maiores. */
-  width: calc(var(--card-width, 52px) * 1.6) !important;
-  height: calc(var(--card-height, 74px) * 1.6) !important;
+  /* 🔥 Cartas do jogador: aumentadas de novo (testado até não estourar
+     nem no menor aparelho comum — iPhone SE 375x667). */
+  width: calc(var(--card-width, 52px) * 1.8) !important;
+  height: calc(var(--card-height, 74px) * 1.8) !important;
 }
 
 .card-container.card-size-large {
-  /* 🔥 Cartas comunitárias: fator maior porque agora cada linha só
-     precisa caber 3 cartas (flop numa linha, turn+river na outra),
-     sobrando bem mais largura por carta do que quando eram 4 ou 5
-     numa fileira só. */
-  width: calc(var(--card-width, 52px) * 1.9) !important;
-  height: calc(var(--card-height, 74px) * 1.9) !important;
+  /* 🔥 Cartas comunitárias: idem — aumentadas mantendo folga no menor
+     aparelho testado. */
+  width: calc(var(--card-width, 52px) * 2.1) !important;
+  height: calc(var(--card-height, 74px) * 2.1) !important;
 }
 
 .card-container .card-rank {
@@ -3288,6 +3286,6 @@ canvas {
    fileiras pensadas para caber várias cartas lado a lado.
    ================================================================ */
 .game-table-river-row {
-  min-height: calc(var(--card-height, 74px) * 1.9 + 10px) !important;
+  min-height: calc(var(--card-height, 74px) * 2.1 + 10px) !important;
   margin-top: 6px !important;
 }
