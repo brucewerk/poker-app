@@ -548,7 +548,7 @@ const GameTable = memo(function GameTable({
           >
             {communityCards && communityCards.length > 0
               ? communityCards
-                  .slice(0, isLandscape ? 5 : 4)
+                  .slice(0, isLandscape ? 5 : 3)
                   .map((card, i) => (
                     <motion.div
                       key={`community-${i}-${card.rank}${card.suit}`}
@@ -568,7 +568,7 @@ const GameTable = memo(function GameTable({
                       />
                     </motion.div>
                   ))
-              : Array(isLandscape ? 5 : 4)
+              : Array(isLandscape ? 5 : 3)
                   .fill(0)
                   .map((_, i) => (
                     <div
@@ -587,47 +587,48 @@ const GameTable = memo(function GameTable({
                   ))}
           </div>
 
-          {/* River — linha própria só no retrato (no retrato sobra largura,
-              na paisagem o que falta é altura, então lá o river continua
-              junto dos outros, como antes) */}
+          {/* Turn + River — linha própria só no retrato (3 cartas na
+              primeira linha, 2 na segunda, para caber mais espaço por
+              carta; em paisagem o espaço apertado é vertical, então lá
+              as 5 continuam numa linha só, como antes) */}
           {!isLandscape && (
             <div className="game-table-community-cards-row game-table-river-row">
-              {communityCards && communityCards.length > 4 ? (
-                (() => {
-                  const card = communityCards[4];
-                  return (
+              {communityCards && communityCards.length > 3
+                ? communityCards.slice(3, 5).map((card, i) => (
                     <motion.div
-                      key={`community-4-${card.rank}${card.suit}`}
+                      key={`community-${3 + i}-${card.rank}${card.suit}`}
                       initial={{ opacity: 0, scale: 0.8, y: -20 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       transition={{
-                        delay: 4 * 0.15,
+                        delay: (3 + i) * 0.15,
                         type: "spring",
                         stiffness: 300,
                       }}
                     >
                       <Card
                         card={card}
-                        delay={4 * 100}
+                        delay={(3 + i) * 100}
                         size="large"
                         isHighlighted={stage === "showdown"}
                       />
                     </motion.div>
-                  );
-                })()
-              ) : (
-                <div
-                  className="game-table-empty-card"
-                  style={emptyCardSlotStyle()}
-                />
-              )}
+                  ))
+                : Array(2)
+                    .fill(0)
+                    .map((_, i) => (
+                      <div
+                        key={`empty-turn-river-${i}`}
+                        className="game-table-empty-card"
+                        style={emptyCardSlotStyle()}
+                      />
+                    ))}
             </div>
           )}
 
           {/* Área do pote */}
           <div
             className="game-table-pot-area"
-            style={isLandscape ? { marginTop: "2px" } : {}}
+            style={isLandscape ? { marginTop: "2px" } : { marginTop: "4px" }}
           >
             <motion.div
               key={`pot-${potAnimationKey}`}
@@ -865,19 +866,19 @@ function emptyCardSlotStyle() {
 function potDisplayStyle() {
   return {
     color: "var(--text-white)",
-    fontSize: "1rem",
+    fontSize: "0.8rem",
     fontWeight: "bold",
     background: "var(--bg-pot)",
-    paddingTop: "8px",
-    paddingBottom: "8px",
-    paddingLeft: "20px",
-    paddingRight: "20px",
-    borderRadius: 20,
+    paddingTop: "5px",
+    paddingBottom: "5px",
+    paddingLeft: "14px",
+    paddingRight: "14px",
+    borderRadius: 16,
     display: "inline-block",
     position: "relative",
     border: "1px solid var(--border-gold)",
     backdropFilter: "blur(4px)",
-    minWidth: "120px",
+    minWidth: "100px",
     textAlign: "center",
     boxShadow: "0 2px 8px var(--shadow-element)",
     transition: "var(--transition-theme)",

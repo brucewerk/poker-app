@@ -2863,16 +2863,19 @@ body {
 }
 
 .card-container.card-size-normal {
-  width: calc(var(--card-width, 52px) * 1.15) !important;
-  height: calc(var(--card-height, 74px) * 1.15) !important;
+  /* 🔥 Cartas do jogador: aumentadas — só 2 cartas nessa linha, então
+     sobra bastante largura para deixá-las bem maiores. */
+  width: calc(var(--card-width, 52px) * 1.6) !important;
+  height: calc(var(--card-height, 74px) * 1.6) !important;
 }
 
 .card-container.card-size-large {
-  /* 🔥 Cartas comunitárias: fator maior porque agora a linha de cartas
-     só precisa caber 4 cartas (o river ganhou linha própria), sobrando
-     bem mais largura por carta do que quando eram 5 numa fileira só. */
-  width: calc(var(--card-width, 52px) * 1.6) !important;
-  height: calc(var(--card-height, 74px) * 1.6) !important;
+  /* 🔥 Cartas comunitárias: fator maior porque agora cada linha só
+     precisa caber 3 cartas (flop numa linha, turn+river na outra),
+     sobrando bem mais largura por carta do que quando eram 4 ou 5
+     numa fileira só. */
+  width: calc(var(--card-width, 52px) * 1.9) !important;
+  height: calc(var(--card-height, 74px) * 1.9) !important;
 }
 
 .card-container .card-rank {
@@ -3276,16 +3279,15 @@ canvas {
 }
 
 /* ================================================================
-   🔥 LINHA DO RIVER (5ª carta comunitária) EM LINHA PRÓPRIA
+   🔥 SEGUNDA LINHA DE CARTAS COMUNITÁRIAS (turn + river)
    ------------------------------------------------------------------
-   O river ganhou uma linha só para ele (pedido do BruCe) para que as
-   4 primeiras cartas (flop + turn) não precisem dividir espaço com
-   uma 5ª carta na mesma fileira — sobra mais largura por carta.
-   A altura mínima aqui acompanha --card-height (responsivo) para não
-   duplicar o "chão" alto das fileiras normais, que foi pensado para
-   caber várias cartas lado a lado.
+   A mesa ganhou uma segunda linha (pedido do BruCe) para que a
+   primeira linha só precise caber 3 cartas (flop) em vez de 4 ou 5 —
+   sobra mais largura por carta. A altura mínima aqui acompanha
+   --card-height (responsivo) para não duplicar o "chão" alto das
+   fileiras pensadas para caber várias cartas lado a lado.
    ================================================================ */
 .game-table-river-row {
-  min-height: calc(var(--card-height, 74px) * 1.6 + 10px) !important;
+  min-height: calc(var(--card-height, 74px) * 1.9 + 10px) !important;
   margin-top: 6px !important;
 }
